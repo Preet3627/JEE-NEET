@@ -1,0 +1,162 @@
+# Universal Data Documentation for AI Agents (JEE Scheduler Pro)
+# Version: 12.0.0 (Flashcard Generation)
+
+## 1. Core Concept: The Internal Knowledge Base
+The AI now operates with a comprehensive, built-in library for Physics, Chemistry, and Maths. All academic content generation (tips, flashcards, MCQs, explanations) **must be sourced from this internal knowledge base**. This ensures accuracy and consistency.
+
+**How to Interact:**
+- When a user asks for academic content, frame your request to the AI by referencing its library.
+- **Example:** "Generate 5 MCQs from the 'Rotational Motion' section of your library."
+- **Example:** "Explain 'Hybridization' using your internal knowledge base."
+- **Example:** "Create a flashcard deck for 'Trigonometric Identities' based on your library content."
+
+---
+## 2. Advanced Text Formatting
+To ensure formulas and chemical equations are rendered correctly, use the following formatting in any `title` or `detail` string:
+
+| Notation | Format | Example Input | Renders As |
+|---|---|---|---|
+| **Subscript** | `_{...}` or `_` | `H_2O`, `C_6H_{12}O_6` | H₂O, C₆H₁₂O₆ |
+| **Superscript**| `^{...}` or `^` | `x^2`, `Fe^{2+}` | x², Fe²⁺ |
+| **Logarithm** | `log_{b}(x)` | `log_{10}(100)` | log₁₀(100) |
+| **Square Root**| `sqrt(...)` | `sqrt(b^2 - 4ac)` | sqrt(b² - 4ac) |
+
+---
+## 3. Output Formats: Deep Link vs. JSON Block
+
+### A. Deep Links (for Quick, Single Actions)
+- **Use Case:** Creating a *single* task, logging a *single* score.
+- **URL Structure:** `https://jee.ponsrischool.in/?action={ACTION_TYPE}&data={URL_ENCODED_JSON}`
+  - `{ACTION_TYPE}`: `new_schedule`, `log_score`, `create_homework`, `flashcard_review`.
+  - `{URL_ENCODED_JSON}`: A URL-encoded JSON object for one task (see schema below).
+
+**Deep Link `data` object schema:**
+| Key | Type | Description |
+|---|---|---|
+| `subject` | string | `Physics`, `Chemistry`, `Math`. |
+| `topic` | string | Specific chapter or concept. |
+| `date` | string | `YYYY-MM-DD`. |
+| `time` | string | **For `new_schedule` & `flashcard_review`**. `HH:MM` format. |
+| `details`| string | Notes for the task. |
+| `score` | number | **For `log_score`**. |
+| `max_score`| number | **For `log_score`**. |
+
+### B. JSON Code Block (for Large, Complex, or Specific Generation)
+- **Use Case:** Batch imports (schedules, exams), or generating a **Practice Test**, **Flashcard Deck**, or **Full Homework Assignment**.
+- **Format:** Your entire response **MUST** be a single, raw JSON object inside a markdown code block.
+
+---
+## 4. Full JSON Schema (for Code Blocks)
+Your entire output must be a single JSON object with these top-level keys. Provide empty arrays `[]` or `null` for types not present.
+- `schedules`: Array of schedule items.
+- `exams`: Array of exam items.
+- `metrics`: Array of results or weaknesses.
+- `practice_test`: Object for a practice test, or `null`.
+- `flashcard_deck`: Object for a new flashcard deck, or `null`.
+- `homework_assignment`: Object for a full homework assignment, or `null`.
+
+### `schedules` Object Schema
+| Key | Type | Description |
+|---|---|---|
+| `id` | string | Unique ID (e.g., "A101"). |
+| `type` | string | `"ACTION"` or `"HOMEWORK"`. |
+| `day` | string | Full day name, e.g., `"MONDAY"`. |
+| `date` | string | Optional `YYYY-MM-DD` for one-off tasks. |
+| `title` | string | Task title. Use advanced formatting. |
+| `detail`| string | Description. Use advanced formatting. |
+| `subject`| string| `"PHYSICS"`, `"CHEMISTRY"`, `"MATHS"`. |
+| `q_ranges`| string | **For `HOMEWORK`**. E.g., `"1-15; 20-25"`. |
+| `answers`| string | Stringified JSON, e.g., `"{\"1\":\"A\", \"2\":\"C\"}"`. |
+
+### `flashcard_deck` Object Schema
+| Key | Type | Description |
+|---|---|---|
+| `name`| string | Name of the new deck. |
+| `subject` | string | `"PHYSICS"`, `"CHEMISTRY"`, `"MATHS"`. |
+| `chapter` | string | Optional: Chapter name for organization. |
+| `cards` | array | Array of flashcard objects (`{ "front": string, "back": string }`). |
+
+### `practice_test` or `homework_assignment` Object Schema
+| Key | Type | Description |
+|---|---|---|
+| `questions`| array | Array of question objects. |
+| `answers` | string | Stringified JSON of question number to correct answer. |
+| `solutions`| string | **For `homework_assignment`**. Stringified JSON of question number to detailed solution. |
+
+**Question Object Schema (inside `questions` array):**
+| Key | Type | Description |
+|---|---|---|
+| `number` | integer| Question number, starting from 1. |
+| `text` | string | Full question text. Use advanced formatting. |
+| `options`| array | For `MCQ`, array of 4 strings. For `NUM`, `[]`. |
+| `type` | string | `"MCQ"` or `"NUM"`. |
+
+**NCERT-Specific Requests:**
+If a user asks for homework from an NCERT textbook (e.g., "schedule NCERT Physics chapter 2, questions 1 to 5"), you must generate a `homework_assignment` using your internal knowledge base to find the question text, answers, and solutions.
+
+---
+## 5. Generating Flashcard Decks
+To create a flashcard deck, provide a JSON object with the `flashcard_deck` key.
+
+**Example Request:** "Create flashcards for Physics chapter on Thermodynamics"
+
+**Example JSON Output:**
+```json
+{
+  "schedules": [],
+  "exams": [],
+  "metrics": [],
+  "practice_test": null,
+  "flashcard_deck": {
+    "name": "Thermodynamics Basics",
+    "subject": "PHYSICS",
+    "chapter": "Thermodynamics",
+    "cards": [
+      {
+        "front": "What is the First Law of Thermodynamics?",
+        "back": "The change in internal energy of a system is equal to the heat added to the system minus the work done by the system (ΔU = q + w)."
+      },
+      {
+        "front": "What is Enthalpy (ΔH)?",
+        "back": "Enthalpy is the heat change of a reaction at constant pressure. A negative ΔH indicates an exothermic reaction."
+      }
+    ]
+  },
+  "homework_assignment": null
+}
+```
+---
+## 6. Scientific Symbols & Diagrams
+
+### A. Symbols
+You can render common scientific and mathematical symbols using LaTeX-like commands in any text field.
+
+| Command    | Renders As |
+|------------|------------|
+| `\Sigma`   | Σ          |
+| `\pi`      | π          |
+| `\phi`     | φ          |
+| `\theta`   | θ          |
+| `\alpha`   | α          |
+| `\beta`    | β          |
+| `\gamma`   | γ          |
+| `\delta`   | δ          |
+| `\Delta`   | Δ          |
+
+### B. Diagrams
+The system **cannot render image-based diagrams** directly from your JSON output. However, you can create textual descriptions or ASCII art to represent diagrams, which will be rendered in a pre-formatted block.
+
+**Example for a Free Body Diagram:**
+"Create a textual diagram for a block on an inclined plane. Show the normal force (N) perpendicular to the surface, gravity (mg) pointing straight down, and friction (f) pointing up the incline."
+
+Your response inside a `detail` field could be:
+\`\`\`
+      /N
+     /
+    /
+   /______
+  / \      \
+ /   \ mg    \
+/_____\_______\
+   f
+\`\`\`

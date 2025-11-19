@@ -1,11 +1,57 @@
-<div align="center">
+# JEE Scheduler Pro - Full Stack Edition
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+This is a secure, multilingual (EN/GU), full-stack Student Management System (SMS) PWA tailored for JEE preparation. It features a robust Node.js backend with a MySQL database and a modern React frontend.
 
-  <h1>Built with AI Studio</h2>
+## Features
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+- **Full-Stack Architecture:** A secure Node.js/Express backend handles all data, authentication, and business logic, communicating with a MySQL database.
+- **Role-Based Dashboards:** Separate, secure dashboards for Students and Admins, powered by live data from the backend.
+- **PWA with Offline Sync:** As an installable PWA, the app caches data for offline viewing. Any changes made offline are queued and automatically synced with the server upon reconnection.
+- **Google Integration:** Seamless Google Sign-In/Sign-Up, with features for backing up data to Google Drive and syncing schedules with Google Calendar.
+- **Admin Broadcast:** Administrators can create and broadcast tasks (schedules, homework) to all students simultaneously, with PWA notifications for users.
+- **Community Hub:** A collaborative forum where students can post questions and solutions, with support for image uploads.
+- **AI-Powered Imports:** Leverage the Gemini API to parse schedules from unstructured text or timetable images directly into the app.
+- **Secure & Configurable:** All sensitive keys and credentials are managed on the backend via environment variables, ensuring the frontend code is secure. User data is encrypted at rest.
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## Tech Stack
 
-</div>
+- **Frontend:** React, Vite, TypeScript, Tailwind CSS
+- **Backend:** Node.js, Express.js
+- **Database:** MySQL
+- **Authentication:** JWT (JSON Web Tokens), Google OAuth2
+
+## Project Setup (Local Development)
+
+1.  **Clone the repository.**
+2.  **Setup Database:** Import the provided SQL schema into your MySQL database.
+3.  **Configure Environment:** Create a `.env` file in the project root. You can copy the contents from `public/.env.example.txt` and fill in your actual database credentials and secret strings.
+4.  **Install Dependencies:**
+    ```bash
+    npm install
+    ```
+5.  **Run in Development Mode:**
+    This command starts both the backend and frontend servers concurrently with hot-reloading.
+    ```bash
+    npm run dev
+    ```
+
+## Deployment to Vercel
+
+This project is configured for seamless deployment on Vercel.
+
+1.  **Push to GitHub:** Ensure your project is pushed to a GitHub repository.
+2.  **Create Vercel Project:** Import your GitHub repository into Vercel.
+3.  **Build & Development Settings:** Vercel should automatically detect the Vite frontend and use the following settings. You typically don't need to change these.
+    - **Framework Preset:** `Vite`
+    - **Build Command:** `npm run build` or `vite build`
+    - **Output Directory:** `dist`
+    - **Install Command:** `npm install`
+4.  **Configure Environment Variables:** This is the most important step. In your Vercel project's settings, go to the "Environment Variables" section and add the following secrets:
+    - `DB_HOST`: Your MySQL database host.
+    - `DB_USER`: Your MySQL database username.
+    - `DB_PASSWORD`: Your MySQL database password.
+    - `DB_NAME`: Your MySQL database name.
+    - `JWT_SECRET`: A long, random, secure string for signing tokens.
+    - `ENCRYPTION_KEY`: A secure, random 32-character string for data encryption. **Do not change this after setting it.**
+
+5.  **Deploy:** Trigger a new deployment from the Vercel dashboard. Vercel will build the frontend and set up the `api/index.js` file as a Serverless Function to handle all `/api` requests.

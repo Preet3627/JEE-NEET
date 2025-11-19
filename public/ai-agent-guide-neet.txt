@@ -1,0 +1,107 @@
+# Universal Data Documentation for AI Agents (NEET Scheduler Pro)
+# Version: 13.0.0 (Rich Text & Homework Rule)
+
+## 1. Core Concept: The Internal Knowledge Base
+The AI now operates with a comprehensive, built-in library for Physics, Chemistry, and Biology (Botany & Zoology). All academic content generation (tips, flashcards, MCQs, explanations) **must be sourced from this internal knowledge base**. This ensures accuracy and consistency for the NEET curriculum.
+
+**How to Interact:**
+- When a user asks for academic content, frame your request to the AI by referencing its library.
+- **Example:** "Generate 5 MCQs from the 'Plant Kingdom' section of your Biology library."
+- **Example:** "Explain 'Hybridization' using your internal chemistry knowledge base."
+- **Example:** "Create a flashcard deck for 'Human Reproduction' based on your library content."
+
+---
+## 2. Advanced Text Formatting
+To ensure formulas and chemical equations are rendered correctly, use the following formatting in any `title` or `detail` string:
+
+| Notation | Format | Example Input | Renders As |
+|---|---|---|---|
+| **Bold** | `**text**` | `**Important Formula**` | **Important Formula** |
+| **Italics** | `*text*` | `*definition*` | *definition* |
+| **Font Size** | `[size=16]text[/size]` | `[size=18]Main Point[/size]` | Main Point (larger) |
+| **Subscript** | `_{...}` or `_` | `H_2O`, `C_6H_{12}O_6` | H₂O, C₆H₁₂O₆ |
+| **Superscript**| `^{...}` or `^` | `x^2`, `Fe^{2+}` | x², Fe²⁺ |
+| **Logarithm** | `log_{b}(x)` | `log_{10}(100)` | log₁₀(100) |
+| **Square Root**| `sqrt(...)` | `sqrt(b^2 - 4ac)` | sqrt(b² - 4ac) |
+
+---
+## 3. Custom Widgets
+You can instruct the AI to generate content for a custom widget on the dashboard. This is useful for creating quick reference panels, notes, or lists. The output should be a simple title and markdown-compatible content.
+
+**Example Request:** "Create a custom widget summarizing the key differences between Mitosis and Meiosis."
+
+**Example JSON Output:**
+```json
+{
+  "custom_widget": {
+    "title": "Mitosis vs. Meiosis",
+    "content": "* **Mitosis:** Somatic cells, 1 division, 2 diploid (2n) daughter cells.\n* **Meiosis:** Germ cells, 2 divisions, 4 haploid (n) daughter cells."
+  }
+}
+```
+
+---
+## 4. Full JSON Schema (for Code Blocks)
+Your entire output must be a single JSON object with these top-level keys. Provide empty arrays `[]` or `null` for types not present.
+- `schedules`: Array of schedule items.
+- `exams`: Array of exam items.
+- `metrics`: Array of results or weaknesses.
+- `practice_test`: Object for a practice test, or `null`.
+- `flashcard_deck`: Object for a new flashcard deck, or `null`.
+- `homework_assignment`: Object for a full homework assignment, or `null`.
+
+### `schedules` Object Schema
+| Key | Type | Description |
+|---|---|---|
+| `id` | string | Unique ID (e.g., "A101"). |
+| `type` | string | `"ACTION"` or `"HOMEWORK"`. **Rule:** If the user requests 'PYQs', 'questions', or 'problems', you **MUST** use `HOMEWORK`. |
+| `day` | string | Full day name, e.g., `"MONDAY"`. |
+| `date` | string | Optional `YYYY-MM-DD` for one-off tasks. |
+| `time` | string | Optional for `HOMEWORK`. `HH:MM` format. |
+| `title` | string | Task title. Use advanced formatting. |
+| `detail`| string | Description. Use advanced formatting. |
+| `subject`| string| `"PHYSICS"`, `"CHEMISTRY"`, `"BIOLOGY"`. |
+| `category`| string| **For `HOMEWORK`**. `Level-1`, `Level-2`, `PYQ`, etc. |
+| `q_ranges`| string | **For `HOMEWORK`**. E.g., `"1-15; 20-25"`. |
+| `answers`| string | **For `HOMEWORK`**. Stringified JSON, e.g., `"{\"1\":\"A\", \"2\":\"C\"}"`. |
+
+### `flashcard_deck` Object Schema
+| Key | Type | Description |
+|---|---|---|
+| `name`| string | Name of the new deck. |
+| `subject` | string | `"PHYSICS"`, `"CHEMISTRY"`, `"BIOLOGY"`. |
+| `chapter` | string | Optional: Chapter name for organization. |
+| `cards` | array | Array of flashcard objects (`{ "front": string, "back": string }`). |
+
+### `practice_test` or `homework_assignment` Object Schema
+| Key | Type | Description |
+|---|---|---|
+| `questions`| array | Array of question objects. |
+| `answers` | string | Stringified JSON of question number to correct answer. |
+| `solutions`| string | **For `homework_assignment` (Optional)**. Stringified JSON of question number to detailed solution. |
+
+**Question Object Schema (inside `questions` array):**
+| Key | Type | Description |
+|---|---|---|
+| `number` | integer| Question number, starting from 1. |
+| `text` | string | Full question text. Use advanced formatting. |
+| `options`| array | For `MCQ`, array of 4 strings. For `NUM`, `[]`. |
+| `type` | string | `"MCQ"` or `"NUM"`. |
+
+---
+## 5. Scientific Symbols & Diagrams
+You can render common scientific and mathematical symbols using LaTeX-like commands in any text field.
+
+| Command    | Renders As |
+|------------|------------|
+| `\Sigma`   | Σ          |
+| `\pi`      | π          |
+| `\phi`     | φ          |
+| `\theta`   | θ          |
+| `\alpha`   | α          |
+| `\beta`    | β          |
+| `\gamma`   | γ          |
+| `\delta`   | δ          |
+| `\Delta`   | Δ          |
+
+**Diagrams:** The system **cannot render image-based diagrams**. However, you can create textual descriptions or ASCII art to represent diagrams (e.g., Punnett squares, floral diagrams), which will be rendered in a pre-formatted block.
