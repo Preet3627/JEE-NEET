@@ -14,7 +14,6 @@ interface RegistrationScreenProps {
 
 const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onSwitchToLogin, backendStatus, initialEmail, onVerificationSuccess, googleClientId }) => {
     const { googleLogin, loginWithToken } = useAuth();
-    // Simplified state: direct form submission, no verification step
     const [formData, setFormData] = useState({ fullName: '', sid: '', email: initialEmail || '', password: '' });
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -59,7 +58,6 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onSwitchToLogin
         setIsLoading(true);
         try {
             const data = await api.register(formData);
-            // Direct login with the returned token, skipping verification
             if (data.token) { 
                  loginWithToken(data.token);
                  onVerificationSuccess();

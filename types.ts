@@ -1,4 +1,5 @@
 
+
 export type Language = 'EN' | 'GU';
 
 export interface LocalizedString {

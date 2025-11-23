@@ -15,7 +15,6 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
     const { playTrack, currentTrack, isPlaying, play, pause, updateTrackMetadata, djDropSettings, setDjDropSettings, playDjDrop, playlists, createPlaylist, addToPlaylist } = useMusicPlayer();
     const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState({ title: '', artist: '' });
-    const [newPlaylistName, setNewPlaylistName] = useState('');
     const dropInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -62,7 +61,6 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
             let playlist = playlists.find(p => p.name.toLowerCase() === playlistName.toLowerCase());
             if (!playlist) {
                 createPlaylist(playlistName);
-                // Wait for state update in real app, here simplistic sync
                 setTimeout(() => {
                     const newPl = playlists.find(p => p.name === playlistName); 
                     if(newPl) addToPlaylist(newPl.id, track);
@@ -89,7 +87,6 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
 
     const filteredTracks = tracks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    // Grouping Logic
     const genres = tracks.reduce((acc, track) => {
         const g = track.genre || 'Unclassified';
         if (!acc[g]) acc[g] = [];

@@ -28,7 +28,6 @@ interface SettingsModalProps {
 const SettingsModal: React.FC<SettingsModalProps> = (props) => {
   const { settings, decks, driveLastSync, isCalendarSyncEnabled, calendarLastSync, onClose, onSave, onExportToIcs, googleAuthStatus, onGoogleSignIn, onGoogleSignOut, onBackupToDrive, onRestoreFromDrive, onApiKeySet, onOpenAssistantGuide, onOpenAiGuide, onClearAllSchedule, onToggleEditLayout } = props;
   
-  // Access context to sync immediate visual changes
   const { setNotchSettings, setVisualizerSettings, notchSettings: currentNotch, visualizerSettings: currentVis } = useMusicPlayer();
 
   const [accentColor, setAccentColor] = useState(settings.accentColor || '#0891b2');
@@ -42,7 +41,6 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
   const [examType, setExamType] = useState(settings.examType || 'JEE');
   const [theme, setTheme] = useState(settings.theme || 'default');
   
-  // Notch & Vis State
   const [notchPos, setNotchPos] = useState<NotchSettings['position']>(currentNotch.position);
   const [notchSize, setNotchSize] = useState<NotchSettings['size']>(currentNotch.size);
   const [notchWidth, setNotchWidth] = useState<number>(currentNotch.width);
@@ -81,7 +79,6 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Update Contexts Immediately
     setNotchSettings({ position: notchPos, size: notchSize, width: notchWidth });
     setVisualizerSettings({ preset: visPreset, colorMode: visColor });
 
@@ -132,7 +129,6 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
         <div className="p-6 overflow-y-auto">
             <form onSubmit={handleSubmit} className="space-y-6">
             
-            {/* Music & Visuals */}
             <div>
                 <h3 className="text-base font-bold text-gray-300">Music Player & Visuals</h3>
                 <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 space-y-4">
@@ -180,7 +176,6 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
 
             <div className="border-t border-gray-700/50"></div>
 
-            {/* Dashboard Appearance */}
             <div className="space-y-4">
                 <h3 className="text-base font-bold text-gray-300">Appearance</h3>
                 <div className="bg-gray-900/50 p-3 rounded-lg border border-gray-700/50 space-y-3">
@@ -211,7 +206,6 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
 
             <div className="border-t border-gray-700/50"></div>
             
-            {/* Google & AI */}
             <div>
                 <h3 className="text-base font-bold text-gray-300 mb-2">Integrations</h3>
                 <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 space-y-4">

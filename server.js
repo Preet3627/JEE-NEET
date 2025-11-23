@@ -252,7 +252,7 @@ const getUserData = async (userId) => {
         const rawConfig = configRows[0].config;
         const decrypted = decrypt(rawConfig);
         
-        // Handle unencrypted JSON strings (e.g. from SQL insertions)
+        // Handle unencrypted JSON strings
         if (typeof decrypted === 'string') {
             try {
                 const parsed = JSON.parse(decrypted);
@@ -265,7 +265,7 @@ const getUserData = async (userId) => {
         }
     }
 
-    // Ensure settings exist to prevent frontend crash
+    // Ensure settings exist
     if (!config.settings) config.settings = {};
     if (!config.settings.accentColor) config.settings.accentColor = '#0891b2';
     if (!config.settings.theme) config.settings.theme = 'default';
@@ -344,7 +344,6 @@ apiRouter.get('/config/public', (req, res) => {
 
 // --- AUTH ROUTES ---
 
-// Google Login
 apiRouter.post('/auth/google', async (req, res) => {
     const { credential } = req.body;
     if (!credential || !googleClient || !pool) {
@@ -456,7 +455,6 @@ apiRouter.post('/register', async (req, res) => {
         const initialConfig = { WAKE: '06:00', SCORE: '0/300', WEAK: [], settings: { accentColor: '#0891b2' } };
         await pool.query("INSERT INTO user_configs (user_id, config) VALUES (?, ?)", [userId, encrypt(initialConfig)]);
 
-        // Generate Token Immediately
         const token = jwt.sign({ id: userId, sid, role: 'student' }, JWT_SECRET, { expiresIn: '30d' });
         res.json({ token });
     } catch(e) {
@@ -601,7 +599,6 @@ apiRouter.post('/config', authMiddleware, async (req, res) => {
             }
         }
         
-        // Deep merge simplistic
         const newConfig = { 
             ...currentConfig, 
             ...req.body, 
@@ -664,9 +661,7 @@ const DOUBTS_CACHE = [];
 apiRouter.get('/doubts/all', async (req, res) => {
     try {
         if (pool) {
-             // Return all doubts that are not deleted
              const [doubts] = await pool.query("SELECT * FROM doubts WHERE status != 'deleted' ORDER BY created_at DESC");
-             // Fetch solutions for each doubt
              for (let doubt of doubts) {
                  const [solutions] = await pool.query("SELECT * FROM doubt_solutions WHERE doubt_id = ? ORDER BY created_at ASC", [doubt.id]);
                  doubt.solutions = solutions;
@@ -796,7 +791,6 @@ const commonAIHandler = async (req, res, promptBuilder) => {
             config: chatConfig
         });
 
-        // Correct SDK response access
         let text = response.text;
         
         if (!text) {
@@ -846,9 +840,8 @@ apiRouter.post('/ai/chat', authMiddleware, async (req, res) => {
         const model = 'gemini-2.5-flash';
         const systemInstruction = `You are a helpful AI assistant. ${getKnowledgeBaseForUser(config)}`;
         
-        // Construct history compatible with SDK and sanitize roles
         const chatHistory = history.map(h => ({
-            role: h.role === 'model' ? 'model' : 'user', // Strict role validation
+            role: h.role === 'model' ? 'model' : 'user',
             parts: h.parts.map(p => ({ text: p.text || '' }))
         }));
 
@@ -864,7 +857,6 @@ apiRouter.post('/ai/chat', authMiddleware, async (req, res) => {
         }
 
         const result = await chat.sendMessage({ message: parts });
-        // Corrected access: use .text, not .response.text
         res.json({ role: 'model', parts: [{ text: result.text }] });
     } catch (error) {
         console.error("AI Chat Error:", error);
@@ -951,7 +943,6 @@ apiRouter.get('/music/browse', authMiddleware, async (req, res) => {
 });
 
 apiRouter.get('/music/content', async (req, res) => {
-    // Direct streaming with robust error handling
     const token = req.query.token;
     
     if (!token) return res.status(401).send('Unauthorized');
@@ -965,16 +956,13 @@ apiRouter.get('/music/content', async (req, res) => {
     if (!musicWebdavClient || !path) return res.status(404).send('Not found');
     
     try {
-        // Create read stream from WebDAV
         const stream = musicWebdavClient.createReadStream(path);
         
-        // Enable CORS for Web Audio API access
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Range');
         res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
-        // stream.pipe(res) handles backpressure automatically
         stream.pipe(res);
         
         stream.on('error', (err) => {
@@ -991,7 +979,6 @@ apiRouter.get('/music/content', async (req, res) => {
     }
 });
 
-// Add Album Art Proxy Endpoint
 apiRouter.get('/music/album-art', async (req, res) => {
     const token = req.query.token;
     if (!token) return res.status(401).send('Unauthorized');
@@ -1005,14 +992,16 @@ apiRouter.get('/music/album-art', async (req, res) => {
     if (!musicWebdavClient || !path) return res.status(404).send('Not found');
 
     try {
-        // Create read stream options - reading first 3MB for ID3 tags
+        // Read 3MB for metadata
         const options = { range: { start: 0, end: 3145727 } }; 
         const stream = musicWebdavClient.createReadStream(path, options);
 
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        res.setHeader('Content-Type', 'audio/mpeg'); // Or generalize based on file ext
-
+        
+        // WebDAV stream might not set content-type for partials, force it or let browser sniff
+        // Ideally check extension
+        
         stream.pipe(res);
         
         stream.on('error', (err) => {
@@ -1056,7 +1045,6 @@ apiRouter.get('/study-material/content', authMiddleware, async (req, res) => {
 });
 
 apiRouter.post('/study-material/details', authMiddleware, async (req, res) => {
-    // Fetch details for multiple paths (used for pinned items)
     if (!webdavClient) return res.json([]);
     const { paths } = req.body;
     const results = [];
@@ -1070,7 +1058,7 @@ apiRouter.post('/study-material/details', authMiddleware, async (req, res) => {
                 size: stat.size,
                 modified: stat.lastmod
             });
-        } catch (e) { /* ignore errors for missing files */ }
+        } catch (e) { /* ignore errors */ }
     }
     res.json(results);
 });

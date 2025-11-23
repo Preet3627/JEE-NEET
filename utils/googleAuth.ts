@@ -5,12 +5,8 @@ declare const google: any;
 let tokenClient: any = null;
 
 const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest", "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"];
-// Added drive.file and calendar.events scopes
 const SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.events";
 
-/**
- * Initializes the GAPI client and Google Identity Services token client.
- */
 export function initClient(
     clientId: string, 
     onStatusChange: (isSignedIn: boolean) => void, 
@@ -55,9 +51,6 @@ export function initClient(
     });
 }
 
-/**
- * Prompts the user to sign in and grant API access.
- */
 export const handleSignIn = (): void => {
     if (tokenClient) {
         tokenClient.requestAccessToken({ prompt: 'consent' });
@@ -67,9 +60,6 @@ export const handleSignIn = (): void => {
     }
 };
 
-/**
- * Signs the user out.
- */
 export const handleSignOut = (onStatusChange: (isSignedIn: boolean) => void): void => {
     const token = gapi.client.getToken();
     if (token !== null) {

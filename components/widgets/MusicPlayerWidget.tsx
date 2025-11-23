@@ -24,7 +24,6 @@ const MusicPlayerWidget: React.FC<MusicPlayerWidgetProps> = ({ onOpenLibrary }) 
     const [isHovered, setIsHovered] = useState(false);
     const [autoExpand, setAutoExpand] = useState(false);
     
-    // Auto-expand briefly on track change
     useEffect(() => {
         if (currentTrack) {
             setAutoExpand(true);
@@ -36,11 +35,7 @@ const MusicPlayerWidget: React.FC<MusicPlayerWidgetProps> = ({ onOpenLibrary }) 
     const artworkSrc = currentTrack?.coverArtUrl;
     const isExpanded = isHovered || autoExpand;
 
-    // Determine Position Class
     const positionClass = notchSettings.position === 'top' ? 'top-4' : 'bottom-24 md:bottom-8';
-    
-    // Determine Size constraints for container
-    // Note: The actual width is controlled via style prop using notchSettings.width
     
     if (!currentTrack) {
         return (
@@ -64,12 +59,10 @@ const MusicPlayerWidget: React.FC<MusicPlayerWidgetProps> = ({ onOpenLibrary }) 
         >
             <div className={`bg-black/90 border border-white/10 rounded-[2rem] shadow-2xl backdrop-blur-xl flex items-center overflow-hidden relative group cursor-pointer ${isExpanded ? 'px-4 py-3 gap-4 w-full' : 'px-2 py-2 gap-3 w-auto'}`}>
                 
-                {/* Mini Visualizer Background */}
                 <div className="absolute inset-0 opacity-30 pointer-events-none mix-blend-overlay w-full h-full">
                      <MusicVisualizerWidget />
                 </div>
 
-                {/* Album Art */}
                 <div className="relative z-10 flex-shrink-0" onClick={toggleFullScreenPlayer}>
                     {artworkSrc ? (
                         <img src={artworkSrc} alt="art" className={`rounded-full object-cover transition-all duration-500 ${isExpanded ? 'w-14 h-14' : 'w-10 h-10'} ${isPlaying ? 'animate-spin-slow' : ''}`} style={{ animationDuration: '10s' }} />
@@ -80,7 +73,6 @@ const MusicPlayerWidget: React.FC<MusicPlayerWidgetProps> = ({ onOpenLibrary }) 
                     )}
                 </div>
 
-                {/* Track Info & Controls (Expanded) */}
                 <div className={`flex-grow flex items-center justify-between overflow-hidden transition-all duration-500 ${isExpanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
                     <div className="flex-grow min-w-0 mr-4" onClick={toggleFullScreenPlayer}>
                         <p className="font-bold text-white truncate text-base">{currentTrack.title}</p>
@@ -97,7 +89,6 @@ const MusicPlayerWidget: React.FC<MusicPlayerWidgetProps> = ({ onOpenLibrary }) 
                     </div>
                 </div>
 
-                {/* Mini State Indicators (When Collapsed) */}
                 {!isExpanded && isPlaying && (
                     <div className="flex gap-1 items-center h-4 mr-2">
                         <div className="w-1 bg-cyan-500 animate-pulse h-full rounded-full"></div>

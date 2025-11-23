@@ -31,19 +31,16 @@ const GlobalMusicVisualizer: React.FC = () => {
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // RGB Shuffle Logic
             hueOffsetRef.current = (hueOffsetRef.current + 1) % 360;
 
             if (visualizerSettings.preset === 'bars') {
-                const barsToDraw = Math.floor(bufferLength * 0.6); // Focus on bass/mid
+                const barsToDraw = Math.floor(bufferLength * 0.6); 
                 const barWidth = (canvas.width / barsToDraw);
                 let x = 0;
 
                 for (let i = 0; i < barsToDraw; i++) {
-                    // Fix: Normalize properly. High volumes are > 200.
-                    // Scale down slightly so max volume = full height
                     const value = dataArray[i];
-                    const percent = Math.min(1, value / 250); // Clip at 250
+                    const percent = Math.min(1, value / 250); 
                     const barHeight = Math.max(2, percent * canvas.height * 0.9);
                     
                     let fillStyle = '#fff';
@@ -51,7 +48,6 @@ const GlobalMusicVisualizer: React.FC = () => {
                         const hue = (hueOffsetRef.current + (i * 5)) % 360;
                         fillStyle = `hsl(${hue}, 90%, 60%)`;
                     } else if (visualizerSettings.colorMode === 'album') {
-                         // Simulated album match - cyan/purple default
                          fillStyle = `hsl(${200 + (i * 2)}, 80%, 60%)`;
                     } else {
                          fillStyle = `rgba(255, 255, 255, ${0.3 + percent})`;
@@ -60,7 +56,6 @@ const GlobalMusicVisualizer: React.FC = () => {
                     ctx.fillStyle = fillStyle;
                     const y = (canvas.height - barHeight) / 2;
                     
-                    // Rounded bars
                     if (typeof ctx.roundRect === 'function') {
                         ctx.roundRect(x, y, barWidth - 1, barHeight, 2);
                     } else {
@@ -98,7 +93,6 @@ const GlobalMusicVisualizer: React.FC = () => {
 
     if (!isPlaying) return null;
 
-    // Dynamic positioning based on settings
     const positionStyles: React.CSSProperties = {
         position: 'fixed',
         left: '50%',
@@ -113,8 +107,6 @@ const GlobalMusicVisualizer: React.FC = () => {
         zIndex: 90
     };
 
-    // Only render global visualizer if player widget isn't capturing it or for aesthetic overlay
-    // For "Always On", we render a detached visualizer container
     return (
         <div style={positionStyles}>
              <canvas ref={canvasRef} width="400" height="60" className="w-full h-full" />
