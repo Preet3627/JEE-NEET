@@ -66,47 +66,37 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const isFirstPlayRef = useRef(true);
     const currentObjectUrlRef = useRef<string | null>(null);
 
-    // Persist Settings & Playlists
+    // Load settings from config on mount/update
     useEffect(() => {
-        if (currentUser && currentUser.CONFIG && currentUser.CONFIG.settings) {
+        if (currentUser?.CONFIG?.settings) {
             const s = currentUser.CONFIG.settings;
             if (s.notchSettings) setNotchSettings(s.notchSettings);
             if (s.visualizerSettings) setVisualizerSettings(s.visualizerSettings);
             if (s.djDropSettings) setDjDropSettings(s.djDropSettings);
         }
-        if (currentUser && currentUser.CONFIG && currentUser.CONFIG.localPlaylists) {
+        if (currentUser?.CONFIG?.localPlaylists) {
             setPlaylists(currentUser.CONFIG.localPlaylists);
         }
     }, [currentUser]);
 
-    const handleSetNotchSettings = (s: NotchSettings) => { setNotchSettings(s); };
-    const handleSetVisualizerSettings = (s: VisualizerSettings) => { setVisualizerSettings(s); };
-    const handleSetDjDropSettings = (s: DjDropSettings) => { setDjDropSettings(s); };
+    const handleSetNotchSettings = (s: NotchSettings) => setNotchSettings(s);
+    const handleSetVisualizerSettings = (s: VisualizerSettings) => setVisualizerSettings(s);
+    const handleSetDjDropSettings = (s: DjDropSettings) => setDjDropSettings(s);
 
     const createPlaylist = (name: string) => {
-        const newPlaylist: LocalPlaylist = { id: `pl_${Date.now()}`, name, trackIds: [] };
-        setPlaylists(prev => [...prev, newPlaylist]);
-        // In real app, sync to backend
+        setPlaylists(prev => [...prev, { id: `pl_${Date.now()}`, name, trackIds: [] }]);
     };
 
     const addToPlaylist = (playlistId: string, track: Track) => {
-        setPlaylists(prev => prev.map(pl => {
-            if (pl.id === playlistId) {
-                // Avoid duplicates
-                if (!pl.trackIds.includes(track.id)) {
-                    return { ...pl, trackIds: [...pl.trackIds, track.id] };
-                }
-            }
-            return pl;
-        }));
+        setPlaylists(prev => prev.map(pl => pl.id === playlistId && !pl.trackIds.includes(track.id) ? { ...pl, trackIds: [...pl.trackIds, track.id] } : pl));
     };
     
     const initializeAudioContext = useCallback(() => {
         if (!audioContext) {
-            const context = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+            const context = new AudioContextClass();
             const analyserNode = context.createAnalyser();
             analyserNode.smoothingTimeConstant = 0.85;
-            
             const gain = context.createGain();
             
             gain.connect(analyserNode);
@@ -115,56 +105,44 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
             setAudioContext(context);
             setAnalyser(analyserNode);
             setGainNode(gain);
+            
+            // Setup Media Source immediately if audio element exists
+            if(audioElementRef.current && !sourceNodeRef.current) {
+                 const source = context.createMediaElementSource(audioElementRef.current);
+                 source.connect(gain);
+                 sourceNodeRef.current = source;
+            }
         } else if (audioContext.state === 'suspended') {
             audioContext.resume();
         }
     }, [audioContext]);
     
-    const updateMediaSession = (track: Track) => {
-        if ('mediaSession' in navigator) {
-            navigator.mediaSession.metadata = new MediaMetadata({
-                title: track.title,
-                artist: track.artist,
-                album: track.album,
-                artwork: [
-                    { src: track.coverArtUrl || DEFAULT_ART, sizes: '96x96', type: 'image/png' },
-                    { src: track.coverArtUrl || DEFAULT_ART, sizes: '128x128', type: 'image/png' },
-                    { src: track.coverArtUrl || DEFAULT_ART, sizes: '192x192', type: 'image/png' },
-                    { src: track.coverArtUrl || DEFAULT_ART, sizes: '256x256', type: 'image/png' },
-                    { src: track.coverArtUrl || DEFAULT_ART, sizes: '384x384', type: 'image/png' },
-                    { src: track.coverArtUrl || DEFAULT_ART, sizes: '512x512', type: 'image/png' },
-                ]
-            });
-
-            navigator.mediaSession.setActionHandler('play', () => play());
-            navigator.mediaSession.setActionHandler('pause', () => pause());
-            navigator.mediaSession.setActionHandler('previoustrack', () => navigateTrack('prev'));
-            navigator.mediaSession.setActionHandler('nexttrack', () => navigateTrack('next'));
-        }
-    };
-
     const playDjDrop = () => {
-        if (djDropSettings.enabled && djDropAudioRef.current) {
+        if (djDropSettings.enabled && djDropAudioRef.current && gainNode && audioContext) {
             djDropAudioRef.current.currentTime = 0;
-            if (djDropSettings.customDropUrl && djDropAudioRef.current.src !== djDropSettings.customDropUrl) {
-                 djDropAudioRef.current.src = djDropSettings.customDropUrl;
-            } else if (!djDropSettings.customDropUrl && djDropAudioRef.current.src.includes('custom')) {
-                 djDropAudioRef.current.src = DJ_DROP_URL;
+            // Set source for drop
+            const targetSrc = djDropSettings.customDropUrl || DJ_DROP_URL;
+            if (djDropAudioRef.current.src !== targetSrc && !djDropAudioRef.current.src.endsWith(targetSrc)) {
+                 djDropAudioRef.current.src = targetSrc;
             }
-            // Lower music volume slightly
-            if (gainNode && audioContext) {
-                gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.3, audioContext.currentTime + 0.1);
-                
-                djDropAudioRef.current.play().then(() => {
-                     setTimeout(() => {
-                         // Restore volume after drop (approx 2s)
-                         if (gainNode && audioContext) {
-                            gainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + 0.5);
-                         }
-                     }, 2000);
-                }).catch(e => console.error("DJ drop error", e));
-            }
+
+            // Ducking effect
+            const now = audioContext.currentTime;
+            gainNode.gain.cancelScheduledValues(now);
+            gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+            gainNode.gain.linearRampToValueAtTime(0.3, now + 0.2);
+            
+            djDropAudioRef.current.play().then(() => {
+                 setTimeout(() => {
+                     // Restore volume
+                     if (gainNode && audioContext) {
+                        const restoreTime = audioContext.currentTime;
+                        gainNode.gain.cancelScheduledValues(restoreTime);
+                        gainNode.gain.setValueAtTime(0.3, restoreTime);
+                        gainNode.gain.linearRampToValueAtTime(1, restoreTime + 0.5);
+                     }
+                 }, 1500);
+            }).catch(e => console.error("DJ drop play error", e));
         }
     };
 
@@ -172,99 +150,96 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
         try {
              const response = await fetch(`/api/music/album-art?path=${encodeURIComponent(track.path || '')}&token=${localStorage.getItem('token')}`);
              if (!response.ok) return DEFAULT_ART;
-             
              const arrayBuffer = await response.arrayBuffer();
              const metadata = await musicMetadata.parseBlob(new Blob([arrayBuffer]));
-             
              if (metadata.common.picture && metadata.common.picture.length > 0) {
                  const picture = metadata.common.picture[0];
                  const blob = new Blob([picture.data], { type: picture.format });
                  return URL.createObjectURL(blob);
              }
-        } catch (e) {
-            console.warn("Failed to fetch album art via proxy", e);
-        }
+        } catch (e) { console.warn("Album art fetch failed", e); }
         return DEFAULT_ART;
     };
 
     const playTrack = useCallback(async (track: Track, newTracklist: Track[]) => {
         initializeAudioContext();
         
-        // Auto-Mix Fade Out
+        // Auto-Mix Crossfade Out
         if (isAutoMixEnabled && isPlaying && gainNode && audioContext) {
              const now = audioContext.currentTime;
              gainNode.gain.cancelScheduledValues(now);
              gainNode.gain.setValueAtTime(1, now);
-             gainNode.gain.exponentialRampToValueAtTime(0.001, now + 4); 
+             gainNode.gain.linearRampToValueAtTime(0, now + 3); // 3s fade out
              
              if (djDropSettings.enabled && djDropSettings.autoTrigger) {
-                 setTimeout(() => playDjDrop(), 2000); 
+                 setTimeout(() => playDjDrop(), 500); 
              }
-             await new Promise(resolve => setTimeout(resolve, 3500));
+             await new Promise(resolve => setTimeout(resolve, 3000));
         }
 
         if (audioElementRef.current) {
             isFirstPlayRef.current = false;
             setTracklist(newTracklist);
 
-            let streamUrl: string;
             let coverArtUrl = DEFAULT_ART;
+            let streamUrl = '';
 
             if (track.isLocal && track.file) {
                 if (currentObjectUrlRef.current) URL.revokeObjectURL(currentObjectUrlRef.current);
                 streamUrl = URL.createObjectURL(track.file);
                 currentObjectUrlRef.current = streamUrl;
+                // Extract metadata locally for local files
                 try {
                     const metadata = await musicMetadata.parseBlob(track.file);
-                    if (metadata.common.picture && metadata.common.picture.length > 0) {
-                        const picture = metadata.common.picture[0];
-                        const blob = new Blob([picture.data], { type: picture.format });
-                        coverArtUrl = URL.createObjectURL(blob);
+                    if (metadata.common.picture?.[0]) {
+                         const pic = metadata.common.picture[0];
+                         coverArtUrl = URL.createObjectURL(new Blob([pic.data], { type: pic.format }));
                     }
-                } catch (e) { /* ignore */ }
+                } catch(e) {}
             } else {
                  streamUrl = api.getMusicContentUrl(track.id);
-                 coverArtUrl = await fetchAlbumArt(track); 
+                 // Async fetch art, update state later if needed, but start playing immediately
+                 fetchAlbumArt(track).then(url => {
+                     if(currentTrack?.id === track.id) setCurrentTrack(prev => prev ? {...prev, coverArtUrl: url} : null);
+                 });
             }
 
             const trackWithArt = { ...track, coverArtUrl };
             setCurrentTrack(trackWithArt);
-            updateMediaSession(trackWithArt);
-
-            audioElementRef.current.src = streamUrl;
-            audioElementRef.current.crossOrigin = "anonymous"; // Ensure this is set!
             
-            if (!sourceNodeRef.current && audioContext && gainNode) {
+            audioElementRef.current.src = streamUrl;
+            audioElementRef.current.crossOrigin = "anonymous";
+            
+            // Re-connect source if needed (should be handled by init but safety check)
+            if (audioContext && !sourceNodeRef.current && gainNode) {
                 sourceNodeRef.current = audioContext.createMediaElementSource(audioElementRef.current);
                 sourceNodeRef.current.connect(gainNode);
             }
 
             audioElementRef.current.play().then(() => {
-                if (audioContext && audioContext.state === 'suspended') audioContext.resume();
+                if (audioContext?.state === 'suspended') audioContext.resume();
                 setIsPlaying(true);
                 
+                // Auto-Mix Fade In
                 if (isAutoMixEnabled && gainNode && audioContext) {
-                    gainNode.gain.cancelScheduledValues(audioContext.currentTime);
-                    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-                    gainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + 3);
+                    const now = audioContext.currentTime;
+                    gainNode.gain.cancelScheduledValues(now);
+                    gainNode.gain.setValueAtTime(0, now);
+                    gainNode.gain.linearRampToValueAtTime(1, now + 3);
                 } else if (gainNode && audioContext) {
                     gainNode.gain.setValueAtTime(1, audioContext.currentTime);
                 }
             }).catch(e => console.error("Playback error:", e));
         }
-    }, [audioContext, analyser, gainNode, initializeAudioContext, isAutoMixEnabled, isPlaying, djDropSettings]);
+    }, [audioContext, analyser, gainNode, initializeAudioContext, isAutoMixEnabled, isPlaying, djDropSettings, currentTrack]);
     
     const updateTrackMetadata = (id: string, newTitle: string, newArtist: string) => {
-        const updatedList = tracklist.map(t => t.id === id ? { ...t, title: newTitle, artist: newArtist } : t);
-        setTracklist(updatedList);
-        if (currentTrack && currentTrack.id === id) {
-            setCurrentTrack({ ...currentTrack, title: newTitle, artist: newArtist });
-            updateMediaSession({ ...currentTrack!, title: newTitle, artist: newArtist });
-        }
+        setTracklist(prev => prev.map(t => t.id === id ? { ...t, title: newTitle, artist: newArtist } : t));
+        if (currentTrack?.id === id) setCurrentTrack({ ...currentTrack, title: newTitle, artist: newArtist });
     };
 
     const play = () => { 
-        initializeAudioContext(); // Ensure context is running on user interaction
+        initializeAudioContext();
         audioElementRef.current?.play(); 
         setIsPlaying(true); 
     };
@@ -289,7 +264,7 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     useEffect(() => {
         if (!audioElementRef.current) {
             const audio = new Audio();
-            audio.crossOrigin = "anonymous"; // Critical for visualizer
+            audio.crossOrigin = "anonymous";
             audioElementRef.current = audio;
             audio.addEventListener('ended', () => navigateTrack('next')); 
             audio.addEventListener('timeupdate', () => setCurrentTime(audio.currentTime));

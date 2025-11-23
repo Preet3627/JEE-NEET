@@ -49,58 +49,62 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleU
             
             const createLocalizedString = (text: string) => ({ EN: text || '', GU: '' });
 
-            const schedules = Array.isArray(data.schedules) ? data.schedules : [];
+            // Robustly extract schedules array
+            const schedules = Array.isArray(data.schedules) ? data.schedules : (data.schedule ? [data.schedule] : []);
+
+            if (schedules.length === 0) {
+                 alert("No valid 'schedules' array found in AI response. Please check the Guide.");
+                 return;
+            }
 
             const tasksToBroadcast: ScheduleItem[] = schedules.map((s: any): ScheduleItem | null => {
-                if (!s || !s.id || !s.type || !s.day || !s.title || !s.detail || !s.subject) {
-                    console.warn("Skipping invalid schedule item from AI:", s);
-                    return null;
-                }
+                // Basic validation
+                if (!s.title) return null;
 
-                if (s.type === 'HOMEWORK') {
+                if (s.type === 'HOMEWORK' || (s.q_ranges)) {
                     let parsedAnswers = s.answers;
-                    if (typeof parsedAnswers === 'string' && parsedAnswers.trim().startsWith('{')) {
-                        try {
-                            parsedAnswers = JSON.parse(parsedAnswers);
-                        } catch (e) {
-                            console.warn("Could not parse homework answers string for broadcast, treating as empty.");
-                            parsedAnswers = {};
-                        }
-                    } else if (typeof parsedAnswers !== 'object') {
-                        parsedAnswers = {};
+                    if (typeof parsedAnswers === 'string') {
+                        try { parsedAnswers = JSON.parse(parsedAnswers); } catch { parsedAnswers = {}; }
                     }
-
+                    
                     return {
-                        ID: s.id, type: 'HOMEWORK', isUserCreated: true, DAY: createLocalizedString(s.day),
-                        CARD_TITLE: createLocalizedString(s.title), FOCUS_DETAIL: createLocalizedString(s.detail),
-                        SUBJECT_TAG: createLocalizedString(s.subject?.toUpperCase()), Q_RANGES: s.q_ranges || '', TIME: s.time || undefined,
-                        answers: parsedAnswers
+                        ID: `H_AI_${Date.now()}_${Math.random()}`, 
+                        type: 'HOMEWORK', 
+                        isUserCreated: true, 
+                        DAY: createLocalizedString(s.day || 'MONDAY'),
+                        CARD_TITLE: createLocalizedString(s.title), 
+                        FOCUS_DETAIL: createLocalizedString(s.detail || s.description || ''),
+                        SUBJECT_TAG: createLocalizedString(s.subject?.toUpperCase() || 'GENERAL'), 
+                        Q_RANGES: s.q_ranges || '', 
+                        TIME: s.time,
+                        answers: parsedAnswers || {}
                     } as HomeworkData;
-                } else if (s.type === 'ACTION') {
-                     if (!s.time) {
-                        console.warn("Skipping ACTION item without a time:", s);
-                        return null; // ACTION type requires a TIME
-                     }
-                    return {
-                        ID: s.id, type: 'ACTION', SUB_TYPE: s.sub_type || 'DEEP_DIVE', isUserCreated: true,
-                        DAY: createLocalizedString(s.day), TIME: s.time, CARD_TITLE: createLocalizedString(s.title),
-                        FOCUS_DETAIL: createLocalizedString(s.detail), SUBJECT_TAG: createLocalizedString(s.subject?.toUpperCase())
-                    } as ScheduleCardData;
-                }
+                } 
                 
-                console.warn("Skipping unknown schedule type from AI:", s);
-                return null;
+                // Default to ACTION
+                return {
+                    ID: `A_AI_${Date.now()}_${Math.random()}`, 
+                    type: 'ACTION', 
+                    SUB_TYPE: 'DEEP_DIVE', 
+                    isUserCreated: true,
+                    DAY: createLocalizedString(s.day || 'MONDAY'), 
+                    TIME: s.time || '09:00', 
+                    CARD_TITLE: createLocalizedString(s.title),
+                    FOCUS_DETAIL: createLocalizedString(s.detail || s.description || ''), 
+                    SUBJECT_TAG: createLocalizedString(s.subject?.toUpperCase() || 'GENERAL')
+                } as ScheduleCardData;
 
             }).filter((item): item is ScheduleItem => item !== null);
 
             if (tasksToBroadcast.length === 0) {
-                alert("No valid schedule items were found in the provided data to broadcast.");
+                alert("No valid tasks could be parsed from the AI output.");
                 return;
             }
 
-            if(window.confirm(`This will broadcast ${tasksToBroadcast.length} tasks to all ${broadcastTarget} students. Continue?`)) {
+            if(window.confirm(`Broadcast ${tasksToBroadcast.length} tasks to ${broadcastTarget} students?`)) {
                 tasksToBroadcast.forEach(task => onBroadcastTask(task, broadcastTarget));
                 setIsAIBroadcastModalOpen(false);
+                alert("Broadcast queued successfully.");
             }
         } catch (error: any) {
             alert(`Error processing data: ${error.message}`);
@@ -108,30 +112,27 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleU
     };
     
     const handleClearData = async (student: StudentData) => {
-        const confirmation = window.prompt(`This will reset all data (schedules, results, config) for ${student.fullName} (${student.sid}). This cannot be undone. To confirm, type the student's ID:`);
+        const confirmation = window.prompt(`Type "${student.sid}" to confirm clearing ALL data for ${student.fullName}. This is irreversible.`);
         if (confirmation === student.sid) {
             try {
                 await api.clearStudentData(student.sid);
-                alert(`Successfully cleared all data for ${student.fullName}.`);
+                alert("Data cleared.");
             } catch (error: any) {
-                alert(`Failed to clear data: ${error.message}`);
+                alert(`Failed: ${error.message}`);
             }
-        } else if (confirmation !== null) {
-            alert("Confirmation failed. Student ID did not match.");
         }
     };
 
     const handleImpersonate = async (sid: string) => {
-        if (window.confirm(`You are about to log in as ${sid}. You will be logged out of your admin account. Proceed?`)) {
+        if (window.confirm(`Log in as ${sid}? You will be logged out of Admin.`)) {
             try {
                 const { token } = await api.impersonateStudent(sid);
                 loginWithToken(token);
             } catch (error: any) {
-                alert(`Failed to impersonate student: ${error.message}`);
+                alert(`Impersonation failed: ${error.message}`);
             }
         }
     };
-
 
     return (
         <main className="mt-8">
@@ -148,33 +149,17 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleU
                 {activeTab === 'guide' && <AIGuide />}
             </div>
 
-            {messagingStudent && (
-                <MessagingModal student={messagingStudent} onClose={() => setMessagingStudent(null)} isDemoMode={false} />
-            )}
-            {isBroadcastModalOpen && (
-                <CreateEditTaskModal task={null} onClose={() => setIsBroadcastModalOpen(false)} onSave={handleBroadcastSave} decks={[]} />
-            )}
-            {isAIBroadcastModalOpen && (
-                // FIX: Add dummy props for onPracticeTestReady and onOpenGuide, which are required but not used in the teacher broadcast context.
-                <AIParserModal
-                    onClose={() => setIsAIBroadcastModalOpen(false)}
-                    onDataReady={handleAIBroadcastSave}
-                    onPracticeTestReady={() => {}}
-                    onOpenGuide={() => {}}
-                />
-            )}
+            {messagingStudent && <MessagingModal student={messagingStudent} onClose={() => setMessagingStudent(null)} isDemoMode={false} />}
+            {isBroadcastModalOpen && <CreateEditTaskModal task={null} onClose={() => setIsBroadcastModalOpen(false)} onSave={handleBroadcastSave} decks={[]} />}
+            {isAIBroadcastModalOpen && <AIParserModal onClose={() => setIsAIBroadcastModalOpen(false)} onDataReady={handleAIBroadcastSave} onPracticeTestReady={()=>{}} onOpenGuide={()=>{}} />}
         </main>
     );
 };
 
-const StudentGrid: React.FC<{ students: StudentData[], onToggleSub: (sid: string) => void, onDeleteUser: (sid: string) => void, onStartMessage: (student: StudentData) => void, onClearData: (student: StudentData) => void, onImpersonate: (sid: string) => void }> = ({ students, onToggleSub, onDeleteUser, onStartMessage, onClearData, onImpersonate }) => {
-    
+const StudentGrid: React.FC<{ students: StudentData[], onToggleSub: (sid: string) => void, onDeleteUser: (sid: string) => void, onStartMessage: (student: StudentData) => void, onClearData: (student: StudentData) => void, onImpersonate: (sid: string) => void }> = ({ students, onDeleteUser, onStartMessage, onClearData, onImpersonate }) => {
     const isOnline = (lastSeen?: string) => {
         if (!lastSeen) return false;
-        const lastSeenDate = new Date(lastSeen);
-        const now = new Date();
-        // User is online if last seen within the last 5 minutes
-        return (now.getTime() - lastSeenDate.getTime()) < 5 * 60 * 1000;
+        return (new Date().getTime() - new Date(lastSeen).getTime()) < 5 * 60 * 1000;
     };
     
     return (
@@ -197,10 +182,10 @@ const StudentGrid: React.FC<{ students: StudentData[], onToggleSub: (sid: string
                     </span>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-2">
-                    <button onClick={() => onImpersonate(student.sid)} className="w-full flex items-center justify-center gap-2 bg-green-800 hover:bg-green-700 text-white text-xs font-semibold py-1.5 px-3 rounded"><Icon name="login" className="w-3.5 h-3.5"/> Impersonate</button>
+                    <button onClick={() => onImpersonate(student.sid)} className="w-full flex items-center justify-center gap-2 bg-green-800 hover:bg-green-700 text-white text-xs font-semibold py-1.5 px-3 rounded"><Icon name="login" className="w-3.5 h-3.5"/> Login As</button>
                     <button onClick={() => onStartMessage(student)} className="w-full flex items-center justify-center gap-2 bg-cyan-800 hover:bg-cyan-700 text-white text-xs font-semibold py-1.5 px-3 rounded"><Icon name="message" className="w-3.5 h-3.5"/> Message</button>
-                    <button onClick={() => onClearData(student)} className="w-full bg-yellow-800 hover:bg-yellow-700 text-white text-xs font-semibold py-1.5 px-3 rounded">Clear Data</button>
-                    <button onClick={() => onDeleteUser(student.sid)} className="w-full bg-red-800 hover:bg-red-700 text-white text-xs font-semibold py-1.5 px-3 rounded">Delete User</button>
+                    <button onClick={() => onClearData(student)} className="w-full bg-yellow-800 hover:bg-yellow-700 text-white text-xs font-semibold py-1.5 px-3 rounded">Reset</button>
+                    <button onClick={() => onDeleteUser(student.sid)} className="w-full bg-red-800 hover:bg-red-700 text-white text-xs font-semibold py-1.5 px-3 rounded">Delete</button>
                 </div>
             </div>
         ))}
@@ -212,10 +197,10 @@ const BroadcastManager: React.FC<{ onOpenModal: () => void, onOpenAIModal: () =>
     <div className="bg-gray-800/70 p-6 rounded-lg border border-gray-700 max-w-2xl mx-auto text-center">
         <Icon name="send" className="w-12 h-12 text-cyan-400 mx-auto mb-4" />
         <h3 className="font-bold text-white text-lg mb-2">Broadcast a Task</h3>
-        <p className="text-sm text-gray-400 mb-4">Create a task and send it to a specific group of students. It will appear in their schedule and sync to their Google Calendar.</p>
+        <p className="text-sm text-gray-400 mb-4">Send tasks, homework, or announcements to all students or specific groups.</p>
         
         <div className="mb-4">
-            <label className="text-sm font-bold text-gray-400 mb-2 block">Target Audience</label>
+            <label className="text-sm font-bold text-gray-400 mb-2 block">Target Group</label>
             <div className="flex justify-center gap-2 p-1 rounded-full bg-gray-900/50 max-w-xs mx-auto">
                 {(['ALL', 'JEE', 'NEET'] as const).map(type => (
                     <button 
@@ -223,18 +208,18 @@ const BroadcastManager: React.FC<{ onOpenModal: () => void, onOpenAIModal: () =>
                         onClick={() => setTarget(type)}
                         className={`flex-1 text-center text-xs font-semibold py-1.5 rounded-full transition-colors ${target === type ? 'bg-cyan-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
                     >
-                        {type} Students
+                        {type}
                     </button>
                 ))}
             </div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button onClick={onOpenModal} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-base font-semibold text-white rounded-lg transition-transform hover:scale-105 active:scale-100 shadow-lg bg-gray-700 hover:bg-gray-600">
-                <Icon name="plus" /> Create Manually
+            <button onClick={onOpenModal} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-base font-semibold text-white rounded-lg bg-gray-700 hover:bg-gray-600 shadow-lg">
+                <Icon name="plus" /> Manual Create
             </button>
-            <button onClick={onOpenAIModal} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-base font-semibold text-white rounded-lg transition-transform hover:scale-105 active:scale-100 shadow-lg bg-gradient-to-r from-[var(--gradient-cyan)] to-[var(--gradient-purple)]">
-                <Icon name="upload" /> Broadcast from AI
+            <button onClick={onOpenAIModal} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-base font-semibold text-white rounded-lg bg-gradient-to-r from-[var(--gradient-cyan)] to-[var(--gradient-purple)] shadow-lg">
+                <Icon name="upload" /> AI Import
             </button>
         </div>
     </div>
