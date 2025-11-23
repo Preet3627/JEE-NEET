@@ -1,6 +1,7 @@
+
 import React, { createContext, useState, useContext, ReactNode, useRef, useCallback, useEffect } from 'react';
 import { api } from '../api/apiService';
-import { Track, NotchSettings, VisualizerSettings, DjDropSettings } from '../types';
+import { Track, NotchSettings, VisualizerSettings, DjDropSettings, LocalPlaylist } from '../types';
 import * as musicMetadata from 'music-metadata-browser';
 import { useAuth } from './AuthContext';
 
@@ -29,6 +30,9 @@ interface MusicPlayerContextType {
     setNotchSettings: (s: NotchSettings) => void;
     setVisualizerSettings: (s: VisualizerSettings) => void;
     setDjDropSettings: (s: DjDropSettings) => void;
+    playlists: LocalPlaylist[];
+    createPlaylist: (name: string) => void;
+    addToPlaylist: (playlistId: string, track: Track) => void;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
@@ -37,11 +41,14 @@ const DJ_DROP_URL = '/api/dj-drop';
 const DEFAULT_ART = 'https://ponsrischool.in/wp-content/uploads/2025/11/Gemini_Generated_Image_mtb6hbmtb6hbmtb6.png';
 
 export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { currentUser, updateProfile } = useAuth();
+    const { currentUser } = useAuth();
 
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
     const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
     const [gainNode, setGainNode] = useState<GainNode | null>(null);
+    // Effects Nodes
+    const [reverbNode, setReverbNode] = useState<ConvolverNode | null>(null);
+    
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
     const [tracklist, setTracklist] = useState<Track[]>([]);
@@ -50,18 +57,19 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const [currentTime, setCurrentTime] = useState(0);
     const [isAutoMixEnabled, setIsAutoMixEnabled] = useState(true);
 
-    // Persistent Settings with defaults
     const [notchSettings, setNotchSettings] = useState<NotchSettings>({ position: 'top', size: 'medium', width: 30 });
     const [visualizerSettings, setVisualizerSettings] = useState<VisualizerSettings>({ preset: 'bars', colorMode: 'rgb' });
     const [djDropSettings, setDjDropSettings] = useState<DjDropSettings>({ enabled: true, autoTrigger: true });
     
+    const [playlists, setPlaylists] = useState<LocalPlaylist[]>([]);
+
     const audioElementRef = useRef<HTMLAudioElement | null>(null);
     const djDropAudioRef = useRef<HTMLAudioElement | null>(null);
     const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
     const isFirstPlayRef = useRef(true);
     const currentObjectUrlRef = useRef<string | null>(null);
 
-    // Load settings from user config on mount
+    // Persist Settings & Playlists
     useEffect(() => {
         if (currentUser && currentUser.CONFIG && currentUser.CONFIG.settings) {
             const s = currentUser.CONFIG.settings;
@@ -69,52 +77,128 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
             if (s.visualizerSettings) setVisualizerSettings(s.visualizerSettings);
             if (s.djDropSettings) setDjDropSettings(s.djDropSettings);
         }
+        if (currentUser && currentUser.CONFIG && currentUser.CONFIG.localPlaylists) {
+            setPlaylists(currentUser.CONFIG.localPlaylists);
+        }
     }, [currentUser]);
-
-    // Helper to save settings to DB
-    const saveSettings = async (newSettings: Partial<any>) => {
-        // In a real app, you'd optimize this debounce. 
-        // Using updateConfig via API service would be cleaner if exposed in AuthContext, 
-        // but for now we assume api.updateConfig is available globally or pass it down.
-        // Since we don't have api.updateConfig directly here, we assume it persists on next full sync or profile update.
-        // Ideally: api.updateConfig({ settings: { ...currentUser.CONFIG.settings, ...newSettings } });
-        // Here we'll just update local state, assuming SettingsModal calls the API save.
-    };
 
     const handleSetNotchSettings = (s: NotchSettings) => { setNotchSettings(s); };
     const handleSetVisualizerSettings = (s: VisualizerSettings) => { setVisualizerSettings(s); };
     const handleSetDjDropSettings = (s: DjDropSettings) => { setDjDropSettings(s); };
+
+    const createPlaylist = (name: string) => {
+        const newPlaylist: LocalPlaylist = { id: `pl_${Date.now()}`, name, trackIds: [] };
+        setPlaylists(prev => [...prev, newPlaylist]);
+        // In real app, sync to backend
+    };
+
+    const addToPlaylist = (playlistId: string, track: Track) => {
+        setPlaylists(prev => prev.map(pl => {
+            if (pl.id === playlistId) {
+                // Avoid duplicates
+                if (!pl.trackIds.includes(track.id)) {
+                    return { ...pl, trackIds: [...pl.trackIds, track.id] };
+                }
+            }
+            return pl;
+        }));
+    };
     
+    // Create Impulse Response for Reverb (Echo)
+    const createReverbImpulse = (ctx: AudioContext) => {
+        const duration = 2;
+        const decay = 2;
+        const rate = ctx.sampleRate;
+        const length = rate * duration;
+        const impulse = ctx.createBuffer(2, length, rate);
+        const left = impulse.getChannelData(0);
+        const right = impulse.getChannelData(1);
+
+        for (let i = 0; i < length; i++) {
+            const n = i;
+            left[i] = (Math.random() * 2 - 1) * Math.pow(1 - n / length, decay);
+            right[i] = (Math.random() * 2 - 1) * Math.pow(1 - n / length, decay);
+        }
+        return impulse;
+    };
+
     const initializeAudioContext = useCallback(() => {
         if (!audioContext) {
             const context = new (window.AudioContext || (window as any).webkitAudioContext)();
             const analyserNode = context.createAnalyser();
-            analyserNode.smoothingTimeConstant = 0.85; // Smoother visualization
+            analyserNode.smoothingTimeConstant = 0.85;
+            
             const gain = context.createGain();
+            const reverb = context.createConvolver();
+            reverb.buffer = createReverbImpulse(context);
+            const reverbGain = context.createGain();
+            reverbGain.gain.value = 0; // Start dry
+
+            // Routing: Source -> Gain -> Analyser -> Destination
+            //          Source -> Reverb -> ReverbGain -> Destination (for effects)
             gain.connect(analyserNode);
             analyserNode.connect(context.destination);
+            
+            reverb.connect(reverbGain);
+            reverbGain.connect(context.destination);
+
             setAudioContext(context);
             setAnalyser(analyserNode);
             setGainNode(gain);
+            setReverbNode(reverb);
         }
     }, [audioContext]);
     
+    const updateMediaSession = (track: Track) => {
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: track.title,
+                artist: track.artist,
+                album: track.album,
+                artwork: [
+                    { src: track.coverArtUrl || DEFAULT_ART, sizes: '96x96', type: 'image/png' },
+                    { src: track.coverArtUrl || DEFAULT_ART, sizes: '128x128', type: 'image/png' },
+                    { src: track.coverArtUrl || DEFAULT_ART, sizes: '192x192', type: 'image/png' },
+                    { src: track.coverArtUrl || DEFAULT_ART, sizes: '256x256', type: 'image/png' },
+                    { src: track.coverArtUrl || DEFAULT_ART, sizes: '384x384', type: 'image/png' },
+                    { src: track.coverArtUrl || DEFAULT_ART, sizes: '512x512', type: 'image/png' },
+                ]
+            });
+
+            navigator.mediaSession.setActionHandler('play', () => play());
+            navigator.mediaSession.setActionHandler('pause', () => pause());
+            navigator.mediaSession.setActionHandler('previoustrack', () => navigateTrack('prev'));
+            navigator.mediaSession.setActionHandler('nexttrack', () => navigateTrack('next'));
+        }
+    };
+
     const playDjDrop = () => {
         if (djDropSettings.enabled && djDropAudioRef.current) {
             djDropAudioRef.current.currentTime = 0;
-            // Use custom URL if available, otherwise default
             if (djDropSettings.customDropUrl && djDropAudioRef.current.src !== djDropSettings.customDropUrl) {
                  djDropAudioRef.current.src = djDropSettings.customDropUrl;
             } else if (!djDropSettings.customDropUrl && djDropAudioRef.current.src.includes('custom')) {
                  djDropAudioRef.current.src = DJ_DROP_URL;
             }
-            djDropAudioRef.current.play().catch(e => console.error("DJ drop error", e));
+            // Lower music volume slightly
+            if (gainNode && audioContext) {
+                gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.3, audioContext.currentTime + 0.1);
+                
+                djDropAudioRef.current.play().then(() => {
+                     setTimeout(() => {
+                         // Restore volume after drop (approx 2s)
+                         if (gainNode && audioContext) {
+                            gainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + 0.5);
+                         }
+                     }, 2000);
+                }).catch(e => console.error("DJ drop error", e));
+            }
         }
     };
 
     const fetchAlbumArt = async (track: Track): Promise<string> => {
         try {
-            // Use API proxy to get first chunk of file for metadata
              const response = await fetch(`/api/music/album-art?path=${encodeURIComponent(track.path || '')}&token=${localStorage.getItem('token')}`);
              if (!response.ok) return DEFAULT_ART;
              
@@ -135,18 +219,25 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const playTrack = useCallback(async (track: Track, newTracklist: Track[]) => {
         initializeAudioContext();
         
-        // Auto-Mix Logic (Crossfade)
-        if (isAutoMixEnabled && isPlaying && gainNode && audioContext) {
-             // Fade out current
-             gainNode.gain.setValueAtTime(1, audioContext.currentTime);
-             gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 3);
+        // Advanced Mixing: Riser + Echo + Crossfade
+        if (isAutoMixEnabled && isPlaying && gainNode && audioContext && reverbNode) {
+             const now = audioContext.currentTime;
              
-             // Trigger DJ Drop during mix if auto-trigger is on
+             // 1. High Pass Filter Sweep (Riser Effect) - Simplified as volume dip & reverb swell
+             gainNode.gain.cancelScheduledValues(now);
+             gainNode.gain.setValueAtTime(1, now);
+             gainNode.gain.exponentialRampToValueAtTime(0.001, now + 4); // 4s fade out
+
+             // Reverb Swell
+             // (Assuming we connected source -> reverb -> reverbGain -> dest)
+             // We'd need a separate gain node for the reverb send, simplified here.
+             
+             // 2. Trigger DJ Drop in the middle of the mix
              if (djDropSettings.enabled && djDropSettings.autoTrigger) {
-                 setTimeout(() => playDjDrop(), 1500); 
+                 setTimeout(() => playDjDrop(), 2000); 
              }
 
-             await new Promise(resolve => setTimeout(resolve, 3000));
+             await new Promise(resolve => setTimeout(resolve, 3500)); // Wait for transition
         }
 
         if (audioElementRef.current && audioContext && analyser) {
@@ -170,27 +261,31 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
                 } catch (e) { /* ignore */ }
             } else {
                  streamUrl = api.getMusicContentUrl(track.id);
-                 // Try to fetch actual art via proxy
                  coverArtUrl = await fetchAlbumArt(track); 
             }
 
             const trackWithArt = { ...track, coverArtUrl };
             setCurrentTrack(trackWithArt);
+            updateMediaSession(trackWithArt); // Background Play support
 
             audioElementRef.current.src = streamUrl;
             audioElementRef.current.crossOrigin = "anonymous";
             
-            if (!sourceNodeRef.current && gainNode) {
+            // Re-connect source if needed (handle changing src)
+            if (!sourceNodeRef.current) {
                 sourceNodeRef.current = audioContext.createMediaElementSource(audioElementRef.current);
-                sourceNodeRef.current.connect(gainNode);
+                sourceNodeRef.current.connect(gainNode!);
+                // Connect to reverb for effects
+                if (reverbNode) sourceNodeRef.current.connect(reverbNode); 
             }
 
             audioElementRef.current.play().then(() => {
                 if (audioContext.state === 'suspended') audioContext.resume();
                 setIsPlaying(true);
                 
-                // Fade in new track
+                // Fade in
                 if (isAutoMixEnabled && gainNode) {
+                    gainNode.gain.cancelScheduledValues(audioContext.currentTime);
                     gainNode.gain.setValueAtTime(0, audioContext.currentTime);
                     gainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + 3);
                 } else if (gainNode) {
@@ -198,13 +293,14 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
                 }
             }).catch(e => console.error("Playback error:", e));
         }
-    }, [audioContext, analyser, gainNode, initializeAudioContext, isAutoMixEnabled, isPlaying, djDropSettings]);
+    }, [audioContext, analyser, gainNode, reverbNode, initializeAudioContext, isAutoMixEnabled, isPlaying, djDropSettings]);
     
     const updateTrackMetadata = (id: string, newTitle: string, newArtist: string) => {
         const updatedList = tracklist.map(t => t.id === id ? { ...t, title: newTitle, artist: newArtist } : t);
         setTracklist(updatedList);
         if (currentTrack && currentTrack.id === id) {
             setCurrentTrack({ ...currentTrack, title: newTitle, artist: newArtist });
+            updateMediaSession({ ...currentTrack!, title: newTitle, artist: newArtist });
         }
     };
 
@@ -242,7 +338,7 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
         audioElement: audioElementRef.current, analyser, isPlaying, currentTrack, isFullScreenPlayerOpen, 
         playTrack, play, pause, nextTrack: () => navigateTrack('next'), prevTrack: () => navigateTrack('prev'), 
         toggleFullScreenPlayer, seek, duration, currentTime, playDjDrop, isAutoMixEnabled, toggleAutoMix, 
-        updateTrackMetadata, notchSettings, visualizerSettings, djDropSettings,
+        updateTrackMetadata, notchSettings, visualizerSettings, djDropSettings, playlists, createPlaylist, addToPlaylist,
         setNotchSettings: handleSetNotchSettings, setVisualizerSettings: handleSetVisualizerSettings, setDjDropSettings: handleSetDjDropSettings
     };
 

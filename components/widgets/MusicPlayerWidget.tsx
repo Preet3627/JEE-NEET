@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useMusicPlayer } from '../../context/MusicPlayerContext';
 import Icon from '../Icon';

@@ -1,8 +1,9 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import McqTimer from './McqTimer';
 import Icon from './Icon';
 import { getQuestionNumbersFromRanges } from '../utils/qRangesParser';
-import { HomeworkData, ResultData, StudentData, ScheduleItem, PracticeQuestion, ScheduleCardData } from '../types';
+import { HomeworkData, ResultData, StudentData, ScheduleItem, PracticeQuestion } from '../types';
 import AIGenerateAnswerKeyModal from './AIGenerateAnswerKeyModal';
 import AIParserModal from './AIParserModal';
 import { api } from '../api/apiService';
@@ -82,7 +83,9 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
   const fileInputRef = useRef<HTMLInputElement>(null);
   const jeeMainsFileInputRef = useRef<HTMLInputElement>(null);
 
+
   const questionNumbers = useMemo(() => getQuestionNumbersFromRanges(qRanges), [qRanges]);
+  const totalQuestions = questionNumbers.length;
   
   const allMistakes = useMemo(() => {
       if (!student.RESULTS) return [];
@@ -97,8 +100,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
       return Array.from(all);
   }, [student.RESULTS]);
 
-  const totalQuestions = activeTab === 'mistakes' ? allMistakes.length : questionNumbers.length;
-  
+
   const handleStart = async () => {
     setError('');
     if (activeTab === 'manual') {
@@ -116,7 +118,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
         setPracticeMode('jeeMains');
         setIsTimerStarted(true);
     } else if (activeTab === 'mistakes') {
-        if (allMistakes.length === 0) {
+         if (allMistakes.length === 0) {
             setError("No active mistakes found to practice.");
             return;
         }
@@ -138,7 +140,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
         } finally {
             setIsLoading(false);
         }
-    } else { 
+    } else { // AI mode
         if (!aiTopic.trim()) {
             setError('Please enter a topic for the AI to generate questions.');
             return;
@@ -413,6 +415,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
           )}
         </div>
       </div>
+      
       {isAiKeyModalOpen && (
           <AIGenerateAnswerKeyModal
               onClose={() => setIsAiKeyModalOpen(false)}

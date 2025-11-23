@@ -1,3 +1,4 @@
+
 export type Language = 'EN' | 'GU';
 
 export interface LocalizedString {
@@ -170,6 +171,7 @@ export interface Track {
   isLocal?: boolean;
   file?: File;
   path?: string;
+  genre?: string;
 }
 
 export interface Flashcard {
@@ -219,7 +221,7 @@ export type ActiveTab = 'dashboard' | 'schedule' | 'today' | 'planner' | 'exams'
 export interface DashboardWidgetItem {
     id: string;
     wide?: boolean;
-    tall?: boolean; // Added for increasable length (2 rows)
+    tall?: boolean; 
     translucent?: boolean;
     minimized?: boolean;
     customTitle?: string;
@@ -228,7 +230,7 @@ export interface DashboardWidgetItem {
 export interface NotchSettings {
     position: 'top' | 'bottom';
     size: 'small' | 'medium' | 'large';
-    width: number; // percentage 20-100
+    width: number; 
 }
 
 export interface VisualizerSettings {
@@ -238,8 +240,8 @@ export interface VisualizerSettings {
 
 export interface DjDropSettings {
     enabled: boolean;
-    autoTrigger: boolean; // Play on auto-mix
-    customDropUrl?: string; // Base64 or URL
+    autoTrigger: boolean; 
+    customDropUrl?: string; 
 }
 
 export interface Config {

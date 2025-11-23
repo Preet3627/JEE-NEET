@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Config, FlashcardDeck, DashboardWidgetItem, NotchSettings, VisualizerSettings } from '../types';
 import Icon from './Icon';
@@ -133,7 +134,7 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
             
             {/* Music & Visuals */}
             <div>
-                <h3 className="text-base font-bold text-gray-300 mb-3">Music Player & Visuals</h3>
+                <h3 className="text-base font-bold text-gray-300">Music Player & Visuals</h3>
                 <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -193,7 +194,7 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                     </div>
                      <div>
                         <label className="text-xs font-bold text-gray-400">Theme Preset</label>
-                        <select value={theme} onChange={e => setTheme(e.target.value)} className={inputClass + " text-sm py-1"}>
+                        <select value={theme} onChange={e => setTheme(e.target.value as 'default' | 'liquid-glass' | 'midnight')} className={inputClass + " text-sm py-1"}>
                             <option value="default">Default Dark</option>
                             <option value="liquid-glass">Liquid Glass</option>
                             <option value="midnight">Midnight</option>
