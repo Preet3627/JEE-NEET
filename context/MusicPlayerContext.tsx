@@ -24,7 +24,8 @@ interface MusicPlayerContextType {
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
 
-const DJ_DROP_URL = 'https://nc.ponsrischool.in/index.php/s/em85Zdf2EYEkz3j/download';
+// Updated to use the local proxy to avoid CORS issues
+const DJ_DROP_URL = '/api/dj-drop';
 
 export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);

@@ -143,10 +143,10 @@ export const api = {
     
     // AI (secure backend endpoints)
     getDailyInsight: (data: { weaknesses: string[], syllabus?: string }) => authFetch('/ai/daily-insight', { method: 'POST', body: JSON.stringify(data) }),
-    aiChat: (data: { history: any[]; prompt: string; imageBase64?: string; }) => authFetch('/ai/chat', { method: 'POST', body: JSON.stringify(data) }),
+    aiChat: (data: { history: any[]; prompt: string; imageBase64?: string; domain?: string }) => authFetch('/ai/chat', { method: 'POST', body: JSON.stringify(data) }),
     analyzeMistake: (data: { prompt: string; imageBase64?: string; }) => authFetch('/ai/analyze-mistake', { method: 'POST', body: JSON.stringify(data) }),
     solveDoubt: (data: { prompt: string; imageBase64?: string; }) => authFetch('/ai/solve-doubt', { method: 'POST', body: JSON.stringify(data) }),
-    parseText: (text: string) => authFetch('/ai/parse-text', { method: 'POST', body: JSON.stringify({ text }) }),
+    parseText: (text: string, domain: string) => authFetch('/ai/parse-text', { method: 'POST', body: JSON.stringify({ text, domain }) }),
     correctJson: (brokenJson: string) => authFetch('/ai/correct-json', { method: 'POST', body: JSON.stringify({ brokenJson }) }),
     analyzeTestResults: (data: { imageBase64: string; userAnswers: Record<string, string>; timings: Record<string, number>, syllabus: string }) => authFetch('/ai/analyze-test-results', { method: 'POST', body: JSON.stringify(data) }),
     analyzeSpecificMistake: (data: { imageBase64: string; prompt: string; }) => authFetch('/ai/analyze-specific-mistake', { method: 'POST', body: JSON.stringify(data) }),

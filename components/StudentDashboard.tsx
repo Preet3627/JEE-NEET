@@ -236,7 +236,27 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     const handleStartPractice = (homework: HomeworkData) => { setPracticeTask(homework); setIsPracticeModalOpen(true); };
     const handleSaveWeakness = (newWeakness: string) => { const updatedWeaknesses = [...new Set([...student.CONFIG.WEAK, newWeakness])]; onUpdateWeaknesses(updatedWeaknesses); };
     const handleApiKeySet = () => { if (!student.CONFIG.settings.hasGeminiKey) setIsAiChatOpen(true); setShowAiChatFab(true); };
-    const handleAiChatMessage = async (prompt: string, imageBase64?: string) => { /* ... */ }; // Same
+    
+    // Updated AI Chat handler to inject current domain
+    const handleAiChatMessage = async (prompt: string, imageBase64?: string) => {
+        const newHistory = [...aiChatHistory, { role: 'user', parts: [{ text: prompt }] }];
+        setAiChatHistory(newHistory);
+        setIsAiChatLoading(true);
+        try {
+            const result = await api.aiChat({ 
+                history: newHistory, 
+                prompt, 
+                imageBase64,
+                domain: window.location.origin // Inject current domain here
+            });
+            setAiChatHistory(prev => [...prev, result]);
+        } catch (error: any) {
+            setAiChatHistory(prev => [...prev, { role: 'model', parts: [{ text: `Error: ${error.message}` }] }]);
+        } finally {
+            setIsAiChatLoading(false);
+        }
+    };
+
     const handleToggleSelectMode = () => { setIsSelectMode(prev => !prev); setSelectedTaskIds([]); };
     const handleTaskSelect = (taskId: string) => { setSelectedTaskIds(prev => prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]); };
     const handleDeleteSelected = async () => { /* ... */ };
