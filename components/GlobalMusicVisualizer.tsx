@@ -59,7 +59,12 @@ const GlobalMusicVisualizer: React.FC = () => {
                 
                 // Draw rect with slightly rounded effect manually if needed, or simple rect
                 canvasCtx.beginPath();
-                canvasCtx.roundRect(x + 1, y, barWidth - 2, barHeight, 2);
+                // Use roundRect if available, else fallback to rect
+                if (typeof canvasCtx.roundRect === 'function') {
+                    canvasCtx.roundRect(x + 1, y, barWidth - 2, barHeight, 2);
+                } else {
+                    canvasCtx.rect(x + 1, y, barWidth - 2, barHeight);
+                }
                 canvasCtx.fill();
 
                 x += barWidth;

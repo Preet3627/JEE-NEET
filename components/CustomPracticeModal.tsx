@@ -54,7 +54,8 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
   const { onClose, onSessionComplete, initialTask, aiPracticeTest, aiInitialTopic, defaultPerQuestionTime, onLogResult, student, onUpdateWeaknesses, onSaveTask, animationOrigin } = props;
   const { currentUser } = useAuth();
   const theme = currentUser?.CONFIG.settings.theme;
-  // Added 'mistakes' tab for consistency with previous features
+  
+  // FIX: Added 'mistakes' to the state type definition
   const [activeTab, setActiveTab] = useState<'ai' | 'manual' | 'jeeMains' | 'mistakes'>(initialTask ? 'manual' : 'ai');
   const [qRanges, setQRanges] = useState(initialTask?.Q_RANGES || '');
   const [subject, setSubject] = useState(initialTask?.SUBJECT_TAG.EN || 'PHYSICS');
@@ -85,7 +86,6 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
 
   const questionNumbers = useMemo(() => getQuestionNumbersFromRanges(qRanges), [qRanges]);
   
-  // Calculate aggregate mistakes for the Mistakes tab
   const allMistakes = useMemo(() => {
       if (!student.RESULTS) return [];
       const all = new Set<string>();
@@ -140,7 +140,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
         } finally {
             setIsLoading(false);
         }
-    } else { // AI mode
+    } else { 
         if (!aiTopic.trim()) {
             setError('Please enter a topic for the AI to generate questions.');
             return;
