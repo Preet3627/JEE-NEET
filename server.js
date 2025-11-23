@@ -795,9 +795,14 @@ const commonAIHandler = async (req, res, promptBuilder) => {
             config: chatConfig
         });
 
+        // Correct SDK response access
         let text = response.text;
+        
+        if (!text) {
+             throw new Error("AI returned empty response (possibly blocked by safety settings).");
+        }
+
         if (jsonResponse) {
-            // Sanitize JSON if needed
             text = text.replace(/```json\n?|\n?```/g, '').trim();
             res.json(JSON.parse(text));
         } else {
@@ -858,7 +863,8 @@ apiRouter.post('/ai/chat', authMiddleware, async (req, res) => {
         }
 
         const result = await chat.sendMessage({ message: parts });
-        res.json({ role: 'model', parts: [{ text: result.response.text }] });
+        // Corrected access: use .text, not .response.text
+        res.json({ role: 'model', parts: [{ text: result.text }] });
     } catch (error) {
         console.error("AI Chat Error:", error);
         res.status(500).json({ error: error.message });
@@ -981,6 +987,41 @@ apiRouter.get('/music/content', async (req, res) => {
         if (!res.headersSent) {
             res.status(500).send("Internal Server Error");
         }
+    }
+});
+
+// Add Album Art Proxy Endpoint
+apiRouter.get('/music/album-art', async (req, res) => {
+    const token = req.query.token;
+    if (!token) return res.status(401).send('Unauthorized');
+    try {
+        jwt.verify(token, JWT_SECRET);
+    } catch {
+        return res.status(401).send('Invalid Token');
+    }
+
+    const path = req.query.path;
+    if (!musicWebdavClient || !path) return res.status(404).send('Not found');
+
+    try {
+        // Create read stream options - reading first 3MB for ID3 tags
+        const options = { range: { start: 0, end: 3145727 } }; 
+        const stream = musicWebdavClient.createReadStream(path, options);
+
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.setHeader('Content-Type', 'audio/mpeg'); // Or generalize based on file ext
+
+        stream.pipe(res);
+        
+        stream.on('error', (err) => {
+             console.error("Album Art Stream Error:", err);
+             if (!res.headersSent) res.status(500).send("Stream Error");
+        });
+
+    } catch (e) {
+        console.error("Album Art Proxy Error:", e);
+        if (!res.headersSent) res.status(500).send("Internal Server Error");
     }
 });
 

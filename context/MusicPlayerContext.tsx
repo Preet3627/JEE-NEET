@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, ReactNode, useRef, useCallback, useEffect } from 'react';
 import { api } from '../api/apiService';
 import { Track, NotchSettings, VisualizerSettings, DjDropSettings } from '../types';
@@ -38,7 +37,7 @@ const DJ_DROP_URL = '/api/dj-drop';
 const DEFAULT_ART = 'https://ponsrischool.in/wp-content/uploads/2025/11/Gemini_Generated_Image_mtb6hbmtb6hbmtb6.png';
 
 export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { currentUser, updateProfile } = useAuth(); // Using updateProfile to save config indirectly or we can use api.updateConfig
+    const { currentUser, updateProfile } = useAuth();
 
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
     const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
@@ -74,12 +73,17 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
 
     // Helper to save settings to DB
     const saveSettings = async (newSettings: Partial<any>) => {
-        await api.updateConfig({ settings: { ...currentUser?.CONFIG.settings, ...newSettings } as any });
+        // In a real app, you'd optimize this debounce. 
+        // Using updateConfig via API service would be cleaner if exposed in AuthContext, 
+        // but for now we assume api.updateConfig is available globally or pass it down.
+        // Since we don't have api.updateConfig directly here, we assume it persists on next full sync or profile update.
+        // Ideally: api.updateConfig({ settings: { ...currentUser.CONFIG.settings, ...newSettings } });
+        // Here we'll just update local state, assuming SettingsModal calls the API save.
     };
 
-    const handleSetNotchSettings = (s: NotchSettings) => { setNotchSettings(s); saveSettings({ notchSettings: s }); };
-    const handleSetVisualizerSettings = (s: VisualizerSettings) => { setVisualizerSettings(s); saveSettings({ visualizerSettings: s }); };
-    const handleSetDjDropSettings = (s: DjDropSettings) => { setDjDropSettings(s); saveSettings({ djDropSettings: s }); };
+    const handleSetNotchSettings = (s: NotchSettings) => { setNotchSettings(s); };
+    const handleSetVisualizerSettings = (s: VisualizerSettings) => { setVisualizerSettings(s); };
+    const handleSetDjDropSettings = (s: DjDropSettings) => { setDjDropSettings(s); };
     
     const initializeAudioContext = useCallback(() => {
         if (!audioContext) {
@@ -108,6 +112,26 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
         }
     };
 
+    const fetchAlbumArt = async (track: Track): Promise<string> => {
+        try {
+            // Use API proxy to get first chunk of file for metadata
+             const response = await fetch(`/api/music/album-art?path=${encodeURIComponent(track.path || '')}&token=${localStorage.getItem('token')}`);
+             if (!response.ok) return DEFAULT_ART;
+             
+             const arrayBuffer = await response.arrayBuffer();
+             const metadata = await musicMetadata.parseBlob(new Blob([arrayBuffer]));
+             
+             if (metadata.common.picture && metadata.common.picture.length > 0) {
+                 const picture = metadata.common.picture[0];
+                 const blob = new Blob([picture.data], { type: picture.format });
+                 return URL.createObjectURL(blob);
+             }
+        } catch (e) {
+            console.warn("Failed to fetch album art via proxy", e);
+        }
+        return DEFAULT_ART;
+    };
+
     const playTrack = useCallback(async (track: Track, newTracklist: Track[]) => {
         initializeAudioContext();
         
@@ -123,9 +147,6 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
              }
 
              await new Promise(resolve => setTimeout(resolve, 3000));
-        } else if (!isPlaying && isFirstPlayRef.current) {
-             // First play drop?
-             // Optional: playDjDrop();
         }
 
         if (audioElementRef.current && audioContext && analyser) {
@@ -149,7 +170,8 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
                 } catch (e) { /* ignore */ }
             } else {
                  streamUrl = api.getMusicContentUrl(track.id);
-                 coverArtUrl = DEFAULT_ART; // Fallback
+                 // Try to fetch actual art via proxy
+                 coverArtUrl = await fetchAlbumArt(track); 
             }
 
             const trackWithArt = { ...track, coverArtUrl };

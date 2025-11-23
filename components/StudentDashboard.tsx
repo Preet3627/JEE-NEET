@@ -311,13 +311,13 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                     </button>
                 </div>
 
-                <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 auto-rows-min">
                     {dashboardWidgets.map((item, index) => {
                         const widget = widgetComponents[item.id];
                         if (!widget) return null;
                         
                         const isLarge = ['countdown', 'dailyInsight', 'quote', 'clock'].includes(item.id) || item.wide;
-                        const isTall = item.tall;
+                        const isTall = item.tall; // Use new tall property
                         const isMinimized = item.minimized;
 
                         return (

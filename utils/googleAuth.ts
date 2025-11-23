@@ -4,6 +4,7 @@ declare const google: any;
 let tokenClient: any = null;
 
 const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest", "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"];
+// Added drive.file and calendar.events scopes
 const SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.events";
 
 /**

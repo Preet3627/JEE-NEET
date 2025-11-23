@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useMusicPlayer } from '../../context/MusicPlayerContext';
 import Icon from '../Icon';
@@ -39,9 +38,9 @@ const MusicPlayerWidget: React.FC<MusicPlayerWidgetProps> = ({ onOpenLibrary }) 
     // Determine Position Class
     const positionClass = notchSettings.position === 'top' ? 'top-4' : 'bottom-24 md:bottom-8';
     
-    // Determine Size constraints
-    const maxWidth = notchSettings.size === 'small' ? 'max-w-sm' : notchSettings.size === 'medium' ? 'max-w-lg' : 'max-w-2xl';
-
+    // Determine Size constraints for container
+    // Note: The actual width is controlled via style prop using notchSettings.width
+    
     if (!currentTrack) {
         return (
              <div className={`fixed left-1/2 -translate-x-1/2 z-50 ${positionClass}`}>
@@ -58,7 +57,7 @@ const MusicPlayerWidget: React.FC<MusicPlayerWidgetProps> = ({ onOpenLibrary }) 
     return (
         <div 
             className={`fixed left-1/2 -translate-x-1/2 z-50 ${positionClass} transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]`}
-            style={{ width: isExpanded ? `${notchSettings.width}%` : 'auto', maxWidth: isExpanded ? '90%' : '200px' }}
+            style={{ width: isExpanded ? `${Math.max(20, notchSettings.width)}%` : 'auto', maxWidth: isExpanded ? '90%' : '200px' }}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
