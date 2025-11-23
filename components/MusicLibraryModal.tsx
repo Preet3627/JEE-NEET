@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../api/apiService';
 import Icon from './Icon';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
-import { Track, LocalPlaylist } from '../types';
+import { Track } from '../types';
 import StaticWaveform from './StaticWaveform';
 
 interface MusicLibraryModalProps { onClose: () => void; }
@@ -11,7 +11,7 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
     const [tracks, setTracks] = useState<Track[]>([]);
     const [view, setView] = useState<'tracks' | 'playlists' | 'genres'>('tracks');
     const [searchQuery, setSearchQuery] = useState('');
-    const { playTrack, currentTrack, isPlaying, play, pause, updateTrackMetadata, djDropSettings, setDjDropSettings, playDjDrop, playlists, createPlaylist, addToPlaylist } = useMusicPlayer();
+    const { playTrack, currentTrack, isPlaying, pause, updateTrackMetadata, djDropSettings, setDjDropSettings, playDjDrop, playlists, createPlaylist, addToPlaylist } = useMusicPlayer();
     const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState({ title: '', artist: '' });
     const dropInputRef = useRef<HTMLInputElement>(null);
@@ -103,17 +103,30 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
                             <Icon name="music" className="text-white" /> LIBRARY
                         </h2>
                         
-                        <div className="flex items-center gap-3 bg-[#222] p-2 rounded-full border border-white/10">
-                             <button onClick={playDjDrop} className="px-4 py-1 bg-[#ff0055] text-white font-bold rounded-full hover:bg-[#d00044] text-xs shadow-[0_0_10px_#ff0055]">
-                                DROP!
+                        {/* Simplified DJ Drop Controls */}
+                        <div className="flex items-center gap-4">
+                             <button 
+                                onClick={playDjDrop} 
+                                className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-yellow-500 to-red-600 text-white font-black rounded-full hover:scale-105 transition-transform shadow-[0_0_15px_rgba(239,68,68,0.5)] active:scale-95"
+                             >
+                                <Icon name="sound-wave" className="w-5 h-5" /> DJ PREET DROP!
                              </button>
-                             <div className="flex items-center gap-2 px-2 border-l border-white/10">
-                                 <span className="text-xs text-gray-400 font-bold">AUTO</span>
-                                 <div onClick={() => setDjDropSettings({...djDropSettings, autoTrigger: !djDropSettings.autoTrigger})} className={`w-8 h-4 rounded-full cursor-pointer relative transition-colors ${djDropSettings.autoTrigger ? 'bg-green-500' : 'bg-gray-600'}`}>
-                                     <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${djDropSettings.autoTrigger ? 'left-4.5' : 'left-0.5'}`}></div>
-                                 </div>
+                             
+                             <div className="flex items-center gap-2 bg-[#222] px-3 py-1.5 rounded-full border border-white/10">
+                                 <label className="text-xs font-bold text-gray-400 cursor-pointer flex items-center gap-2">
+                                     <input 
+                                        type="checkbox" 
+                                        checked={djDropSettings.autoTrigger} 
+                                        onChange={(e) => setDjDropSettings({...djDropSettings, autoTrigger: e.target.checked})}
+                                        className="accent-green-500 w-4 h-4"
+                                     />
+                                     Auto-Drop on Mix
+                                 </label>
                              </div>
-                             <button onClick={() => dropInputRef.current?.click()} className="text-gray-400 hover:text-white"><Icon name="upload" className="w-4 h-4" /></button>
+
+                             <button onClick={() => dropInputRef.current?.click()} className="text-gray-500 hover:text-white text-xs underline">
+                                 Upload Custom Sound
+                             </button>
                              <input type="file" ref={dropInputRef} className="hidden" accept="audio/*" onChange={handleDropUpload} />
                         </div>
                     </div>
