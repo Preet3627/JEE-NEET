@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, ReactNode, useRef, useCallback, useEffect } from 'react';
 import { api } from '../api/apiService';
 import { Track, NotchSettings, VisualizerSettings, DjDropSettings, LocalPlaylist } from '../types';
@@ -67,6 +66,7 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const isFirstPlayRef = useRef(true);
     const currentObjectUrlRef = useRef<string | null>(null);
 
+    // Persist Settings & Playlists
     useEffect(() => {
         if (currentUser && currentUser.CONFIG && currentUser.CONFIG.settings) {
             const s = currentUser.CONFIG.settings;
@@ -86,11 +86,13 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const createPlaylist = (name: string) => {
         const newPlaylist: LocalPlaylist = { id: `pl_${Date.now()}`, name, trackIds: [] };
         setPlaylists(prev => [...prev, newPlaylist]);
+        // In real app, sync to backend
     };
 
     const addToPlaylist = (playlistId: string, track: Track) => {
         setPlaylists(prev => prev.map(pl => {
             if (pl.id === playlistId) {
+                // Avoid duplicates
                 if (!pl.trackIds.includes(track.id)) {
                     return { ...pl, trackIds: [...pl.trackIds, track.id] };
                 }
@@ -113,6 +115,8 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
             setAudioContext(context);
             setAnalyser(analyserNode);
             setGainNode(gain);
+        } else if (audioContext.state === 'suspended') {
+            audioContext.resume();
         }
     }, [audioContext]);
     
@@ -125,9 +129,13 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
                 artwork: [
                     { src: track.coverArtUrl || DEFAULT_ART, sizes: '96x96', type: 'image/png' },
                     { src: track.coverArtUrl || DEFAULT_ART, sizes: '128x128', type: 'image/png' },
+                    { src: track.coverArtUrl || DEFAULT_ART, sizes: '192x192', type: 'image/png' },
+                    { src: track.coverArtUrl || DEFAULT_ART, sizes: '256x256', type: 'image/png' },
+                    { src: track.coverArtUrl || DEFAULT_ART, sizes: '384x384', type: 'image/png' },
                     { src: track.coverArtUrl || DEFAULT_ART, sizes: '512x512', type: 'image/png' },
                 ]
             });
+
             navigator.mediaSession.setActionHandler('play', () => play());
             navigator.mediaSession.setActionHandler('pause', () => pause());
             navigator.mediaSession.setActionHandler('previoustrack', () => navigateTrack('prev'));
@@ -143,12 +151,14 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
             } else if (!djDropSettings.customDropUrl && djDropAudioRef.current.src.includes('custom')) {
                  djDropAudioRef.current.src = DJ_DROP_URL;
             }
+            // Lower music volume slightly
             if (gainNode && audioContext) {
                 gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.3, audioContext.currentTime + 0.1);
                 
                 djDropAudioRef.current.play().then(() => {
                      setTimeout(() => {
+                         // Restore volume after drop (approx 2s)
                          if (gainNode && audioContext) {
                             gainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + 0.5);
                          }
@@ -180,6 +190,7 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const playTrack = useCallback(async (track: Track, newTracklist: Track[]) => {
         initializeAudioContext();
         
+        // Auto-Mix Fade Out
         if (isAutoMixEnabled && isPlaying && gainNode && audioContext) {
              const now = audioContext.currentTime;
              gainNode.gain.cancelScheduledValues(now);
@@ -192,7 +203,7 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
              await new Promise(resolve => setTimeout(resolve, 3500));
         }
 
-        if (audioElementRef.current && audioContext && analyser) {
+        if (audioElementRef.current) {
             isFirstPlayRef.current = false;
             setTracklist(newTracklist);
 
@@ -221,22 +232,22 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
             updateMediaSession(trackWithArt);
 
             audioElementRef.current.src = streamUrl;
-            audioElementRef.current.crossOrigin = "anonymous";
+            audioElementRef.current.crossOrigin = "anonymous"; // Ensure this is set!
             
-            if (!sourceNodeRef.current) {
+            if (!sourceNodeRef.current && audioContext && gainNode) {
                 sourceNodeRef.current = audioContext.createMediaElementSource(audioElementRef.current);
-                sourceNodeRef.current.connect(gainNode!);
+                sourceNodeRef.current.connect(gainNode);
             }
 
             audioElementRef.current.play().then(() => {
-                if (audioContext.state === 'suspended') audioContext.resume();
+                if (audioContext && audioContext.state === 'suspended') audioContext.resume();
                 setIsPlaying(true);
                 
-                if (isAutoMixEnabled && gainNode) {
+                if (isAutoMixEnabled && gainNode && audioContext) {
                     gainNode.gain.cancelScheduledValues(audioContext.currentTime);
                     gainNode.gain.setValueAtTime(0, audioContext.currentTime);
                     gainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + 3);
-                } else if (gainNode) {
+                } else if (gainNode && audioContext) {
                     gainNode.gain.setValueAtTime(1, audioContext.currentTime);
                 }
             }).catch(e => console.error("Playback error:", e));
@@ -252,8 +263,17 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
         }
     };
 
-    const play = () => { audioElementRef.current?.play(); setIsPlaying(true); audioContext?.resume(); };
-    const pause = () => { audioElementRef.current?.pause(); setIsPlaying(false); };
+    const play = () => { 
+        initializeAudioContext(); // Ensure context is running on user interaction
+        audioElementRef.current?.play(); 
+        setIsPlaying(true); 
+    };
+    
+    const pause = () => { 
+        audioElementRef.current?.pause(); 
+        setIsPlaying(false); 
+    };
+    
     const seek = (time: number) => { if(audioElementRef.current) audioElementRef.current.currentTime = time; };
     const toggleFullScreenPlayer = () => setIsFullScreenPlayerOpen(prev => !prev);
     const toggleAutoMix = () => setIsAutoMixEnabled(prev => !prev);
@@ -269,7 +289,7 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     useEffect(() => {
         if (!audioElementRef.current) {
             const audio = new Audio();
-            audio.crossOrigin = "anonymous";
+            audio.crossOrigin = "anonymous"; // Critical for visualizer
             audioElementRef.current = audio;
             audio.addEventListener('ended', () => navigateTrack('next')); 
             audio.addEventListener('timeupdate', () => setCurrentTime(audio.currentTime));

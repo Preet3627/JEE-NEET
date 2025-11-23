@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useMusicPlayer } from '../../context/MusicPlayerContext';
 import Icon from '../Icon';
@@ -18,7 +17,8 @@ const MusicPlayerWidget: React.FC<MusicPlayerWidgetProps> = ({ onOpenLibrary }) 
         prevTrack,
         toggleFullScreenPlayer,
         notchSettings,
-        playDjDrop
+        playDjDrop,
+        audioElement // Check if audio is ready
     } = useMusicPlayer();
     
     const [isHovered, setIsHovered] = useState(false);
@@ -35,16 +35,22 @@ const MusicPlayerWidget: React.FC<MusicPlayerWidgetProps> = ({ onOpenLibrary }) 
     const artworkSrc = currentTrack?.coverArtUrl;
     const isExpanded = isHovered || autoExpand;
 
+    // Ensure high z-index to appear above other content
     const positionClass = notchSettings.position === 'top' ? 'top-4' : 'bottom-24 md:bottom-8';
     
+    // If no track is loaded, show a persistent "Open Library" pill
     if (!currentTrack) {
         return (
-             <div className={`fixed left-1/2 -translate-x-1/2 z-50 ${positionClass}`}>
-                <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-full shadow-lg px-4 py-2 backdrop-blur-xl flex items-center justify-center gap-3 cursor-pointer transition-all hover:bg-white/10" onClick={onOpenLibrary}>
-                    <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center">
-                        <Icon name="music" className="w-4 h-4 text-gray-400" />
+             <div className={`fixed left-1/2 -translate-x-1/2 z-[100] ${positionClass} transition-all duration-300`}>
+                <div 
+                    className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-full shadow-lg px-4 py-2 backdrop-blur-xl flex items-center justify-center gap-3 cursor-pointer transition-all hover:bg-white/10 hover:scale-105" 
+                    onClick={onOpenLibrary}
+                    title="Open Music Library"
+                >
+                    <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center shadow-inner">
+                        <Icon name="music" className="w-4 h-4 text-cyan-400" />
                     </div>
-                    <span className="text-xs font-bold text-gray-300">Library</span>
+                    <span className="text-xs font-bold text-gray-200">Music Library</span>
                 </div>
             </div>
         );
@@ -52,43 +58,47 @@ const MusicPlayerWidget: React.FC<MusicPlayerWidgetProps> = ({ onOpenLibrary }) 
     
     return (
         <div 
-            className={`fixed left-1/2 -translate-x-1/2 z-50 ${positionClass} transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]`}
+            className={`fixed left-1/2 -translate-x-1/2 z-[100] ${positionClass} transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]`}
             style={{ width: isExpanded ? `${Math.max(20, notchSettings.width)}%` : 'auto', maxWidth: isExpanded ? '90%' : '200px' }}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
             <div className={`bg-black/90 border border-white/10 rounded-[2rem] shadow-2xl backdrop-blur-xl flex items-center overflow-hidden relative group cursor-pointer ${isExpanded ? 'px-4 py-3 gap-4 w-full' : 'px-2 py-2 gap-3 w-auto'}`}>
                 
+                {/* Visualizer Background */}
                 <div className="absolute inset-0 opacity-30 pointer-events-none mix-blend-overlay w-full h-full">
                      <MusicVisualizerWidget />
                 </div>
 
-                <div className="relative z-10 flex-shrink-0" onClick={toggleFullScreenPlayer}>
+                {/* Album Art / Icon */}
+                <div className="relative z-10 flex-shrink-0" onClick={(e) => { e.stopPropagation(); toggleFullScreenPlayer(); }}>
                     {artworkSrc ? (
-                        <img src={artworkSrc} alt="art" className={`rounded-full object-cover transition-all duration-500 ${isExpanded ? 'w-14 h-14' : 'w-10 h-10'} ${isPlaying ? 'animate-spin-slow' : ''}`} style={{ animationDuration: '10s' }} />
+                        <img src={artworkSrc} alt="art" className={`rounded-full object-cover transition-all duration-500 shadow-md ${isExpanded ? 'w-14 h-14' : 'w-10 h-10'} ${isPlaying ? 'animate-spin-slow' : ''}`} style={{ animationDuration: '10s' }} />
                     ) : (
-                        <div className={`rounded-full bg-gray-800 flex items-center justify-center transition-all ${isExpanded ? 'w-14 h-14' : 'w-10 h-10'}`}>
+                        <div className={`rounded-full bg-gray-800 flex items-center justify-center transition-all shadow-md ${isExpanded ? 'w-14 h-14' : 'w-10 h-10'}`}>
                             <Icon name="music" className="text-gray-500" />
                         </div>
                     )}
                 </div>
 
+                {/* Expanded Controls */}
                 <div className={`flex-grow flex items-center justify-between overflow-hidden transition-all duration-500 ${isExpanded ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0'}`}>
-                    <div className="flex-grow min-w-0 mr-4" onClick={toggleFullScreenPlayer}>
+                    <div className="flex-grow min-w-0 mr-4" onClick={(e) => { e.stopPropagation(); toggleFullScreenPlayer(); }}>
                         <p className="font-bold text-white truncate text-base">{currentTrack.title}</p>
                         <p className="text-xs text-gray-400 truncate">{currentTrack.artist}</p>
                     </div>
 
                     <div className="flex items-center gap-3 flex-shrink-0">
-                         <button onClick={(e) => { e.stopPropagation(); playDjDrop(); }} className="p-2 text-xs font-bold text-yellow-400 bg-yellow-400/10 rounded hover:bg-yellow-400/20" title="DJ Drop">DROP</button>
-                         <button onClick={(e) => { e.stopPropagation(); prevTrack(); }} className="p-1 text-gray-400 hover:text-white"><Icon name="arrow-left" className="w-5 h-5" /></button>
-                         <button onClick={(e) => { e.stopPropagation(); isPlaying ? pause() : play(); }} className="p-2 bg-white text-black rounded-full hover:scale-110 transition-transform">
-                            <Icon name={isPlaying ? "pause" : "play"} className="w-5 h-5" />
+                         <button onClick={(e) => { e.stopPropagation(); playDjDrop(); }} className="p-2 text-xs font-bold text-yellow-400 bg-yellow-400/10 rounded hover:bg-yellow-400/20 transition-colors" title="DJ Drop">DROP</button>
+                         <button onClick={(e) => { e.stopPropagation(); prevTrack(); }} className="p-1 text-gray-400 hover:text-white transition-colors"><Icon name="arrow-left" className="w-6 h-6" /></button>
+                         <button onClick={(e) => { e.stopPropagation(); isPlaying ? pause() : play(); }} className="p-2 bg-white text-black rounded-full hover:scale-110 transition-transform shadow-lg">
+                            <Icon name={isPlaying ? "pause" : "play"} className="w-5 h-5 fill-current" />
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); nextTrack(); }} className="p-1 text-gray-400 hover:text-white"><Icon name="arrow-right" className="w-5 h-5" /></button>
+                        <button onClick={(e) => { e.stopPropagation(); nextTrack(); }} className="p-1 text-gray-400 hover:text-white transition-colors"><Icon name="arrow-right" className="w-6 h-6" /></button>
                     </div>
                 </div>
 
+                {/* Mini Visualizer for Collapsed State */}
                 {!isExpanded && isPlaying && (
                     <div className="flex gap-1 items-center h-4 mr-2">
                         <div className="w-1 bg-cyan-500 animate-pulse h-full rounded-full"></div>

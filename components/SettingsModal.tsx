@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Config, FlashcardDeck, DashboardWidgetItem, NotchSettings, VisualizerSettings } from '../types';
 import Icon from './Icon';

@@ -28,6 +28,7 @@ export function initClient(
                 scope: SCOPES,
                 callback: (tokenResponse: any) => {
                     if (tokenResponse && tokenResponse.access_token) {
+                        // Set the access token for gapi to use in Drive/Calendar calls
                         gapi.client.setToken(tokenResponse);
                         onStatusChange(true);
                     } else {
@@ -53,6 +54,7 @@ export function initClient(
 
 export const handleSignIn = (): void => {
     if (tokenClient) {
+        // This triggers the popup requesting the specific scopes (Drive, Calendar)
         tokenClient.requestAccessToken({ prompt: 'consent' });
     } else {
         console.error("Token client not initialized.");

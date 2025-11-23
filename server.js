@@ -1,4 +1,3 @@
-
 import express from 'express';
 import mysql from 'mysql2/promise';
 import cors from 'cors';
@@ -794,6 +793,7 @@ const commonAIHandler = async (req, res, promptBuilder) => {
             config: chatConfig
         });
 
+        // Correct SDK response access
         let text = response.text;
         
         if (!text) {
@@ -860,6 +860,7 @@ apiRouter.post('/ai/chat', authMiddleware, async (req, res) => {
         }
 
         const result = await chat.sendMessage({ message: parts });
+        // Corrected access: use .text, not .response.text
         res.json({ role: 'model', parts: [{ text: result.text }] });
     } catch (error) {
         console.error("AI Chat Error:", error);
