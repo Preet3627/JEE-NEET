@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './context/AuthContext';
 import { StudentData, ScheduleItem, StudySession, Config, ResultData, ExamData, DoubtData } from './types';
@@ -60,11 +61,17 @@ const App: React.FC = () => {
         }
 
         const action = params.get('action');
+        const query = params.get('query');
         const dataStr = params.get('data');
-        const taskId = params.get('id'); // For new view_task action
+        const taskId = params.get('id');
 
-        if (action === 'view_task' && taskId) {
-            setDeepLinkAction({ action: 'view_task', data: { id: taskId } });
+        // Support for direct task viewing or starting practice from notifications/calendar
+        if (action === 'search' && query) {
+            setDeepLinkAction({ action: 'search', data: { query } });
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (taskId && (action === 'view_task' || action === 'start_practice')) {
+            setDeepLinkAction({ action, data: { id: taskId } });
+            // Don't clear URL immediately if we want to persist state, but cleaning up is cleaner
             window.history.replaceState({}, document.title, window.location.pathname);
         } else if (action && dataStr) {
             const handleDeepLink = async (encodedData: string) => {

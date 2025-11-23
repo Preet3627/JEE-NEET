@@ -1,3 +1,4 @@
+
 export type Language = 'EN' | 'GU';
 
 export interface LocalizedString {
@@ -35,6 +36,10 @@ export interface ScheduleCardData {
   googleEventId?: string;
   deckId?: string;
   date?: string; // For one-off events, format YYYY-MM-DD
+  gradient?: string; // e.g., 'from-cyan-500 to-blue-600'
+  imageUrl?: string; // URL for background image
+  externalLink?: string; // URL to open external app (Zoom, Meet, etc)
+  isRecurring?: boolean; // If true, exports as weekly recurring for 2 years
 }
 
 export interface PracticeHistory {
@@ -63,6 +68,10 @@ export interface HomeworkData {
   date?: string; // For one-off homework, format YYYY-MM-DD
   practiceHistory?: PracticeHistory[];
   flashcards?: { front: string; back: string }[]; // For AI-generated cards
+  gradient?: string;
+  imageUrl?: string;
+  externalLink?: string; // URL to open external app
+  isRecurring?: boolean;
 }
 
 export interface ActivityData {
@@ -163,7 +172,6 @@ export interface Track {
   size: string; // in bytes
   coverArtUrl?: string; // dynamically added by the player context
   isLocal?: boolean;
-  // FIX: Changed type from FileSystemFileHandle to File for compatibility with Blob-based APIs.
   file?: File; // For local files using File System Access API
   path?: string; // For Nextcloud files
 }
@@ -247,8 +255,10 @@ export interface Config {
         dashboardLayout?: DashboardWidgetItem[];
         dashboardFlashcardDeckIds?: string[];
         musicPlayerWidgetLayout?: 'minimal' | 'expanded';
-        // FIX: Added widgetSettings to store per-widget configuration like translucency.
         widgetSettings?: { [widgetId: string]: { translucent?: boolean; wide?: boolean } };
+        dashboardBackgroundImage?: string; // New: Custom background
+        dashboardTransparency?: number; // New: Widget transparency level (0-100)
+        alwaysShowMusicPopup?: boolean; // New: Music setting
     };
 }
 

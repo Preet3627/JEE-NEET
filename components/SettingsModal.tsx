@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Config, FlashcardDeck, DashboardWidgetItem } from '../types';
 import Icon from './Icon';
@@ -35,14 +36,13 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
   const [examType, setExamType] = useState(settings.examType || 'JEE');
   const [theme, setTheme] = useState(settings.theme || 'default');
   
-  const WIDGET_KEYS = ['countdown', 'dailyInsight', 'quote', 'music', 'subjectAllocation', 'scoreTrend', 'flashcards', 'readingHours', 'todaysAgenda', 'upcomingExams', 'homework', 'visualizer'];
+  const WIDGET_KEYS = ['countdown', 'dailyInsight', 'quote', 'music', 'subjectAllocation', 'scoreTrend', 'flashcards', 'readingHours', 'todaysAgenda', 'upcomingExams', 'homework', 'visualizer', 'weather', 'clock'];
   const LAYOUT_PRESETS: Record<'default' | 'focus' | 'compact', string[]> = {
     default: WIDGET_KEYS,
     focus: ['countdown', 'dailyInsight', 'todaysAgenda', 'upcomingExams', 'scoreTrend', 'homework'],
     compact: ['todaysAgenda', 'scoreTrend', 'subjectAllocation', 'readingHours', 'flashcards', 'upcomingExams'],
   };
 
-  // FIX: dashboardLayout is a DashboardWidgetItem[] of widget objects. This section handles mapping UI presets to that array.
   const getPresetFromLayout = (layout: DashboardWidgetItem[] | undefined): 'default' | 'focus' | 'compact' => {
     if (!layout) return 'default';
     const sortedLayoutIds = layout.map(item => item.id).sort();
@@ -55,6 +55,10 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
   const [dashboardFlashcardDeckIds, setDashboardFlashcardDeckIds] = useState(settings.dashboardFlashcardDeckIds || []);
   const [musicPlayerLayout, setMusicPlayerLayout] = useState(settings.musicPlayerWidgetLayout || 'minimal');
   
+  // New Aesthetic Settings
+  const [bgImage, setBgImage] = useState(settings.dashboardBackgroundImage || '');
+  const [transparency, setTransparency] = useState(settings.dashboardTransparency ?? 50);
+
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
   const [isExiting, setIsExiting] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState(Notification.permission);
@@ -86,10 +90,11 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
         isCalendarSyncEnabled: calendarSync,
         examType: examType as 'JEE' | 'NEET',
         theme: theme as 'default' | 'liquid-glass' | 'midnight',
-        // FIX: The dashboardLayout property expects a DashboardWidgetItem array. Map string IDs to objects.
         dashboardLayout: LAYOUT_PRESETS[dashboardLayoutPreset].map(id => ({ id })),
         dashboardFlashcardDeckIds,
         musicPlayerWidgetLayout: musicPlayerLayout as 'minimal' | 'expanded',
+        dashboardBackgroundImage: bgImage,
+        dashboardTransparency: transparency,
     };
     if (geminiApiKey.trim()) {
         settingsToSave.geminiApiKey = geminiApiKey.trim();
@@ -137,9 +142,32 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
         <form onSubmit={handleSubmit} className="space-y-6">
           
           <div className="space-y-4">
-             <h3 className="text-base font-bold text-gray-300">Dashboard Customization</h3>
+             <h3 className="text-base font-bold text-gray-300">Dashboard & Appearance</h3>
+              
+              {/* Custom Background & Transparency */}
+              <div className="bg-gray-900/50 p-3 rounded-lg border border-gray-700/50 space-y-3">
+                  <div>
+                      <label className="text-xs font-bold text-gray-400">Background Image URL</label>
+                      <input value={bgImage} onChange={e => setBgImage(e.target.value)} className={inputClass + " text-sm py-1"} placeholder="https://example.com/bg.jpg" />
+                  </div>
+                  <div>
+                      <label className="text-xs font-bold text-gray-400 flex justify-between">
+                          Widget Transparency
+                          <span>{transparency}%</span>
+                      </label>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="100" 
+                        value={transparency} 
+                        onChange={e => setTransparency(Number(e.target.value))} 
+                        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500" 
+                      />
+                  </div>
+              </div>
+
               <div>
-                  <label className="text-sm font-bold text-gray-400">Layout</label>
+                  <label className="text-sm font-bold text-gray-400">Default Layout</label>
                   <div className="grid grid-cols-3 gap-2 mt-1">
                       {(['default', 'focus', 'compact'] as const).map(layout => (
                           <button key={layout} type="button" onClick={() => setDashboardLayoutPreset(layout)} className={`p-2 rounded-lg border-2 ${dashboardLayoutPreset === layout ? 'border-cyan-500' : 'border-transparent'}`}>
@@ -151,6 +179,7 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                           </button>
                       ))}
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">Enable "Edit Layout" on the dashboard to drag & drop.</p>
               </div>
               <div>
                   <label className="text-sm font-bold text-gray-400">Flashcard Widget</label>
@@ -174,13 +203,6 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                           </label>
                       ))}
                   </div>
-              </div>
-              <div>
-                  <label className="text-sm font-bold text-gray-400">Music Player Widget</label>
-                  <select value={musicPlayerLayout} onChange={e => setMusicPlayerLayout(e.target.value as 'minimal' | 'expanded')} className={inputClass}>
-                      <option value="minimal">Minimal</option>
-                      <option value="expanded">Expanded</option>
-                  </select>
               </div>
           </div>
 

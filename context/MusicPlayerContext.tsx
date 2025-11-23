@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useContext, ReactNode, useRef, useCallback, useEffect } from 'react';
 import { api } from '../api/apiService';
 import { Track } from '../types';
@@ -92,6 +93,7 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
                 }
 
             } else {
+                 // Use the proxy endpoint to handle Nextcloud auth/CORS
                  streamUrl = api.getMusicContentUrl(track.id);
                  coverArtUrl = api.getMusicContentUrl(track.coverArt);
             }

@@ -43,6 +43,10 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, backendStatus, isSyncin
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    const triggerSearch = () => {
+        window.dispatchEvent(new Event('open-universal-search'));
+    };
+
     return (
         <>
             <header className="sticky top-4 z-50 flex flex-col sm:flex-row justify-between items-center p-4 rounded-xl bg-[var(--glass-bg)] border border-[var(--glass-border)] backdrop-blur-lg mb-8 gap-4">
@@ -53,6 +57,14 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, backendStatus, isSyncin
                 </div>
                 
                 <div className="flex items-center gap-4">
+                    <button 
+                        onClick={triggerSearch}
+                        className="p-2 rounded-full bg-gray-800/50 text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors hidden sm:block"
+                        title="Search (Cmd+K)"
+                    >
+                        <Icon name="search" className="w-5 h-5" />
+                    </button>
+
                     <div className="flex items-center gap-1.5 p-1 rounded-full bg-gray-900/50">
                         <button onClick={() => setLanguage('EN')} className={`px-3 py-1 text-xs font-bold rounded-full transition-all ${language === 'EN' ? activeLangClasses : inactiveLangClasses}`}>EN</button>
                         <button onClick={() => setLanguage('GU')} className={`px-3 py-1 text-xs font-bold rounded-full transition-all ${language === 'GU' ? activeLangClasses : inactiveLangClasses}`}>GU</button>

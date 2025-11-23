@@ -1,3 +1,4 @@
+
 import { StudentData, ScheduleItem, Config, ResultData, ExamData } from '../types';
 
 const API_URL = '/api';
@@ -125,7 +126,7 @@ export const api = {
         return res.blob();
     },
 
-    // Music (new WebDAV method)
+    // Music (WebDAV via Nextcloud)
     getMusicFiles: (path: string) => authFetch(`/music/browse?path=${encodeURIComponent(path)}`),
     getMusicContentUrl: (path: string): string => {
         const token = localStorage.getItem('token');
