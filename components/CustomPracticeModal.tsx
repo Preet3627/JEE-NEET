@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import McqTimer from './McqTimer';
 import Icon from './Icon';
@@ -49,12 +50,12 @@ const parseAnswers = (text: string): Record<string, string> => {
     return answers;
 };
 
-
 export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) => {
   const { onClose, onSessionComplete, initialTask, aiPracticeTest, aiInitialTopic, defaultPerQuestionTime, onLogResult, student, onUpdateWeaknesses, onSaveTask, animationOrigin } = props;
   const { currentUser } = useAuth();
   const theme = currentUser?.CONFIG.settings.theme;
-  const [activeTab, setActiveTab] = useState<'ai' | 'manual' | 'jeeMains'>(initialTask ? 'manual' : 'ai');
+  // Added 'mistakes' tab for consistency with previous features
+  const [activeTab, setActiveTab] = useState<'ai' | 'manual' | 'jeeMains' | 'mistakes'>(initialTask ? 'manual' : 'ai');
   const [qRanges, setQRanges] = useState(initialTask?.Q_RANGES || '');
   const [subject, setSubject] = useState(initialTask?.SUBJECT_TAG.EN || 'PHYSICS');
   const [category, setCategory] = useState(initialTask ? 'Homework Practice' : 'AI Generated');
@@ -82,9 +83,23 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
   const fileInputRef = useRef<HTMLInputElement>(null);
   const jeeMainsFileInputRef = useRef<HTMLInputElement>(null);
 
-
   const questionNumbers = useMemo(() => getQuestionNumbersFromRanges(qRanges), [qRanges]);
-  const totalQuestions = questionNumbers.length;
+  
+  // Calculate aggregate mistakes for the Mistakes tab
+  const allMistakes = useMemo(() => {
+      if (!student.RESULTS) return [];
+      const all = new Set<string>();
+      student.RESULTS.forEach(r => {
+          r.MISTAKES.forEach(m => {
+              if (!r.FIXED_MISTAKES?.includes(m)) {
+                  all.add(m);
+              }
+          });
+      });
+      return Array.from(all);
+  }, [student.RESULTS]);
+
+  const totalQuestions = activeTab === 'mistakes' ? allMistakes.length : questionNumbers.length;
   
   const handleStart = async () => {
     setError('');
@@ -102,6 +117,29 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
         }
         setPracticeMode('jeeMains');
         setIsTimerStarted(true);
+    } else if (activeTab === 'mistakes') {
+        if (allMistakes.length === 0) {
+            setError("No active mistakes found to practice.");
+            return;
+        }
+        setIsLoading(true);
+        try {
+            const topicPrompt = `Create a remedial quiz for these weak topics: ${allMistakes.join(', ')}`;
+            const result = await api.generatePracticeTest({ topic: topicPrompt, numQuestions: Math.min(10, allMistakes.length), difficulty: 'Medium' });
+            if (result.questions && result.answers) {
+                setPracticeMode('custom');
+                setPracticeQuestions(result.questions);
+                setPracticeAnswers(result.answers);
+                setCategory("Mistake Remediation");
+                setIsTimerStarted(true);
+            } else {
+                throw new Error("AI returned invalid data.");
+            }
+        } catch (e: any) {
+            setError(e.error || "Failed to generate mistake quiz.");
+        } finally {
+            setIsLoading(false);
+        }
     } else { // AI mode
         if (!aiTopic.trim()) {
             setError('Please enter a topic for the AI to generate questions.');
@@ -131,7 +169,6 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
             setActiveTab('ai');
             setAiTopic(aiInitialTopic);
             setCategory('Post-Session Quiz');
-            // Automatically start the generation
             handleStart();
         }
     }, [aiInitialTopic]);
@@ -167,7 +204,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
                 const formattedKey = Object.entries(json).map(([q, a]) => `${q}:${a}`).join('\n');
                 setCorrectAnswersText(formattedKey);
             } catch (err) {
-                alert("Failed to parse JSON file. Please ensure it's a valid JSON object of answers (e.g., {\"1\": \"A\", \"2\": \"C\"}).");
+                alert("Failed to parse JSON file. Please ensure it's a valid JSON object of answers.");
             }
         };
         reader.readAsText(file);
@@ -188,7 +225,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
                 const formattedKey = Object.entries(json).map(([q, a]) => `${q}:${a}`).join('\n');
                 setJeeMainsCorrectAnswersText(formattedKey);
             } catch (err) {
-                alert("Failed to parse JSON file. Please ensure it's a valid JSON object of answers (e.g., {\"1\": \"A\", \"2\": \"C\"}).");
+                alert("Failed to parse JSON file.");
             }
         };
         reader.readAsText(file);
@@ -215,7 +252,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
         setSubject('MIXED');
         setIsTimerStarted(true);
     } else {
-        alert("The imported data did not contain a valid practice test. Please check the format and try again.");
+        alert("The imported data did not contain a valid practice test.");
     }
     setIsAiParserOpen(false);
   };
@@ -250,7 +287,8 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
               <h2 className="text-sm font-semibold text-white text-center flex-grow -ml-12">Practice Session</h2>
             </div>
           )}
-          <div className="p-6 overflow-y-auto">
+          
+          <div className="p-6 overflow-y-auto max-h-[80vh]">
             {isTimerStarted ? (
               <McqTimer 
                 questionNumbers={practiceQuestions ? practiceQuestions.map(q => q.number) : practiceMode === 'jeeMains' ? Array.from({ length: 75 }, (_, i) => i + 1) : questionNumbers}
@@ -276,10 +314,11 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
                   <button onClick={() => setIsAiParserOpen(true)} className="text-xs font-semibold text-cyan-400 hover:underline flex items-center gap-1"><Icon name="upload" /> Import from Text/JSON</button>
                 </div>
                 
-                <div className="flex items-center gap-2 p-1 rounded-full bg-gray-900/50 my-4">
-                  <button onClick={() => setActiveTab('jeeMains')} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-full ${activeTab === 'jeeMains' ? 'bg-purple-600 text-white' : 'text-gray-300'}`}>JEE Mains Full Test</button>
-                  <button onClick={() => setActiveTab('ai')} disabled={!!initialTask} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-full disabled:opacity-50 ${activeTab === 'ai' ? 'bg-cyan-600 text-white' : 'text-gray-300'}`}>AI Quick Practice</button>
-                  <button onClick={() => setActiveTab('manual')} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-full ${activeTab === 'manual' ? 'bg-cyan-600 text-white' : 'text-gray-300'}`}>From Homework</button>
+                <div className="flex items-center gap-2 p-1 rounded-full bg-gray-900/50 my-4 overflow-x-auto">
+                  <button onClick={() => setActiveTab('jeeMains')} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-full whitespace-nowrap px-2 ${activeTab === 'jeeMains' ? 'bg-purple-600 text-white' : 'text-gray-300'}`}>JEE Full Test</button>
+                  <button onClick={() => setActiveTab('ai')} disabled={!!initialTask} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-full disabled:opacity-50 whitespace-nowrap px-2 ${activeTab === 'ai' ? 'bg-cyan-600 text-white' : 'text-gray-300'}`}>AI Quiz</button>
+                  <button onClick={() => setActiveTab('mistakes')} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-full whitespace-nowrap px-2 ${activeTab === 'mistakes' ? 'bg-red-600 text-white' : 'text-gray-300'}`}>Mistakes</button>
+                  <button onClick={() => setActiveTab('manual')} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-full whitespace-nowrap px-2 ${activeTab === 'manual' ? 'bg-gray-600 text-white' : 'text-gray-300'}`}>Manual</button>
                 </div>
                 
                 {activeTab === 'manual' && (
@@ -323,6 +362,19 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
                               </select>
                           </div>
                       </div>
+                    </div>
+                )}
+                {activeTab === 'mistakes' && (
+                    <div className="space-y-4 text-center py-4">
+                        <Icon name="stopwatch" className="w-12 h-12 text-red-400 mx-auto mb-2" />
+                        <h3 className="text-lg font-bold text-white">Mistake Remediation</h3>
+                        <p className="text-sm text-gray-300">You have <span className="font-bold text-red-400">{allMistakes.length}</span> active mistakes.</p>
+                        <p className="text-xs text-gray-500">The AI will generate specific practice questions targeting these weak areas.</p>
+                        {allMistakes.length > 0 && (
+                            <div className="text-left max-h-32 overflow-y-auto bg-gray-900/50 p-2 rounded border border-gray-700 text-xs text-gray-400 mt-2">
+                                {allMistakes.join(', ')}
+                            </div>
+                        )}
                     </div>
                 )}
                 {activeTab === 'jeeMains' && (

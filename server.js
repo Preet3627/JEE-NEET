@@ -1,3 +1,4 @@
+
 import express from 'express';
 import mysql from 'mysql2/promise';
 import cors from 'cors';
@@ -914,7 +915,11 @@ apiRouter.get('/music/content', async (req, res) => {
         // Create read stream from WebDAV
         const stream = musicWebdavClient.createReadStream(path);
         
-        // Set basic headers if known, otherwise browser handles it
+        // Enable CORS for Web Audio API access
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
         // stream.pipe(res) handles backpressure automatically
         stream.pipe(res);
         

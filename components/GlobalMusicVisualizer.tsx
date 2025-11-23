@@ -6,6 +6,7 @@ const GlobalMusicVisualizer: React.FC = () => {
     const { analyser, isPlaying } = useMusicPlayer();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animationFrameId = useRef<number | null>(null);
+    const hueOffsetRef = useRef<number>(0);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -20,34 +21,48 @@ const GlobalMusicVisualizer: React.FC = () => {
         const canvasCtx = canvas.getContext('2d');
         if (!canvasCtx) return;
 
-        analyser.fftSize = 128; // Lower resolution for a stylized look
+        analyser.fftSize = 128; // Resolution of bars
         const bufferLength = analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
 
         const draw = () => {
-            // FIX: `requestAnimationFrame` requires a callback argument. Passed the `draw` function to create the animation loop.
             animationFrameId.current = requestAnimationFrame(draw);
             analyser.getByteFrequencyData(dataArray);
 
             canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
             
-            const barWidth = 3;
-            let barHeight;
+            // Calculate dimensions - optimize for visual appeal
+            const barsToDraw = Math.floor(bufferLength * 0.75); 
+            const barWidth = (canvas.width / barsToDraw);
             let x = 0;
             
-            // We'll only use a portion of the frequency data for a cleaner look
-            const barsToDraw = Math.floor(bufferLength * 0.7);
+            // Increment color cycle for RGB shuffle effect
+            hueOffsetRef.current = (hueOffsetRef.current + 0.5) % 360;
 
             for (let i = 0; i < barsToDraw; i++) {
-                barHeight = Math.pow(dataArray[i] / 255, 2) * canvas.height;
+                // Scale bar height to canvas, boosting sensitivity
+                const barHeight = Math.max(4, Math.pow(dataArray[i] / 255, 1.5) * canvas.height * 0.95);
                 
-                // Create a gradient color effect
-                const hue = (i / barsToDraw) * 120 + 180; // From cyan to purple-ish
-                canvasCtx.fillStyle = `hsl(${hue}, 80%, 60%)`;
+                // RGB Color Shuffle Logic
+                // Combine time-based offset (hueOffsetRef) with position-based offset (i)
+                const hue = (hueOffsetRef.current + (i * 5)) % 360;
                 
-                canvasCtx.fillRect(x, (canvas.height - barHeight) / 2, barWidth, barHeight);
+                // Create vibrant neon colors
+                canvasCtx.fillStyle = `hsl(${hue}, 90%, 60%)`;
+                
+                // Add a subtle glow effect
+                canvasCtx.shadowBlur = 15;
+                canvasCtx.shadowColor = `hsl(${hue}, 100%, 50%)`;
 
-                x += barWidth + 2;
+                // Draw rounded bar centered vertically
+                const y = (canvas.height - barHeight) / 2;
+                
+                // Draw rect with slightly rounded effect manually if needed, or simple rect
+                canvasCtx.beginPath();
+                canvasCtx.roundRect(x + 1, y, barWidth - 2, barHeight, 2);
+                canvasCtx.fill();
+
+                x += barWidth;
             }
         };
 
@@ -66,24 +81,26 @@ const GlobalMusicVisualizer: React.FC = () => {
 
     return (
         <div 
-          className="fixed left-1/2 -translate-x-1/2 z-[100] global-visualizer-notch"
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] global-visualizer-notch"
           style={{
-            width: '200px',
-            height: '28px',
-            backgroundColor: 'rgba(20, 20, 20, 0.8)',
-            borderRadius: '14px',
-            backdropFilter: 'blur(10px)',
+            width: '280px',
+            height: '42px',
+            backgroundColor: 'rgba(10, 10, 12, 0.7)',
+            borderRadius: '21px',
+            backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '0 8px',
-            transition: 'opacity 0.3s',
+            padding: '0 16px',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.05)',
+            transition: 'opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
             opacity: isPlaying ? 1 : 0,
+            transform: isPlaying ? 'translate(-50%, 0) scale(1)' : 'translate(-50%, -20px) scale(0.9)',
             pointerEvents: 'none'
           }}
         >
-            <canvas ref={canvasRef} width="180" height="20" />
+            <canvas ref={canvasRef} width="248" height="28" />
         </div>
     );
 };
