@@ -9,7 +9,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import { createClient } from 'webdav';
 import { knowledgeBase } from './data/knowledgeBase.js';
 
@@ -310,10 +310,14 @@ apiRouter.get('/dj-drop', async (req, res) => {
 });
 
 apiRouter.get('/config/public', (req, res) => {
-    res.json({
-        googleClientId: process.env.GOOGLE_CLIENT_ID,
-        isNextcloudConfigured: isNextcloudMusicConfigured
-    });
+    try {
+        res.json({
+            googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+            isNextcloudConfigured: isNextcloudConfigured
+        });
+    } catch (e) {
+        res.status(500).json({ error: "Failed to load config" });
+    }
 });
 
 // --- AUTH ROUTES ---
@@ -403,10 +407,15 @@ apiRouter.get('/me', authMiddleware, async (req, res) => {
 
 apiRouter.post('/heartbeat', authMiddleware, async (req, res) => {
     if (!pool) return res.status(503);
-    await pool.query("UPDATE users SET last_seen = NOW() WHERE id = ?", [req.userId]);
-    res.json({ status: 'ok' });
+    try {
+        await pool.query("UPDATE users SET last_seen = NOW() WHERE id = ?", [req.userId]);
+        res.json({ status: 'ok' });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
+// Auto-Verify Register
 apiRouter.post('/register', async (req, res) => {
     const { fullName, sid, email, password } = req.body;
     if (!pool) return res.status(503);
@@ -420,12 +429,16 @@ apiRouter.post('/register', async (req, res) => {
             "INSERT INTO users (sid, email, full_name, password_hash, is_verified, role) VALUES (?, ?, ?, ?, 1, 'student')",
             [sid, email, fullName, hash]
         );
+        const userId = result.insertId;
+        
         const initialConfig = { WAKE: '06:00', SCORE: '0/300', WEAK: [], settings: { accentColor: '#0891b2' } };
-        await pool.query("INSERT INTO user_configs (user_id, config) VALUES (?, ?)", [result.insertId, encrypt(initialConfig)]);
+        await pool.query("INSERT INTO user_configs (user_id, config) VALUES (?, ?)", [userId, encrypt(initialConfig)]);
 
-        const token = jwt.sign({ id: result.insertId, sid, role: 'student' }, JWT_SECRET, { expiresIn: '30d' });
+        // Generate Token Immediately
+        const token = jwt.sign({ id: userId, sid, role: 'student' }, JWT_SECRET, { expiresIn: '30d' });
         res.json({ token });
     } catch(e) {
+        console.error("Register Error", e);
         res.status(500).json({ error: e.message });
     }
 });
@@ -434,96 +447,132 @@ apiRouter.post('/register', async (req, res) => {
 
 apiRouter.get('/admin/students', adminMiddleware, async (req, res) => {
     if (!pool) return res.status(503);
-    const [students] = await pool.query("SELECT id, sid, email, full_name as fullName, profile_photo as profilePhoto, role, last_seen, is_verified FROM users");
-    for (let s of students) {
-        const [configRows] = await pool.query("SELECT config FROM user_configs WHERE user_id = ?", [s.id]);
-        if (configRows.length > 0) {
-            const conf = decrypt(configRows[0].config);
-            s.CONFIG = conf;
-        } else {
-            s.CONFIG = { settings: {} };
+    try {
+        const [students] = await pool.query("SELECT id, sid, email, full_name as fullName, profile_photo as profilePhoto, role, last_seen, is_verified FROM users");
+        for (let s of students) {
+            const [configRows] = await pool.query("SELECT config FROM user_configs WHERE user_id = ?", [s.id]);
+            if (configRows.length > 0) {
+                const conf = decrypt(configRows[0].config);
+                s.CONFIG = conf;
+            } else {
+                s.CONFIG = { settings: {} };
+            }
         }
+        res.json(students);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
-    res.json(students);
 });
 
 apiRouter.post('/admin/impersonate/:sid', adminMiddleware, async (req, res) => {
     const { sid } = req.params;
-    const [users] = await pool.query("SELECT * FROM users WHERE sid = ?", [sid]);
-    if (users.length === 0) return res.status(404).json({ error: "User not found" });
-    const user = users[0];
-    const token = jwt.sign({ id: user.id, sid: user.sid, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
-    res.json({ token });
+    try {
+        const [users] = await pool.query("SELECT * FROM users WHERE sid = ?", [sid]);
+        if (users.length === 0) return res.status(404).json({ error: "User not found" });
+        const user = users[0];
+        const token = jwt.sign({ id: user.id, sid: user.sid, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+        res.json({ token });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 apiRouter.post('/admin/broadcast-task', adminMiddleware, async (req, res) => {
     const { task, examType } = req.body;
-    let query = "SELECT id FROM users WHERE role = 'student'";
-    const [users] = await pool.query(query);
-    
-    for (const u of users) {
-        await pool.query("INSERT INTO schedule_items (user_id, data) VALUES (?, ?)", [u.id, encrypt(task)]);
+    try {
+        let query = "SELECT id FROM users WHERE role = 'student'";
+        const [users] = await pool.query(query);
+        
+        for (const u of users) {
+            await pool.query("INSERT INTO schedule_items (user_id, data) VALUES (?, ?)", [u.id, encrypt(task)]);
+        }
+        res.json({ success: true, count: users.length });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
-    res.json({ success: true, count: users.length });
 });
 
 apiRouter.delete('/admin/students/:sid', adminMiddleware, async (req, res) => {
     const { sid } = req.params;
-    await pool.query("DELETE FROM users WHERE sid = ?", [sid]);
-    res.json({ success: true });
+    try {
+        await pool.query("DELETE FROM users WHERE sid = ?", [sid]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 apiRouter.post('/admin/students/:sid/clear-data', adminMiddleware, async (req, res) => {
     const { sid } = req.params;
-    const [users] = await pool.query("SELECT id FROM users WHERE sid = ?", [sid]);
-    if (users.length === 0) return res.status(404).json({ error: "User not found" });
-    const uid = users[0].id;
-    await pool.query("DELETE FROM schedule_items WHERE user_id = ?", [uid]);
-    await pool.query("DELETE FROM results WHERE user_id = ?", [uid]);
-    await pool.query("DELETE FROM study_sessions WHERE user_id = ?", [uid]);
-    await pool.query("DELETE FROM exams WHERE user_id = ?", [uid]);
-    res.json({ success: true });
+    try {
+        const [users] = await pool.query("SELECT id FROM users WHERE sid = ?", [sid]);
+        if (users.length === 0) return res.status(404).json({ error: "User not found" });
+        const uid = users[0].id;
+        await pool.query("DELETE FROM schedule_items WHERE user_id = ?", [uid]);
+        await pool.query("DELETE FROM results WHERE user_id = ?", [uid]);
+        await pool.query("DELETE FROM study_sessions WHERE user_id = ?", [uid]);
+        await pool.query("DELETE FROM exams WHERE user_id = ?", [uid]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // --- USER DATA ROUTES ---
 
 apiRouter.post('/schedule-items', authMiddleware, async (req, res) => {
     const { task } = req.body;
-    await pool.query("INSERT INTO schedule_items (user_id, data) VALUES (?, ?)", [req.userId, encrypt(task)]);
-    res.json({ success: true, id: task.ID });
+    try {
+        await pool.query("INSERT INTO schedule_items (user_id, data) VALUES (?, ?)", [req.userId, encrypt(task)]);
+        res.json({ success: true, id: task.ID });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 apiRouter.post('/schedule-items/batch', authMiddleware, async (req, res) => {
     const { tasks } = req.body;
-    for (const t of tasks) {
-        await pool.query("INSERT INTO schedule_items (user_id, data) VALUES (?, ?)", [req.userId, encrypt(t)]);
+    try {
+        for (const t of tasks) {
+            await pool.query("INSERT INTO schedule_items (user_id, data) VALUES (?, ?)", [req.userId, encrypt(t)]);
+        }
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
-    res.json({ success: true });
 });
 
 apiRouter.delete('/schedule-items/:id', authMiddleware, async (req, res) => {
-    const [rows] = await pool.query("SELECT id, data FROM schedule_items WHERE user_id = ?", [req.userId]);
-    for (const row of rows) {
-        const data = decrypt(row.data);
-        if (data.ID === req.params.id) {
-            await pool.query("DELETE FROM schedule_items WHERE id = ?", [row.id]);
-            break;
+    try {
+        const [rows] = await pool.query("SELECT id, data FROM schedule_items WHERE user_id = ?", [req.userId]);
+        for (const row of rows) {
+            const data = decrypt(row.data);
+            if (data.ID === req.params.id) {
+                await pool.query("DELETE FROM schedule_items WHERE id = ?", [row.id]);
+                break;
+            }
         }
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
-    res.json({ success: true });
 });
 
 apiRouter.post('/config', authMiddleware, async (req, res) => {
-    const [rows] = await pool.query("SELECT config FROM user_configs WHERE user_id = ?", [req.userId]);
-    let currentConfig = rows.length > 0 ? decrypt(rows[0].config) : {};
-    const newConfig = { ...currentConfig, ...req.body, settings: { ...currentConfig.settings, ...req.body.settings } };
-    
-    if (rows.length > 0) {
-        await pool.query("UPDATE user_configs SET config = ? WHERE user_id = ?", [encrypt(newConfig), req.userId]);
-    } else {
-        await pool.query("INSERT INTO user_configs (user_id, config) VALUES (?, ?)", [req.userId, encrypt(newConfig)]);
+    try {
+        const [rows] = await pool.query("SELECT config FROM user_configs WHERE user_id = ?", [req.userId]);
+        let currentConfig = rows.length > 0 ? decrypt(rows[0].config) : {};
+        const newConfig = { ...currentConfig, ...req.body, settings: { ...currentConfig.settings, ...req.body.settings } };
+        
+        if (rows.length > 0) {
+            await pool.query("UPDATE user_configs SET config = ? WHERE user_id = ?", [encrypt(newConfig), req.userId]);
+        } else {
+            await pool.query("INSERT INTO user_configs (user_id, config) VALUES (?, ?)", [req.userId, encrypt(newConfig)]);
+        }
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
-    res.json({ success: true });
 });
 
 // Full Sync
@@ -531,34 +580,38 @@ apiRouter.post('/user-data/full-sync', authMiddleware, async (req, res) => {
     const { userData } = req.body;
     const uid = req.userId;
     
-    await pool.query("DELETE FROM user_configs WHERE user_id = ?", [uid]);
-    await pool.query("INSERT INTO user_configs (user_id, config) VALUES (?, ?)", [uid, encrypt(userData.CONFIG)]);
+    try {
+        await pool.query("DELETE FROM user_configs WHERE user_id = ?", [uid]);
+        await pool.query("INSERT INTO user_configs (user_id, config) VALUES (?, ?)", [uid, encrypt(userData.CONFIG)]);
 
-    await pool.query("DELETE FROM schedule_items WHERE user_id = ?", [uid]);
-    if (userData.SCHEDULE_ITEMS.length > 0) {
-        const values = userData.SCHEDULE_ITEMS.map(i => [uid, encrypt(i)]);
-        await pool.query("INSERT INTO schedule_items (user_id, data) VALUES ?", [values]);
-    }
+        await pool.query("DELETE FROM schedule_items WHERE user_id = ?", [uid]);
+        if (userData.SCHEDULE_ITEMS.length > 0) {
+            const values = userData.SCHEDULE_ITEMS.map(i => [uid, encrypt(i)]);
+            await pool.query("INSERT INTO schedule_items (user_id, data) VALUES ?", [values]);
+        }
 
-    await pool.query("DELETE FROM results WHERE user_id = ?", [uid]);
-    if (userData.RESULTS.length > 0) {
-        const values = userData.RESULTS.map(i => [uid, encrypt(i)]);
-        await pool.query("INSERT INTO results (user_id, data) VALUES ?", [values]);
-    }
+        await pool.query("DELETE FROM results WHERE user_id = ?", [uid]);
+        if (userData.RESULTS.length > 0) {
+            const values = userData.RESULTS.map(i => [uid, encrypt(i)]);
+            await pool.query("INSERT INTO results (user_id, data) VALUES ?", [values]);
+        }
 
-    await pool.query("DELETE FROM exams WHERE user_id = ?", [uid]);
-    if (userData.EXAMS.length > 0) {
-        const values = userData.EXAMS.map(i => [uid, encrypt(i)]);
-        await pool.query("INSERT INTO exams (user_id, data) VALUES ?", [values]);
-    }
-    
-    await pool.query("DELETE FROM study_sessions WHERE user_id = ?", [uid]);
-    if (userData.STUDY_SESSIONS.length > 0) {
-        const values = userData.STUDY_SESSIONS.map(i => [uid, encrypt(i)]);
-        await pool.query("INSERT INTO study_sessions (user_id, data) VALUES ?", [values]);
-    }
+        await pool.query("DELETE FROM exams WHERE user_id = ?", [uid]);
+        if (userData.EXAMS.length > 0) {
+            const values = userData.EXAMS.map(i => [uid, encrypt(i)]);
+            await pool.query("INSERT INTO exams (user_id, data) VALUES ?", [values]);
+        }
+        
+        await pool.query("DELETE FROM study_sessions WHERE user_id = ?", [uid]);
+        if (userData.STUDY_SESSIONS.length > 0) {
+            const values = userData.STUDY_SESSIONS.map(i => [uid, encrypt(i)]);
+            await pool.query("INSERT INTO study_sessions (user_id, data) VALUES ?", [values]);
+        }
 
-    res.json({ success: true });
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // --- DOUBTS ---
@@ -680,19 +733,30 @@ const commonAIHandler = async (req, res, promptBuilder) => {
         const chatConfig = { systemInstruction };
         if (jsonResponse) chatConfig.responseMimeType = 'application/json';
 
-        const chat = ai.chats.create({ model, config: chatConfig });
-        
-        const parts = [{ text: userPrompt }];
-        if (imageBase64) parts.push({ inlineData: { mimeType: 'image/jpeg', data: imageBase64 } });
+        const contents = [{
+            role: 'user',
+            parts: [
+                { text: userPrompt },
+                ...(imageBase64 ? [{ inlineData: { mimeType: 'image/jpeg', data: imageBase64 } }] : [])
+            ]
+        }];
 
-        const result = await chat.sendMessage({ message: parts }); 
-        
+        const response = await ai.models.generateContent({
+            model,
+            contents,
+            config: chatConfig
+        });
+
+        let text = response.text;
         if (jsonResponse) {
-            res.json(JSON.parse(result.response.text));
+            // Sanitize JSON if needed
+            text = text.replace(/```json\n?|\n?```/g, '').trim();
+            res.json(JSON.parse(text));
         } else {
-            res.json({ response: result.response.text });
+            res.json({ response: text });
         }
     } catch (e) {
+        console.error("AI Handler Error:", e);
         res.status(500).json({ error: e.message });
     }
 };
@@ -728,13 +792,28 @@ apiRouter.post('/ai/chat', authMiddleware, async (req, res) => {
         const model = 'gemini-2.5-flash';
         const systemInstruction = `You are a helpful AI assistant. ${getKnowledgeBaseForUser(config)}`;
         
-        const chat = ai.chats.create({ model, config: { systemInstruction }, history: history.map(h => ({ role: h.role, parts: h.parts })) });
+        // Construct history compatible with SDK
+        const chatHistory = history.map(h => ({
+            role: h.role,
+            parts: h.parts
+        }));
+
+        const chat = ai.chats.create({
+            model,
+            config: { systemInstruction },
+            history: chatHistory
+        });
+
         const parts = [{ text: prompt }];
-        if (imageBase64) parts.push({ inlineData: { mimeType: 'image/jpeg', data: imageBase64 } });
+        if (imageBase64) {
+            parts.push({ inlineData: { mimeType: 'image/jpeg', data: imageBase64 } });
+        }
 
         const result = await chat.sendMessage({ message: parts });
+        // Use .text getter
         res.json({ role: 'model', parts: [{ text: result.response.text }] });
     } catch (error) {
+        console.error("AI Chat Error:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -818,11 +897,10 @@ apiRouter.get('/music/browse', authMiddleware, async (req, res) => {
 });
 
 apiRouter.get('/music/content', async (req, res) => {
-    // Music streaming often uses direct Audio tags which can't easily send Auth headers.
-    // We allow access via query token for this specific route.
+    // Direct streaming with robust error handling
     const token = req.query.token;
-    if (!token) return res.status(401).send('Unauthorized');
     
+    if (!token) return res.status(401).send('Unauthorized');
     try {
         jwt.verify(token, JWT_SECRET);
     } catch {
@@ -833,10 +911,24 @@ apiRouter.get('/music/content', async (req, res) => {
     if (!musicWebdavClient || !path) return res.status(404).send('Not found');
     
     try {
+        // Create read stream from WebDAV
         const stream = musicWebdavClient.createReadStream(path);
+        
+        // Set basic headers if known, otherwise browser handles it
+        // stream.pipe(res) handles backpressure automatically
         stream.pipe(res);
+        
+        stream.on('error', (err) => {
+            console.error("Stream Error:", err);
+            if (!res.headersSent) {
+                res.status(500).send("Stream Error");
+            }
+        });
     } catch (e) {
-        res.status(500).send();
+        console.error("Music Content Error:", e);
+        if (!res.headersSent) {
+            res.status(500).send("Internal Server Error");
+        }
     }
 });
 
