@@ -1,3 +1,4 @@
+
 export type Language = 'EN' | 'GU';
 
 export interface LocalizedString {
@@ -34,15 +35,15 @@ export interface ScheduleCardData {
   isStarred?: boolean;
   googleEventId?: string;
   deckId?: string;
-  date?: string; // For one-off events, format YYYY-MM-DD
-  gradient?: string; // e.g., 'from-cyan-500 to-blue-600'
-  imageUrl?: string; // URL for background image
-  externalLink?: string; // URL to open external app (Zoom, Meet, etc)
-  isRecurring?: boolean; // If true, exports as weekly recurring for 2 years
+  date?: string;
+  gradient?: string;
+  imageUrl?: string;
+  externalLink?: string;
+  isRecurring?: boolean;
 }
 
 export interface PracticeHistory {
-  date: string; // ISO string
+  date: string;
   attempted: number[];
   correct: number[];
   incorrect: number[];
@@ -62,14 +63,14 @@ export interface HomeworkData {
   isUserCreated?: boolean;
   isStarred?: boolean;
   googleEventId?: string;
-  answers?: Record<string, string>; // e.g., { "1": "A", "2": "12.5" }
-  solutions?: Record<string, string>; // For AI-generated detailed solutions
-  date?: string; // For one-off homework, format YYYY-MM-DD
+  answers?: Record<string, string>;
+  solutions?: Record<string, string>;
+  date?: string;
   practiceHistory?: PracticeHistory[];
-  flashcards?: { front: string; back: string }[]; // For AI-generated cards
+  flashcards?: { front: string; back: string }[];
   gradient?: string;
   imageUrl?: string;
-  externalLink?: string; // URL to open external app
+  externalLink?: string;
   isRecurring?: boolean;
 }
 
@@ -89,13 +90,11 @@ export type ScheduleItem = ScheduleCardData | HomeworkData | ActivityData;
 export interface ResultData {
   ID: string;
   DATE: string;
-  SCORE: string; // e.g., "185/300"
-  MISTAKES: string[]; // List of mistake topics or question numbers
+  SCORE: string;
+  MISTAKES: string[];
   FIXED_MISTAKES?: string[];
-  
-  // New detailed analysis fields
   syllabus?: string;
-  timings?: Record<number, number>; // { qNum: seconds }
+  timings?: Record<number, number>;
   analysis?: {
     subjectTimings: Record<'PHYSICS' | 'CHEMISTRY' | 'MATHS' | 'OTHER', number>;
     chapterScores: Record<string, { correct: number; incorrect: number; accuracy: number }>;
@@ -112,14 +111,13 @@ export interface ResultData {
   }[];
 }
 
-
 export interface ExamData {
   ID: string;
   subject: 'PHYSICS' | 'CHEMISTRY' | 'MATHS' | 'FULL';
   title: string;
-  date: string; // YYYY-MM-DD
-  time: string; // HH:MM
-  syllabus: string; // Comma-separated list of topics
+  date: string;
+  time: string;
+  syllabus: string;
 }
 
 export interface SolutionData {
@@ -127,7 +125,7 @@ export interface SolutionData {
   doubt_id: string;
   user_sid: string;
   solution: string;
-  solution_image?: string; // Base64 image data
+  solution_image?: string;
   created_at: string;
   solver_name: string;
   solver_photo: string;
@@ -137,7 +135,7 @@ export interface DoubtData {
   id: string;
   user_sid: string;
   question: string;
-  question_image?: string; // Base64 image data
+  question_image?: string;
   created_at: string;
   author_name: string;
   author_photo: string;
@@ -154,8 +152,8 @@ export interface MessageData {
 }
 
 export interface StudySession {
-  date: string; // YYYY-MM-DD
-  duration: number; // in seconds
+  date: string;
+  duration: number;
   questions_solved: number;
   questions_skipped: number[];
 }
@@ -165,14 +163,14 @@ export interface Track {
   title: string;
   artist: string;
   album: string;
-  track: string; // track number
-  coverArt: string; // cover art ID from Ampache/WebDAV
-  duration: string; // in seconds
-  size: string; // in bytes
-  coverArtUrl?: string; // dynamically added by the player context
+  track: string;
+  coverArt: string;
+  duration: string;
+  size: string;
+  coverArtUrl?: string;
   isLocal?: boolean;
-  file?: File; // For local files using File System Access API
-  path?: string; // For Nextcloud files
+  file?: File;
+  path?: string;
 }
 
 export interface Flashcard {
@@ -208,27 +206,43 @@ export interface PracticeQuestion {
 export interface CustomWidget {
   id: string;
   title: string;
-  content: string; // Markdown content
+  content: string;
 }
 
 export interface LocalPlaylist {
   id: string;
   name: string;
-  trackIds: string[]; // For local files, this could be the file name or a generated ID
+  trackIds: string[];
 }
 
 export type ActiveTab = 'dashboard' | 'schedule' | 'today' | 'planner' | 'exams' | 'performance' | 'doubts' | 'flashcards' | 'material';
 
 export interface DashboardWidgetItem {
-    id: string; // Corresponds to a key in the widgetConfig map or a customWidget ID
+    id: string;
     wide?: boolean;
-    tall?: boolean; // Added for increasable length
+    tall?: boolean;
     translucent?: boolean;
     minimized?: boolean;
     customTitle?: string;
 }
 
-// Represents the structure of the encrypted JSON blob in the `user_configs` table
+export interface NotchSettings {
+    position: 'top' | 'bottom';
+    size: 'small' | 'medium' | 'large';
+    width: number; // percentage 20-100
+}
+
+export interface VisualizerSettings {
+    preset: 'bars' | 'wave' | 'circle';
+    colorMode: 'rgb' | 'album' | 'mono';
+}
+
+export interface DjDropSettings {
+    enabled: boolean;
+    autoTrigger: boolean; // Play on auto-mix
+    customDropUrl?: string; // Base64 or URL
+}
+
 export interface Config {
     WAKE: string;
     SCORE: string;
@@ -238,9 +252,9 @@ export interface Config {
     driveLastSync?: string;
     isCalendarSyncEnabled?: boolean;
     calendarLastSync?: string;
-    geminiApiKey?: string; // This is stored encrypted on the backend ONLY.
+    geminiApiKey?: string;
     flashcardDecks?: FlashcardDeck[];
-    pinnedMaterials?: string[]; // Array of item paths
+    pinnedMaterials?: string[];
     customWidgets?: CustomWidget[];
     localPlaylists?: LocalPlaylist[];
     settings: {
@@ -248,25 +262,26 @@ export interface Config {
         blurEnabled: boolean;
         mobileLayout: 'standard' | 'toolbar';
         forceOfflineMode: boolean;
-        perQuestionTime: number; // Default time in seconds per MCQ
-        hasGeminiKey?: boolean; // A safe flag for the frontend
+        perQuestionTime: number;
+        hasGeminiKey?: boolean;
         showAiChatAssistant?: boolean;
-        creditSaver?: boolean; // Use faster, cheaper AI models
+        creditSaver?: boolean;
         examType?: 'JEE' | 'NEET';
         theme?: 'default' | 'liquid-glass' | 'midnight';
         dashboardLayout?: DashboardWidgetItem[];
         dashboardFlashcardDeckIds?: string[];
         musicPlayerWidgetLayout?: 'minimal' | 'expanded';
         widgetSettings?: { [widgetId: string]: { translucent?: boolean; wide?: boolean } };
-        dashboardBackgroundImage?: string; // New: Custom background
-        dashboardTransparency?: number; // New: Widget transparency level (0-100)
-        alwaysShowMusicPopup?: boolean; // New: Music setting
+        dashboardBackgroundImage?: string;
+        dashboardTransparency?: number;
+        alwaysShowMusicPopup?: boolean;
+        notchSettings?: NotchSettings;
+        visualizerSettings?: VisualizerSettings;
+        djDropSettings?: DjDropSettings;
     };
 }
 
-// The complete, normalized user data object used throughout the frontend
 export interface StudentData {
-    // Core user info from the `users` table
     id: number;
     sid: string;
     email: string;
@@ -274,10 +289,8 @@ export interface StudentData {
     profilePhoto: string;
     isVerified: boolean;
     role: 'student' | 'admin';
-    apiToken?: string; // Only sent once on generation
-    last_seen?: string; // ISO timestamp for online status
-
-    // Data from other tables, combined by the backend
+    apiToken?: string;
+    last_seen?: string;
     CONFIG: Config;
     SCHEDULE_ITEMS: ScheduleItem[];
     RESULTS: ResultData[];
