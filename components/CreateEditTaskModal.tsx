@@ -155,12 +155,14 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
   const ModalShell: React.FC<{ children: React.ReactNode, title: string }> = ({ children, title }) => (
     <div className={`fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${animationClasses}`} style={{ '--clip-origin-x': animationOrigin?.x, '--clip-origin-y': animationOrigin?.y } as React.CSSProperties} onClick={handleClose}>
       <div className={`w-full max-w-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--modal-border-radius)] shadow-[var(--modal-shadow)] ${contentAnimationClasses} max-h-[90vh] overflow-hidden flex flex-col`} onClick={(e) => e.stopPropagation()}>
-        {theme === 'liquid-glass' && (
-          <div className="flex-shrink-0 flex items-center p-3 border-b border-[var(--glass-border)]">
-            <div className="flex gap-2"><button onClick={handleClose} className="w-3 h-3 rounded-full bg-red-500"></button><div className="w-3 h-3 rounded-full bg-yellow-500"></div><div className="w-3 h-3 rounded-full bg-green-500"></div></div>
-            <h2 className="text-sm font-semibold text-white text-center flex-grow -ml-12">{title}</h2>
-          </div>
-        )}
+        {/* MacOS Traffic Light Header */}
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-black/20">
+            <button onClick={handleClose} className="w-3 h-3 rounded-full bg-[#ff5f56] hover:bg-[#ff5f56]/80 shadow-inner"></button>
+            <div className="w-3 h-3 rounded-full bg-[#ffbd2e] shadow-inner"></div>
+            <div className="w-3 h-3 rounded-full bg-[#27c93f] shadow-inner"></div>
+            <span className="ml-2 text-xs font-medium text-gray-400 tracking-wide">{title}</span>
+        </div>
+
         <div className={`p-6 ${theme === 'liquid-glass' ? 'overflow-y-auto' : ''}`}>
           {theme !== 'liquid-glass' && <h2 className="text-2xl font-bold text-white mb-4">{title}</h2>}
           {children}
@@ -205,8 +207,14 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
               </select>
             </div>
 
-            <div><label className="text-sm font-bold text-gray-400">Title</label><input required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className={inputClass} /></div>
-            <div><label className="text-sm font-bold text-gray-400">Details</label><textarea required value={formData.details} onChange={e => setFormData({...formData, details: e.target.value})} className={inputClass}></textarea></div>
+            <div>
+              <label className="text-sm font-bold text-gray-400">Title</label>
+              <input required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className={inputClass} />
+            </div>
+             <div>
+              <label className="text-sm font-bold text-gray-400">Details</label>
+              <textarea required value={formData.details} onChange={e => setFormData({...formData, details: e.target.value})} className={inputClass}></textarea>
+            </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                  <div>

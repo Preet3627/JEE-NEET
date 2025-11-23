@@ -1,5 +1,4 @@
 
-// ... existing imports ...
 import React, { useState, useEffect } from 'react';
 import { Config, FlashcardDeck, DashboardWidgetItem } from '../types';
 import Icon from './Icon';
@@ -22,7 +21,7 @@ interface SettingsModalProps {
   onOpenAssistantGuide: () => void;
   onOpenAiGuide: () => void;
   onClearAllSchedule: () => void;
-  onToggleEditLayout?: () => void; // New Prop
+  onToggleEditLayout?: () => void;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = (props) => {
@@ -57,27 +56,15 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
   const [dashboardFlashcardDeckIds, setDashboardFlashcardDeckIds] = useState(settings.dashboardFlashcardDeckIds || []);
   const [musicPlayerLayout, setMusicPlayerLayout] = useState(settings.musicPlayerWidgetLayout || 'minimal');
   
-  // New Aesthetic Settings
   const [bgImage, setBgImage] = useState(settings.dashboardBackgroundImage || '');
   const [transparency, setTransparency] = useState(settings.dashboardTransparency ?? 50);
 
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
   const [isExiting, setIsExiting] = useState(false);
-  const [notificationPermission, setNotificationPermission] = useState(Notification.permission);
 
   const handleClose = () => {
     setIsExiting(true);
     setTimeout(onClose, 300);
-  };
-
-  const handleRequestNotification = async () => {
-    const permission = await Notification.requestPermission();
-    setNotificationPermission(permission);
-    if (permission === 'granted') {
-        new Notification("Notifications Enabled!", {
-            body: "You'll now receive reminders for your schedule.",
-        });
-    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -108,148 +95,155 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
     handleClose();
   };
 
-  const toggleFullScreen = () => {
-    if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(err => alert(`Error enabling full-screen: ${err.message}`));
-    } else {
-        document.exitFullscreen();
-    }
-  };
-
   useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', onFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
   }, []);
   
-  const colorPresets = ['#0891b2', '#7c3aed', '#16a34a', '#db2777', '#ca8a04', '#64748b'];
   const inputClass = "w-full px-4 py-2 mt-1 text-gray-200 bg-gray-900/50 border border-[var(--glass-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500";
   const animationClasses = isExiting ? 'modal-exit' : 'modal-enter';
   const contentAnimationClasses = isExiting ? 'modal-content-exit' : 'modal-content-enter';
 
-  const ToggleSwitch: React.FC<{ label: string; desc?: string; checked: boolean; onChange: (c: boolean) => void; id: string; disabled?: boolean; }> = ({ label, desc, checked, onChange, id, disabled }) => (
-    <div className={`${disabled ? 'opacity-50' : ''}`}>
-        <label className="text-base font-bold text-gray-300 flex items-center justify-between">
-            <span>{label}</span>
-            <div className="relative inline-block w-10 align-middle"><input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} id={id} disabled={disabled} className={`toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`} style={{ right: checked ? '0' : 'auto', left: checked ? 'auto' : '0' }}/><label htmlFor={id} className={`toggle-label block h-6 rounded-full ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'} ${checked ? 'bg-cyan-500' : 'bg-gray-600'}`}></label></div>
-        </label>
-        {desc && <p className="text-xs text-gray-500 mt-1">{desc}</p>}
-    </div>
-  );
-
   return (
     <div className={`fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${animationClasses}`} onClick={handleClose}>
-      <div className={`w-full max-w-md bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl shadow-2xl p-6 ${contentAnimationClasses} overflow-y-auto max-h-[90vh]`} onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-2xl font-bold text-white mb-6">Settings</h2>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          
-          <div className="space-y-4">
-             <h3 className="text-base font-bold text-gray-300">Dashboard & Appearance</h3>
-              
-              {/* Custom Background & Transparency */}
-              <div className="bg-gray-900/50 p-3 rounded-lg border border-gray-700/50 space-y-3">
-                  <div>
-                      <label className="text-xs font-bold text-gray-400">Background Image URL</label>
-                      <input value={bgImage} onChange={e => setBgImage(e.target.value)} className={inputClass + " text-sm py-1"} placeholder="https://example.com/bg.jpg" />
-                  </div>
-                  <div>
-                      <label className="text-xs font-bold text-gray-400 flex justify-between">
-                          Widget Transparency
-                          <span>{transparency}%</span>
-                      </label>
-                      <input 
-                        type="range" 
-                        min="0" 
-                        max="100" 
-                        value={transparency} 
-                        onChange={e => setTransparency(Number(e.target.value))} 
-                        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500" 
-                      />
-                  </div>
-              </div>
+      <div className={`w-full max-w-md bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl shadow-2xl ${contentAnimationClasses} overflow-hidden flex flex-col max-h-[90vh]`} onClick={(e) => e.stopPropagation()}>
+        
+        {/* MacOS Traffic Light Header */}
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-black/20">
+            <button onClick={handleClose} className="w-3 h-3 rounded-full bg-[#ff5f56] hover:bg-[#ff5f56]/80 shadow-inner"></button>
+            <div className="w-3 h-3 rounded-full bg-[#ffbd2e] shadow-inner"></div>
+            <div className="w-3 h-3 rounded-full bg-[#27c93f] shadow-inner"></div>
+            <span className="ml-2 text-xs font-medium text-gray-400 tracking-wide">System Settings</span>
+        </div>
 
-              <div>
-                  <label className="text-sm font-bold text-gray-400">Default Layout</label>
-                  <div className="grid grid-cols-3 gap-2 mt-1">
-                      {(['default', 'focus', 'compact'] as const).map(layout => (
-                          <button key={layout} type="button" onClick={() => setDashboardLayoutPreset(layout)} className={`p-2 rounded-lg border-2 ${dashboardLayoutPreset === layout ? 'border-cyan-500' : 'border-transparent'}`}>
-                              <div className={`h-16 bg-gray-900/50 rounded-md p-1.5 flex gap-1.5 ${layout === 'focus' ? 'flex-col' : ''} ${layout === 'compact' ? 'flex-wrap' : ''}`}>
-                                  <div className={`rounded-sm bg-cyan-500/50 ${layout === 'focus' ? 'w-full h-1/2' : 'w-1/2 h-full'}`}></div>
-                                  <div className={`rounded-sm bg-purple-500/50 ${layout === 'focus' ? 'w-full h-1/2' : 'w-1/2 h-full'}`}></div>
-                              </div>
-                              <p className="text-xs mt-1 text-gray-300 capitalize">{layout}</p>
-                          </button>
-                      ))}
-                  </div>
-                  {onToggleEditLayout && (
-                      <button type="button" onClick={() => { onToggleEditLayout(); handleClose(); }} className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-xl shadow-lg transform transition hover:scale-[1.02]">
-                          <Icon name="dashboard" className="w-5 h-5" /> Open Layout Editor
-                      </button>
-                  )}
-              </div>
-              <div>
-                  <label className="text-sm font-bold text-gray-400">Flashcard Widget</label>
-                  <p className="text-xs text-gray-500 mb-2">Select decks to show on the dashboard.</p>
-                  <div className="max-h-32 overflow-y-auto space-y-1 bg-gray-900/50 p-2 rounded-md">
-                      {decks.map(deck => (
-                          <label key={deck.id} className="flex items-center gap-2 text-sm text-gray-300">
-                              <input
-                                  type="checkbox"
-                                  className="w-4 h-4 rounded text-cyan-600 bg-gray-700 border-gray-600 focus:ring-cyan-500"
-                                  checked={dashboardFlashcardDeckIds.includes(deck.id)}
-                                  onChange={e => {
-                                      if (e.target.checked) {
-                                          setDashboardFlashcardDeckIds(prev => [...prev, deck.id]);
-                                      } else {
-                                          setDashboardFlashcardDeckIds(prev => prev.filter(id => id !== deck.id));
-                                      }
-                                  }}
-                              />
-                              {deck.name}
-                          </label>
-                      ))}
-                  </div>
-              </div>
-          </div>
+        <div className="p-6 overflow-y-auto">
+            <form onSubmit={handleSubmit} className="space-y-6">
+            
+            {/* Google Integration Section */}
+            <div>
+                <h3 className="text-base font-bold text-gray-300 mb-3">Google Integration</h3>
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 space-y-4">
+                    <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-300">Account Status</span>
+                        {googleAuthStatus === 'signed_in' ? (
+                            <button type="button" onClick={onGoogleSignOut} className="text-xs bg-red-600/20 text-red-400 px-3 py-1.5 rounded-md border border-red-600/50 hover:bg-red-600/30">Disconnect</button>
+                        ) : (
+                            <button type="button" onClick={onGoogleSignIn} className="text-xs bg-cyan-600/20 text-cyan-400 px-3 py-1.5 rounded-md border border-cyan-600/50 hover:bg-cyan-600/30">Connect Google</button>
+                        )}
+                    </div>
 
-          <div className="border-t border-gray-700/50"></div>
-          
-           <div>
-              <h3 className="text-base font-bold text-gray-300">Integrations & Data</h3>
-               <div className="mt-4 bg-gray-900/50 p-3 rounded-lg border border-gray-700">
-                <p className="text-sm font-semibold text-cyan-400">Gemini API Key</p>
-                <p className="text-xs text-gray-400 mb-2">Provide your own key to use AI features. Your key is stored securely and is never visible to others.</p>
-                 <input type="password" value={geminiApiKey} onChange={(e) => setGeminiApiKey(e.target.value)} className={inputClass} placeholder="Enter new API key to update" />
-                 {settings.hasGeminiKey && !geminiApiKey && <p className="text-xs text-green-400 mt-1">An API key is already saved for your account.</p>}
-              </div>
-              {/* ... other settings ... */}
-          </div>
-          
-          <div className="border-t border-gray-700/50"></div>
+                    {googleAuthStatus === 'signed_in' && (
+                        <>
+                            <div className="flex justify-between items-center border-t border-gray-700/50 pt-3">
+                                <div>
+                                    <p className="text-sm font-bold text-white">Google Drive Backup</p>
+                                    <p className="text-xs text-gray-500">{driveLastSync ? `Last sync: ${new Date(driveLastSync).toLocaleDateString()}` : 'Not synced yet'}</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button type="button" onClick={onBackupToDrive} className="p-2 text-gray-400 hover:text-white" title="Backup now"><Icon name="upload" /></button>
+                                    <button type="button" onClick={onRestoreFromDrive} className="p-2 text-gray-400 hover:text-white" title="Restore"><Icon name="upload" className="transform rotate-180" /></button>
+                                </div>
+                            </div>
 
-          <div>
-             <h3 className="text-base font-bold text-gray-300">App Preferences</h3>
-             <div className="mt-4 space-y-4">
+                            <div className="flex justify-between items-center border-t border-gray-700/50 pt-3">
+                                <div>
+                                    <p className="text-sm font-bold text-white">Google Calendar Sync</p>
+                                    <p className="text-xs text-gray-500">{isCalendarSyncEnabled ? 'Active' : 'Disabled'}</p>
+                                </div>
+                                <input 
+                                    type="checkbox" 
+                                    checked={calendarSync} 
+                                    onChange={(e) => setCalendarSync(e.target.checked)} 
+                                    className="w-5 h-5 rounded text-cyan-600 bg-gray-700 border-gray-600 focus:ring-cyan-500"
+                                />
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            <div className="border-t border-gray-700/50"></div>
+
+            {/* Documentation Section */}
+            <div>
+                <h3 className="text-base font-bold text-gray-300 mb-3">Guides & Help</h3>
+                <div className="grid grid-cols-2 gap-3">
+                    <button type="button" onClick={onOpenAssistantGuide} className="flex items-center justify-center gap-2 p-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm text-gray-300 border border-gray-700">
+                        <Icon name="message" className="w-4 h-4" /> Voice Commands
+                    </button>
+                    <button type="button" onClick={onOpenAiGuide} className="flex items-center justify-center gap-2 p-3 rounded-lg bg-gray-800 hover:bg-gray-700 text-sm text-gray-300 border border-gray-700">
+                        <Icon name="book-open" className="w-4 h-4" /> AI Agent Guide
+                    </button>
+                </div>
+            </div>
+
+            <div className="border-t border-gray-700/50"></div>
+
+            {/* Dashboard & Appearance */}
+            <div className="space-y-4">
+                <h3 className="text-base font-bold text-gray-300">Dashboard & Appearance</h3>
+                
+                <div className="bg-gray-900/50 p-3 rounded-lg border border-gray-700/50 space-y-3">
+                    <div>
+                        <label className="text-xs font-bold text-gray-400">Background Image URL</label>
+                        <input value={bgImage} onChange={e => setBgImage(e.target.value)} className={inputClass + " text-sm py-1"} placeholder="https://example.com/bg.jpg" />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-400 flex justify-between">
+                            Widget Transparency
+                            <span>{transparency}%</span>
+                        </label>
+                        <input 
+                            type="range" 
+                            min="0" 
+                            max="100" 
+                            value={transparency} 
+                            onChange={e => setTransparency(Number(e.target.value))} 
+                            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-cyan-500" 
+                        />
+                    </div>
+                </div>
+
                 <div>
-                    <label className="text-base font-bold text-gray-300">Theme</label>
-                    <div className="flex gap-2 mt-2">
-                        {(['default', 'liquid-glass', 'midnight'] as const).map(t => (
-                            <button key={t} type="button" onClick={() => setTheme(t)} className={`flex-1 p-2 rounded-lg border-2 ${theme === t ? 'border-cyan-500' : 'border-transparent'}`}>
-                                <div className={`h-8 rounded-md bg-gray-700 ${t === 'liquid-glass' ? 'bg-blue-200' : ''} ${t === 'midnight' ? 'bg-black' : ''}`}></div>
-                                <p className="text-xs mt-1 text-gray-300 capitalize">{t.replace('-', ' ')}</p>
+                    <label className="text-sm font-bold text-gray-400">Default Layout</label>
+                    <div className="grid grid-cols-3 gap-2 mt-1">
+                        {(['default', 'focus', 'compact'] as const).map(layout => (
+                            <button key={layout} type="button" onClick={() => setDashboardLayoutPreset(layout)} className={`p-2 rounded-lg border-2 ${dashboardLayoutPreset === layout ? 'border-cyan-500' : 'border-transparent'}`}>
+                                <div className={`h-16 bg-gray-900/50 rounded-md p-1.5 flex gap-1.5 ${layout === 'focus' ? 'flex-col' : ''} ${layout === 'compact' ? 'flex-wrap' : ''}`}>
+                                    <div className={`rounded-sm bg-cyan-500/50 ${layout === 'focus' ? 'w-full h-1/2' : 'w-1/2 h-full'}`}></div>
+                                    <div className={`rounded-sm bg-purple-500/50 ${layout === 'focus' ? 'w-full h-1/2' : 'w-1/2 h-full'}`}></div>
+                                </div>
+                                <p className="text-xs mt-1 text-gray-300 capitalize">{layout}</p>
                             </button>
                         ))}
                     </div>
+                    {onToggleEditLayout && (
+                        <button type="button" onClick={() => { onToggleEditLayout(); handleClose(); }} className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-xl shadow-lg transform transition hover:scale-[1.02]">
+                            <Icon name="dashboard" className="w-5 h-5" /> Open Layout Editor
+                        </button>
+                    )}
                 </div>
-                {/* ... other prefs ... */}
             </div>
-          </div>
 
-          <div className="flex justify-end gap-4 pt-4">
-            <button type="button" onClick={handleClose} className="px-5 py-2 text-sm font-semibold rounded-lg bg-gray-700">Cancel</button>
-            <button type="submit" className="px-5 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-[var(--accent-color)] to-[var(--gradient-purple)] text-white">Save</button>
-          </div>
-        </form>
+            <div className="border-t border-gray-700/50"></div>
+            
+            <div>
+                <h3 className="text-base font-bold text-gray-300">AI Settings</h3>
+                <div className="mt-4 bg-gray-900/50 p-3 rounded-lg border border-gray-700">
+                    <p className="text-sm font-semibold text-cyan-400">Gemini API Key</p>
+                    <p className="text-xs text-gray-400 mb-2">Provide your own key to use AI features. Your key is stored securely.</p>
+                    <input type="password" value={geminiApiKey} onChange={(e) => setGeminiApiKey(e.target.value)} className={inputClass} placeholder="Enter new API key to update" />
+                    {settings.hasGeminiKey && !geminiApiKey && <p className="text-xs text-green-400 mt-1">API key is configured.</p>}
+                </div>
+            </div>
+            
+            <div className="flex justify-end gap-4 pt-4">
+                <button type="button" onClick={handleClose} className="px-5 py-2 text-sm font-semibold rounded-lg bg-gray-700">Cancel</button>
+                <button type="submit" className="px-5 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-[var(--accent-color)] to-[var(--gradient-purple)] text-white">Save</button>
+            </div>
+            </form>
+        </div>
       </div>
     </div>
   );

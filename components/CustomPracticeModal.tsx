@@ -6,6 +6,7 @@ import { HomeworkData, ResultData, StudentData, ScheduleItem, PracticeQuestion }
 import AIGenerateAnswerKeyModal from './AIGenerateAnswerKeyModal';
 import AIParserModal from './AIParserModal';
 import { api } from '../api/apiService';
+import { useAuth } from '../context/AuthContext';
 
 interface CustomPracticeModalProps {
   onClose: () => void;
@@ -18,6 +19,7 @@ interface CustomPracticeModalProps {
   onUpdateWeaknesses: (weaknesses: string[]) => void;
   student: StudentData;
   onSaveTask: (task: ScheduleItem) => void;
+  animationOrigin?: { x: string, y: string };
 }
 
 const parseAnswers = (text: string): Record<string, string> => {
@@ -48,8 +50,10 @@ const parseAnswers = (text: string): Record<string, string> => {
 };
 
 
-const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) => {
-  const { onClose, onSessionComplete, initialTask, aiPracticeTest, aiInitialTopic, defaultPerQuestionTime, onLogResult, student, onUpdateWeaknesses, onSaveTask } = props;
+export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) => {
+  const { onClose, onSessionComplete, initialTask, aiPracticeTest, aiInitialTopic, defaultPerQuestionTime, onLogResult, student, onUpdateWeaknesses, onSaveTask, animationOrigin } = props;
+  const { currentUser } = useAuth();
+  const theme = currentUser?.CONFIG.settings.theme;
   const [activeTab, setActiveTab] = useState<'ai' | 'manual' | 'jeeMains'>(initialTask ? 'manual' : 'ai');
   const [qRanges, setQRanges] = useState(initialTask?.Q_RANGES || '');
   const [subject, setSubject] = useState(initialTask?.SUBJECT_TAG.EN || 'PHYSICS');
@@ -146,7 +150,7 @@ const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) => {
 
   const handleClose = () => {
     setIsExiting(true);
-    setTimeout(onClose, 300);
+    setTimeout(onClose, theme === 'liquid-glass' ? 500 : 300);
   };
   
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -216,8 +220,8 @@ const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) => {
     setIsAiParserOpen(false);
   };
   
-  const animationClasses = isExiting ? 'modal-exit' : 'modal-enter';
-  const contentAnimationClasses = isExiting ? 'modal-content-exit' : 'modal-content-enter';
+  const animationClasses = theme === 'liquid-glass' ? (isExiting ? 'genie-out' : 'genie-in') : (isExiting ? 'modal-exit' : 'modal-enter');
+  const contentAnimationClasses = theme === 'liquid-glass' ? '' : (isExiting ? 'modal-content-exit' : 'modal-content-enter');
   
   const correctAnswers = useMemo(() => {
     if (activeTab === 'jeeMains') return parseAnswers(jeeMainsCorrectAnswersText);
@@ -227,84 +231,101 @@ const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) => {
 
   return (
     <>
-      <div className={`fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${animationClasses}`} onClick={handleClose}>
-        <div className={`w-full max-w-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl shadow-2xl p-6 ${contentAnimationClasses}`} onClick={(e) => e.stopPropagation()}>
-          
-          {isTimerStarted ? (
-            <McqTimer 
-              questionNumbers={practiceQuestions ? practiceQuestions.map(q => q.number) : practiceMode === 'jeeMains' ? Array.from({ length: 75 }, (_, i) => i + 1) : questionNumbers}
-              questions={practiceQuestions || undefined}
-              perQuestionTime={perQuestionTime}
-              onClose={handleClose} 
-              onSessionComplete={onSessionComplete}
-              practiceMode={practiceMode}
-              subject={subject}
-              category={category}
-              syllabus={syllabus}
-              onLogResult={onLogResult}
-              onUpdateWeaknesses={onUpdateWeaknesses}
-              student={student}
-              correctAnswers={practiceAnswers || correctAnswers}
-              onSaveTask={onSaveTask}
-              initialTask={initialTask}
-            />
-          ) : (
-            <div>
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-white mb-4">Practice Session</h2>
-                <button onClick={() => setIsAiParserOpen(true)} className="text-xs font-semibold text-cyan-400 hover:underline flex items-center gap-1"><Icon name="upload" /> Import from Text/JSON</button>
+      <div
+        className={`fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${animationClasses}`}
+        style={{ '--clip-origin-x': animationOrigin?.x, '--clip-origin-y': animationOrigin?.y } as React.CSSProperties}
+        onClick={handleClose}
+      >
+        <div
+          className={`w-full max-w-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--modal-border-radius)] shadow-[var(--modal-shadow)] ${contentAnimationClasses} overflow-hidden flex flex-col`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {theme === 'liquid-glass' && (
+            <div className="flex-shrink-0 flex items-center p-3 border-b border-[var(--glass-border)]">
+              <div className="flex gap-2">
+                <button onClick={handleClose} className="w-3 h-3 rounded-full bg-red-500"></button>
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
               </div>
-              
-              <div className="flex items-center gap-2 p-1 rounded-full bg-gray-900/50 mb-4">
-                <button onClick={() => setActiveTab('jeeMains')} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-full ${activeTab === 'jeeMains' ? 'bg-purple-600 text-white' : 'text-gray-300'}`}>JEE Mains Full Test</button>
-                <button onClick={() => setActiveTab('ai')} disabled={!!initialTask} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-full disabled:opacity-50 ${activeTab === 'ai' ? 'bg-cyan-600 text-white' : 'text-gray-300'}`}>AI Quick Practice</button>
-                <button onClick={() => setActiveTab('manual')} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-full ${activeTab === 'manual' ? 'bg-cyan-600 text-white' : 'text-gray-300'}`}>From Homework</button>
-              </div>
-              
-              {activeTab === 'manual' && (
-                  <>
-                    <div className="mt-4">
-                      <label className="text-sm font-bold text-gray-400">Question Ranges (e.g., 1-15; 20-25)</label>
-                      <textarea value={qRanges} onChange={(e) => setQRanges(e.target.value)} className="w-full h-20 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 mt-1" placeholder="e.g., 1-25; 30-35;" />
-                    </div>
-                     {!initialTask && (
-                          <div className="mt-4">
-                              <div className="flex justify-between items-center">
-                                  <label className="text-sm font-bold text-gray-400">Correct Answers (Optional)</label>
-                                  <div className="flex gap-2">
-                                     <input type="file" accept=".json" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-                                     <button type="button" onClick={() => fileInputRef.current?.click()} className="text-xs font-semibold text-cyan-400 hover:underline">Upload JSON</button>
-                                     <button type="button" onClick={() => setIsAiKeyModalOpen(true)} className="text-xs font-semibold text-cyan-400 hover:underline flex items-center gap-1"><Icon name="gemini" className="w-3 h-3" /> AI Gen</button>
-                                  </div>
-                              </div>
-                              <textarea value={correctAnswersText} onChange={(e) => setCorrectAnswersText(e.target.value)} className="w-full h-20 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 mt-1" placeholder="1:A, 2:C, 3:12.5 OR A C 12.5" />
+              <h2 className="text-sm font-semibold text-white text-center flex-grow -ml-12">Practice Session</h2>
+            </div>
+          )}
+          <div className="p-6 overflow-y-auto">
+            {isTimerStarted ? (
+              <McqTimer 
+                questionNumbers={practiceQuestions ? practiceQuestions.map(q => q.number) : practiceMode === 'jeeMains' ? Array.from({ length: 75 }, (_, i) => i + 1) : questionNumbers}
+                questions={practiceQuestions || undefined}
+                perQuestionTime={perQuestionTime}
+                onClose={handleClose} 
+                onSessionComplete={onSessionComplete}
+                practiceMode={practiceMode}
+                subject={subject}
+                category={category}
+                syllabus={syllabus}
+                onLogResult={onLogResult}
+                onUpdateWeaknesses={onUpdateWeaknesses}
+                student={student}
+                correctAnswers={practiceAnswers || correctAnswers}
+                onSaveTask={onSaveTask}
+                initialTask={initialTask}
+              />
+            ) : (
+              <div>
+                <div className="flex justify-between items-center">
+                  {theme !== 'liquid-glass' && <h2 className="text-2xl font-bold text-white mb-4">Practice Session</h2>}
+                  <button onClick={() => setIsAiParserOpen(true)} className="text-xs font-semibold text-cyan-400 hover:underline flex items-center gap-1"><Icon name="upload" /> Import from Text/JSON</button>
+                </div>
+                
+                <div className="flex items-center gap-2 p-1 rounded-full bg-gray-900/50 my-4">
+                  <button onClick={() => setActiveTab('jeeMains')} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-full ${activeTab === 'jeeMains' ? 'bg-purple-600 text-white' : 'text-gray-300'}`}>JEE Mains Full Test</button>
+                  <button onClick={() => setActiveTab('ai')} disabled={!!initialTask} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-full disabled:opacity-50 ${activeTab === 'ai' ? 'bg-cyan-600 text-white' : 'text-gray-300'}`}>AI Quick Practice</button>
+                  <button onClick={() => setActiveTab('manual')} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-full ${activeTab === 'manual' ? 'bg-cyan-600 text-white' : 'text-gray-300'}`}>From Homework</button>
+                </div>
+                
+                {activeTab === 'manual' && (
+                    <>
+                      <div className="mt-4">
+                        <label className="text-sm font-bold text-gray-400">Question Ranges (e.g., 1-15; 20-25)</label>
+                        <textarea value={qRanges} onChange={(e) => setQRanges(e.target.value)} className="w-full h-20 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 mt-1" placeholder="e.g., 1-25; 30-35;" />
+                      </div>
+                       {!initialTask && (
+                            <div className="mt-4">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-sm font-bold text-gray-400">Correct Answers (Optional)</label>
+                                    <div className="flex gap-2">
+                                       <input type="file" accept=".json" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+                                       <button type="button" onClick={() => fileInputRef.current?.click()} className="text-xs font-semibold text-cyan-400 hover:underline">Upload JSON</button>
+                                       <button type="button" onClick={() => setIsAiKeyModalOpen(true)} className="text-xs font-semibold text-cyan-400 hover:underline flex items-center gap-1"><Icon name="gemini" className="w-3 h-3" /> AI Gen</button>
+                                    </div>
+                                </div>
+                                <textarea value={correctAnswersText} onChange={(e) => setCorrectAnswersText(e.target.value)} className="w-full h-20 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 mt-1" placeholder="1:A, 2:C, 3:12.5 OR A C 12.5" />
+                            </div>
+                       )}
+                    </>
+                )}
+                {activeTab === 'ai' && (
+                    <div className="space-y-4">
+                       <div>
+                          <label className="text-sm font-bold text-gray-400">Topic</label>
+                           <input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} className="w-full px-3 py-2 mt-1 text-gray-200 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500" placeholder="e.g., Rotational Motion" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="text-sm font-bold text-gray-400"># of Questions</label>
+                              <input type="number" value={aiNumQuestions} onChange={(e) => setAiNumQuestions(parseInt(e.target.value))} className="w-full px-3 py-2 mt-1 text-gray-200 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg" />
                           </div>
-                     )}
-                  </>
-              )}
-              {activeTab === 'ai' && (
-                  <div className="space-y-4">
-                     <div>
-                        <label className="text-sm font-bold text-gray-400">Topic</label>
-                         <input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} className="w-full px-3 py-2 mt-1 text-gray-200 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500" placeholder="e.g., Rotational Motion" />
+                          <div>
+                              <label className="text-sm font-bold text-gray-400">Difficulty</label>
+                              <select value={aiDifficulty} onChange={e => setAiDifficulty(e.target.value)} className="w-full px-3 py-2 mt-1 text-gray-200 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg">
+                                  <option>Easy</option>
+                                  <option>Medium</option>
+                                  <option>Hard</option>
+                              </select>
+                          </div>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-sm font-bold text-gray-400"># of Questions</label>
-                            <input type="number" value={aiNumQuestions} onChange={(e) => setAiNumQuestions(parseInt(e.target.value))} className="w-full px-3 py-2 mt-1 text-gray-200 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg" />
-                        </div>
-                        <div>
-                            <label className="text-sm font-bold text-gray-400">Difficulty</label>
-                            <select value={aiDifficulty} onChange={e => setAiDifficulty(e.target.value)} className="w-full px-3 py-2 mt-1 text-gray-200 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg">
-                                <option>Easy</option>
-                                <option>Medium</option>
-                                <option>Hard</option>
-                            </select>
-                        </div>
-                    </div>
-                  </div>
-              )}
-               {activeTab === 'jeeMains' && (
+                )}
+                {activeTab === 'jeeMains' && (
                   <div className="space-y-4">
                      <div className="text-center p-4 bg-purple-900/30 border border-purple-500/50 rounded-lg">
                         <Icon name="trophy" className="w-8 h-8 mx-auto text-purple-400 mb-2"/>
@@ -365,5 +386,3 @@ const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) => {
     </>
   );
 };
-
-export default CustomPracticeModal;
