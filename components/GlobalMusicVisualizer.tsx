@@ -41,10 +41,11 @@ const GlobalMusicVisualizer: React.FC = () => {
 
             for (let i = 0; i < barsToDraw; i++) {
                 // Scale bar height to canvas, boosting sensitivity
-                const barHeight = Math.max(4, Math.pow(dataArray[i] / 255, 1.5) * canvas.height * 0.95);
+                const value = dataArray[i];
+                const percent = value / 255;
+                const barHeight = Math.max(4, Math.pow(percent, 1.5) * canvas.height * 0.95);
                 
                 // RGB Color Shuffle Logic
-                // Combine time-based offset (hueOffsetRef) with position-based offset (i)
                 const hue = (hueOffsetRef.current + (i * 5)) % 360;
                 
                 // Create vibrant neon colors
@@ -57,7 +58,6 @@ const GlobalMusicVisualizer: React.FC = () => {
                 // Draw rounded bar centered vertically
                 const y = (canvas.height - barHeight) / 2;
                 
-                // Draw rect with slightly rounded effect manually if needed, or simple rect
                 canvasCtx.beginPath();
                 // Use roundRect if available, else fallback to rect
                 if (typeof canvasCtx.roundRect === 'function') {

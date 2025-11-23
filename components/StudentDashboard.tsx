@@ -197,7 +197,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     const handleStartPractice = (homework: HomeworkData) => { setPracticeTask(homework); setIsPracticeModalOpen(true); };
     const handleSaveWeakness = (newWeakness: string) => { const updatedWeaknesses = [...new Set([...student.CONFIG.WEAK, newWeakness])]; onUpdateWeaknesses(updatedWeaknesses); };
     const handleApiKeySet = () => { if (!student.CONFIG.settings.hasGeminiKey) setIsAiChatOpen(true); setShowAiChatFab(true); };
-    // Updated AI Chat handler to inject current domain
     const handleAiChatMessage = async (prompt: string, imageBase64?: string) => {
         const newHistory = [...aiChatHistory, { role: 'user', parts: [{ text: prompt }] }];
         setAiChatHistory(newHistory);
@@ -207,7 +206,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                 history: newHistory, 
                 prompt, 
                 imageBase64,
-                domain: window.location.origin // Inject current domain here
+                domain: window.location.origin 
             });
             setAiChatHistory(prev => [...prev, result]);
         } catch (error: any) {
@@ -238,7 +237,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             case 'edit_task': setEditingTask(data); setIsCreateModalOpen(true); break;
             case 'edit_exam': setEditingExam(data); setIsExamModalOpen(true); break;
             case 'view_deck': setViewingDeck(data); break;
-            // Navigation handled by setActiveTab directly in UniversalSearch props
         }
     };
     
@@ -354,9 +352,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         );
     };
 
-    // ... (Tab handling logic & components like TopTabBar, renderContent switch) ...
-    // Standard content rendering omitted for brevity, reuse existing...
-    
     const TabButton: React.FC<{ tabId: ActiveTab; icon: IconName; children: React.ReactNode; }> = ({ tabId, icon, children }) => (
         <button onClick={() => setActiveTab(tabId)} className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors border-b-2 ${activeTab === tabId ? 'text-[var(--accent-color)] border-[var(--accent-color)]' : 'text-gray-400 border-transparent hover:text-white'}`}>
             <Icon name={icon} className="w-4 h-4" /> {children}
@@ -375,7 +370,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
           <TabButton tabId="performance" icon="performance">Performance</TabButton>
           <TabButton tabId="doubts" icon="community">Doubts</TabButton>
         </div>
-        {/* ... buttons ... */}
         <div className="flex items-center gap-2 mb-2 sm:mb-0">
           <button onClick={() => setIsSearchOpen(true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 hover:text-white" title="Search (Cmd+K)">
             <Icon name="search" className="w-4 h-4" />

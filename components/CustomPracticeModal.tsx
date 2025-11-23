@@ -3,7 +3,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import McqTimer from './McqTimer';
 import Icon from './Icon';
 import { getQuestionNumbersFromRanges } from '../utils/qRangesParser';
-import { HomeworkData, ResultData, StudentData, ScheduleItem, PracticeQuestion } from '../types';
+import { HomeworkData, ResultData, StudentData, ScheduleItem, PracticeQuestion, ScheduleCardData } from '../types';
 import AIGenerateAnswerKeyModal from './AIGenerateAnswerKeyModal';
 import AIParserModal from './AIParserModal';
 import { api } from '../api/apiService';
@@ -268,7 +268,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
   // Calculate question numbers ensuring a strict number[] return type
   const finalQuestionNumbers: number[] = useMemo(() => {
       if (practiceQuestions) {
-          return practiceQuestions.map(q => q.number);
+          return practiceQuestions.map(q => Number(q.number));
       }
       if (practiceMode === 'jeeMains') {
           return Array.from({ length: 75 }, (_, i) => i + 1);
@@ -287,7 +287,6 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
           className={`w-full max-w-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--modal-border-radius)] shadow-[var(--modal-shadow)] ${contentAnimationClasses} overflow-hidden flex flex-col`}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
           {theme === 'liquid-glass' && (
             <div className="flex-shrink-0 flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-black/20">
               <button onClick={handleClose} className="w-3 h-3 rounded-full bg-[#ff5f56] hover:bg-[#ff5f56]/80 shadow-inner"></button>
@@ -484,5 +483,3 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
     </>
   );
 };
-
-export default CustomPracticeModal;

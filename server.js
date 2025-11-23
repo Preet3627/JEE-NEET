@@ -245,9 +245,28 @@ const getUserData = async (userId) => {
     // Fetch Config
     const [configRows] = await pool.query("SELECT config FROM user_configs WHERE user_id = ?", [userId]);
     let config = { settings: { accentColor: '#0891b2', theme: 'default' } };
+    
     if (configRows.length > 0) {
-        config = decrypt(configRows[0].config);
+        const rawConfig = configRows[0].config;
+        const decrypted = decrypt(rawConfig);
+        
+        // Handle unencrypted JSON strings (e.g. from SQL insertions)
+        if (typeof decrypted === 'string') {
+            try {
+                const parsed = JSON.parse(decrypted);
+                config = { ...config, ...parsed, settings: { ...config.settings, ...parsed.settings } };
+            } catch (e) {
+                console.warn(`Failed to parse config for user ${userId}`, e);
+            }
+        } else if (typeof decrypted === 'object' && decrypted !== null) {
+            config = { ...config, ...decrypted, settings: { ...config.settings, ...decrypted.settings } };
+        }
     }
+
+    // Ensure settings exist to prevent frontend crash
+    if (!config.settings) config.settings = {};
+    if (!config.settings.accentColor) config.settings.accentColor = '#0891b2';
+    if (!config.settings.theme) config.settings.theme = 'default';
 
     // Fetch Related Data
     const tables = ['schedule_items', 'results', 'exams', 'study_sessions'];
@@ -453,11 +472,18 @@ apiRouter.get('/admin/students', adminMiddleware, async (req, res) => {
         for (let s of students) {
             const [configRows] = await pool.query("SELECT config FROM user_configs WHERE user_id = ?", [s.id]);
             if (configRows.length > 0) {
-                const conf = decrypt(configRows[0].config);
-                s.CONFIG = conf;
+                const raw = configRows[0].config;
+                const decrypted = decrypt(raw);
+                if (typeof decrypted === 'string') {
+                    try { s.CONFIG = JSON.parse(decrypted); } catch { s.CONFIG = {}; }
+                } else {
+                    s.CONFIG = decrypted;
+                }
             } else {
                 s.CONFIG = { settings: {} };
             }
+            if (!s.CONFIG) s.CONFIG = {};
+            if (!s.CONFIG.settings) s.CONFIG.settings = {};
         }
         res.json(students);
     } catch (e) {
@@ -562,8 +588,23 @@ apiRouter.delete('/schedule-items/:id', authMiddleware, async (req, res) => {
 apiRouter.post('/config', authMiddleware, async (req, res) => {
     try {
         const [rows] = await pool.query("SELECT config FROM user_configs WHERE user_id = ?", [req.userId]);
-        let currentConfig = rows.length > 0 ? decrypt(rows[0].config) : {};
-        const newConfig = { ...currentConfig, ...req.body, settings: { ...currentConfig.settings, ...req.body.settings } };
+        let currentConfig = { settings: {} };
+        
+        if (rows.length > 0) {
+            const decrypted = decrypt(rows[0].config);
+            if (typeof decrypted === 'string') {
+                try { currentConfig = JSON.parse(decrypted); } catch { }
+            } else {
+                currentConfig = decrypted;
+            }
+        }
+        
+        // Deep merge simplistic
+        const newConfig = { 
+            ...currentConfig, 
+            ...req.body, 
+            settings: { ...currentConfig.settings, ...req.body.settings } 
+        };
         
         if (rows.length > 0) {
             await pool.query("UPDATE user_configs SET config = ? WHERE user_id = ?", [encrypt(newConfig), req.userId]);
@@ -714,7 +755,12 @@ const getApiKeyAndConfigForUser = async (userId) => {
     let config = {};
     let apiKey = process.env.API_KEY;
     if (rows[0]) {
-        config = decrypt(rows[0].config);
+        const decrypted = decrypt(rows[0].config);
+        if (typeof decrypted === 'string') {
+            try { config = JSON.parse(decrypted); } catch { }
+        } else {
+            config = decrypted;
+        }
         if (config.geminiApiKey) apiKey = config.geminiApiKey;
     }
     return { apiKey, config };
