@@ -1,0 +1,96 @@
+CREATE DATABASE IF NOT EXISTS jee_scheduler;
+USE jee_scheduler;
+
+-- 1. Users Table
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    sid VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    full_name VARCHAR(255),
+    password_hash VARCHAR(255),
+    profile_photo LONGTEXT,
+    is_verified BOOLEAN DEFAULT FALSE,
+    role VARCHAR(50) DEFAULT 'student',
+    api_token VARCHAR(255),
+    last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. User Configs
+CREATE TABLE IF NOT EXISTS user_configs (
+    user_id INT PRIMARY KEY,
+    config LONGTEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 3. Data Tables
+CREATE TABLE IF NOT EXISTS schedule_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    data LONGTEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS results (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    data LONGTEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS exams (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    data LONGTEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS study_sessions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    data LONGTEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 4. Community Tables
+CREATE TABLE IF NOT EXISTS doubts (
+    id VARCHAR(255) PRIMARY KEY,
+    user_sid VARCHAR(255),
+    question TEXT,
+    question_image LONGTEXT,
+    created_at DATETIME,
+    author_name VARCHAR(255),
+    author_photo LONGTEXT,
+    status VARCHAR(50) DEFAULT 'active'
+);
+
+CREATE TABLE IF NOT EXISTS doubt_solutions (
+    id VARCHAR(255) PRIMARY KEY,
+    doubt_id VARCHAR(255),
+    user_sid VARCHAR(255),
+    solution TEXT,
+    solution_image LONGTEXT,
+    created_at DATETIME,
+    solver_name VARCHAR(255),
+    solver_photo LONGTEXT,
+    FOREIGN KEY (doubt_id) REFERENCES doubts(id) ON DELETE CASCADE
+);
+
+-- 5. Hardcoded Admin Account
+-- Email: patelbhavna107@gmail.com
+-- Password: admin123
+INSERT INTO users (sid, email, full_name, password_hash, is_verified, role, profile_photo)
+VALUES (
+    'ADMIN_001',
+    'patelbhavna107@gmail.com',
+    'System Admin',
+    '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjRZLLnR8lwWcF.APSi/WWJJxsuNB.O', 
+    1,
+    'admin',
+    'https://api.dicebear.com/8.x/initials/svg?seed=Admin'
+) ON DUPLICATE KEY UPDATE role='admin';
+
+-- 6. Admin Default Config
+INSERT INTO user_configs (user_id, config)
+SELECT id, '{"WAKE":"06:00","SCORE":"0/300","WEAK":[],"settings":{"accentColor":"#0891b2","theme":"default","examType":"JEE"}}'
+FROM users WHERE email = 'patelbhavna107@gmail.com'
+ON DUPLICATE KEY UPDATE config=VALUES(config);

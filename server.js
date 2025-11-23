@@ -35,7 +35,7 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 // --- ENV & SETUP CHECK ---
 const isConfigured = process.env.DB_HOST && process.env.JWT_SECRET && process.env.DB_USER && process.env.DB_NAME && process.env.ENCRYPTION_KEY && process.env.GOOGLE_CLIENT_ID;
-const isNextcloudMusicConfigured = !!(process.env.NEXTCLOUD_URL && process.env.NEXTCLOUD_MUSIC_SHARE_TOKEN);
+const isNextcloudConfigured = !!(process.env.NEXTCLOUD_URL && process.env.NEXTCLOUD_MUSIC_SHARE_TOKEN);
 
 let pool = null;
 let mailer = null;
@@ -82,6 +82,86 @@ const decrypt = (text) => {
     }
 };
 
+// --- DATABASE INITIALIZATION ---
+const initDB = async () => {
+    if (!pool) return;
+    try {
+        const connection = await pool.getConnection();
+        
+        // 1. Users Table
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                sid VARCHAR(255) UNIQUE NOT NULL,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                full_name VARCHAR(255),
+                password_hash VARCHAR(255),
+                profile_photo LONGTEXT,
+                is_verified BOOLEAN DEFAULT FALSE,
+                role VARCHAR(50) DEFAULT 'student',
+                api_token VARCHAR(255),
+                last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // 2. User Configs
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS user_configs (
+                user_id INT PRIMARY KEY,
+                config LONGTEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+
+        // 3. Data Tables (Encrypted Blobs)
+        const dataTables = ['schedule_items', 'results', 'exams', 'study_sessions'];
+        for (const table of dataTables) {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS ${table} (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT,
+                    data LONGTEXT,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            `);
+        }
+
+        // 4. Doubts (Community)
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS doubts (
+                id VARCHAR(255) PRIMARY KEY,
+                user_sid VARCHAR(255),
+                question TEXT,
+                question_image LONGTEXT,
+                created_at DATETIME,
+                author_name VARCHAR(255),
+                author_photo LONGTEXT,
+                status VARCHAR(50) DEFAULT 'active'
+            )
+        `);
+
+        // 5. Solutions
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS doubt_solutions (
+                id VARCHAR(255) PRIMARY KEY,
+                doubt_id VARCHAR(255),
+                user_sid VARCHAR(255),
+                solution TEXT,
+                solution_image LONGTEXT,
+                created_at DATETIME,
+                solver_name VARCHAR(255),
+                solver_photo LONGTEXT,
+                FOREIGN KEY (doubt_id) REFERENCES doubts(id) ON DELETE CASCADE
+            )
+        `);
+
+        console.log("Database tables initialized successfully.");
+        connection.release();
+    } catch (error) {
+        console.error("Failed to initialize database tables:", error);
+    }
+};
+
 
 if (isConfigured) {
     try {
@@ -95,6 +175,9 @@ if (isConfigured) {
             queueLimit: 0,
             charset: 'utf8mb4'
         });
+        
+        // Run DB Init
+        initDB();
         
         googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
         
@@ -484,11 +567,19 @@ const DOUBTS_CACHE = [];
 apiRouter.get('/doubts/all', async (req, res) => {
     try {
         if (pool) {
-             res.json(DOUBTS_CACHE);
+             // Return all doubts that are not deleted
+             const [doubts] = await pool.query("SELECT * FROM doubts WHERE status != 'deleted' ORDER BY created_at DESC");
+             // Fetch solutions for each doubt
+             for (let doubt of doubts) {
+                 const [solutions] = await pool.query("SELECT * FROM doubt_solutions WHERE doubt_id = ? ORDER BY created_at ASC", [doubt.id]);
+                 doubt.solutions = solutions;
+             }
+             res.json(doubts);
         } else {
             res.json(DOUBTS_CACHE);
         }
-    } catch {
+    } catch (e) {
+        console.error("Error fetching doubts:", e);
         res.json(DOUBTS_CACHE);
     }
 });
@@ -500,40 +591,59 @@ apiRouter.post('/doubts', authMiddleware, async (req, res) => {
         user_sid: req.userSid,
         question,
         question_image,
-        created_at: new Date().toISOString(),
-        author_name: 'Me', 
-        author_photo: '',
-        solutions: [],
-        status: 'active'
+        created_at: new Date(),
     };
-    DOUBTS_CACHE.push(newDoubt);
-    res.json({ success: true });
+    
+    try {
+        const [userRows] = await pool.query("SELECT full_name, profile_photo FROM users WHERE sid = ?", [req.userSid]);
+        if (userRows.length > 0) {
+            const user = userRows[0];
+            await pool.query(
+                "INSERT INTO doubts (id, user_sid, question, question_image, created_at, author_name, author_photo, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'active')",
+                [newDoubt.id, newDoubt.user_sid, newDoubt.question, newDoubt.question_image, newDoubt.created_at, user.full_name, user.profile_photo]
+            );
+            res.json({ success: true });
+        } else {
+            res.status(404).json({ error: "User not found" });
+        }
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 apiRouter.post('/doubts/:id/solutions', authMiddleware, async (req, res) => {
     const { id } = req.params;
-    const { solution } = req.body;
-    const doubt = DOUBTS_CACHE.find(d => d.id === id);
-    if (doubt) {
-        doubt.solutions.push({
-            id: `S${Date.now()}`,
-            doubt_id: id,
-            user_sid: req.userSid,
-            solution,
-            created_at: new Date().toISOString(),
-            solver_name: 'Me',
-            solver_photo: ''
-        });
+    const { solution, solution_image } = req.body;
+    
+    try {
+        const [userRows] = await pool.query("SELECT full_name, profile_photo FROM users WHERE sid = ?", [req.userSid]);
+        if (userRows.length > 0) {
+            const user = userRows[0];
+            const solId = `S${Date.now()}`;
+            await pool.query(
+                "INSERT INTO doubt_solutions (id, doubt_id, user_sid, solution, solution_image, created_at, solver_name, solver_photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                [solId, id, req.userSid, solution, solution_image, new Date(), user.full_name, user.profile_photo]
+            );
+            res.json({ success: true });
+        } else {
+            res.status(404).json({ error: "User not found" });
+        }
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: e.message });
     }
-    res.json({ success: true });
 });
 
 apiRouter.put('/admin/doubts/:id/status', adminMiddleware, async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
-    const doubt = DOUBTS_CACHE.find(d => d.id === id);
-    if (doubt) doubt.status = status;
-    res.json({ success: true });
+    try {
+        await pool.query("UPDATE doubts SET status = ? WHERE id = ?", [status, id]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // --- AI ENDPOINTS ---
