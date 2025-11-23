@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect } from 'react';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
 
@@ -40,7 +39,8 @@ const GlobalMusicVisualizer: React.FC = () => {
 
                 for (let i = 0; i < barsToDraw; i++) {
                     const value = dataArray[i];
-                    const percent = Math.min(1, value / 250); 
+                    // FIX: Increased divider from 250 to 255 and added power to make response more dynamic/less topped out
+                    const percent = Math.min(1, Math.pow(value / 255, 1.5)); 
                     const barHeight = Math.max(2, percent * canvas.height * 0.9);
                     
                     let fillStyle = '#fff';

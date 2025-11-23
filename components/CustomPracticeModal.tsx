@@ -1,9 +1,8 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import McqTimer from './McqTimer';
 import Icon from './Icon';
 import { getQuestionNumbersFromRanges } from '../utils/qRangesParser';
-import { HomeworkData, ResultData, StudentData, ScheduleItem, PracticeQuestion, ScheduleCardData } from '../types';
+import { HomeworkData, ResultData, StudentData, ScheduleItem, PracticeQuestion } from '../types';
 import AIGenerateAnswerKeyModal from './AIGenerateAnswerKeyModal';
 import AIParserModal from './AIParserModal';
 import { api } from '../api/apiService';
@@ -26,7 +25,6 @@ interface CustomPracticeModalProps {
 const parseAnswers = (text: string): Record<string, string> => {
     const answers: Record<string, string> = {};
     if (!text) return answers;
-
     if (/[:=,;\n]/.test(text)) {
         const entries = text.split(/[,;\n]/);
         entries.forEach(entry => {
@@ -264,7 +262,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
   }, [correctAnswersText, jeeMainsCorrectAnswersText, initialTask, activeTab]);
 
   return (
-    <React.Fragment>
+    <>
       <div
         className={`fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${animationClasses}`}
         style={{ '--clip-origin-x': animationOrigin?.x, '--clip-origin-y': animationOrigin?.y } as React.CSSProperties}
@@ -319,7 +317,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
                 </div>
                 
                 {activeTab === 'manual' && (
-                    <React.Fragment>
+                    <>
                       <div className="mt-4">
                         <label className="text-sm font-bold text-gray-400">Question Ranges (e.g., 1-15; 20-25)</label>
                         <textarea value={qRanges} onChange={(e) => setQRanges(e.target.value)} className="w-full h-20 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 mt-1" placeholder="e.g., 1-25; 30-35;" />
@@ -337,7 +335,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
                                 <textarea value={correctAnswersText} onChange={(e) => setCorrectAnswersText(e.target.value)} className="w-full h-20 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 mt-1" placeholder="1:A, 2:C, 3:12.5 OR A C 12.5" />
                             </div>
                        )}
-                    </React.Fragment>
+                    </>
                 )}
                 {activeTab === 'ai' && (
                     <div className="space-y-4">
@@ -429,12 +427,10 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
           <AIParserModal
             onClose={() => setIsAiParserOpen(false)}
             onDataReady={handleDataFromParser}
-            onPracticeTestReady={() => {}} // This will be handled by the StudentDashboard
-            onOpenGuide={() => {}} // This will be handled by the StudentDashboard
+            onPracticeTestReady={() => {}}
+            onOpenGuide={() => {}}
           />
       )}
-    </React.Fragment>
+    </>
   );
 };
-
-export default CustomPracticeModal;
