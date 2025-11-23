@@ -252,7 +252,7 @@ const getUserData = async (userId) => {
         const rawConfig = configRows[0].config;
         const decrypted = decrypt(rawConfig);
         
-        // Handle unencrypted JSON strings
+        // Handle unencrypted JSON strings (e.g. from SQL insertions)
         if (typeof decrypted === 'string') {
             try {
                 const parsed = JSON.parse(decrypted);
@@ -265,7 +265,7 @@ const getUserData = async (userId) => {
         }
     }
 
-    // Ensure settings exist
+    // Ensure settings exist to prevent frontend crash
     if (!config.settings) config.settings = {};
     if (!config.settings.accentColor) config.settings.accentColor = '#0891b2';
     if (!config.settings.theme) config.settings.theme = 'default';
@@ -344,6 +344,7 @@ apiRouter.get('/config/public', (req, res) => {
 
 // --- AUTH ROUTES ---
 
+// Google Login
 apiRouter.post('/auth/google', async (req, res) => {
     const { credential } = req.body;
     if (!credential || !googleClient || !pool) {
@@ -455,6 +456,7 @@ apiRouter.post('/register', async (req, res) => {
         const initialConfig = { WAKE: '06:00', SCORE: '0/300', WEAK: [], settings: { accentColor: '#0891b2' } };
         await pool.query("INSERT INTO user_configs (user_id, config) VALUES (?, ?)", [userId, encrypt(initialConfig)]);
 
+        // Generate Token Immediately
         const token = jwt.sign({ id: userId, sid, role: 'student' }, JWT_SECRET, { expiresIn: '30d' });
         res.json({ token });
     } catch(e) {
@@ -599,6 +601,7 @@ apiRouter.post('/config', authMiddleware, async (req, res) => {
             }
         }
         
+        // Deep merge simplistic
         const newConfig = { 
             ...currentConfig, 
             ...req.body, 
@@ -999,9 +1002,6 @@ apiRouter.get('/music/album-art', async (req, res) => {
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
         
-        // WebDAV stream might not set content-type for partials, force it or let browser sniff
-        // Ideally check extension
-        
         stream.pipe(res);
         
         stream.on('error', (err) => {
@@ -1058,7 +1058,7 @@ apiRouter.post('/study-material/details', authMiddleware, async (req, res) => {
                 size: stat.size,
                 modified: stat.lastmod
             });
-        } catch (e) { /* ignore errors */ }
+        } catch (e) { /* ignore errors for missing files */ }
     }
     res.json(results);
 });

@@ -59,6 +59,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onSwitchToLogin
         try {
             const data = await api.register(formData);
             if (data.token) { 
+                 // Direct login without verification
                  loginWithToken(data.token);
                  onVerificationSuccess();
             } else {
