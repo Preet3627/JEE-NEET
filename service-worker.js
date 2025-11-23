@@ -1,3 +1,4 @@
+
 // This file is now configured for Workbox's injectManifest strategy.
 import { precacheAndRoute } from 'workbox-precaching';
 
@@ -16,14 +17,18 @@ self.addEventListener('push', (event) => {
         const data = event.data.json();
         const title = data.title || "JEE Scheduler Pro";
         
-        // Ensure the data object contains the URL for deep linking
+        // The payload from backend/admin broadcast should include 'url' or 'action' in data
+        // Example payload: { title: "...", body: "...", data: { url: "/?action=start_practice&id=123" } }
         const notificationData = data.data || { url: '/' };
         
         const options = {
             body: data.body,
             icon: 'https://ponsrischool.in/wp-content/uploads/2025/11/Gemini_Generated_Image_ujvnj5ujvnj5ujvn.png',
             badge: 'https://ponsrischool.in/wp-content/uploads/2025/11/Gemini_Generated_Image_ujvnj5ujvnj5ujvn.png',
-            data: notificationData
+            data: notificationData,
+            actions: [
+                { action: 'open', title: 'Open App' }
+            ]
         };
         event.waitUntil(self.registration.showNotification(title, options));
     } catch (e) {
@@ -39,14 +44,23 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
     
-    // Extract the URL from the notification data (default to root if not present)
-    const urlToOpen = event.notification.data?.url || '/';
+    // Extract the URL from the notification data. 
+    // Support both direct URL or action construction
+    let urlToOpen = event.notification.data?.url || '/';
+    
+    // Add domain if missing
+    if (urlToOpen.startsWith('/')) {
+        urlToOpen = self.location.origin + urlToOpen;
+    }
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
             // Check if a window is already open
             for (const client of clientList) {
                 // If exact match or root, focus and navigate
+                if (client.url === urlToOpen && 'focus' in client) {
+                    return client.focus();
+                }
                 if ('focus' in client) {
                     return client.focus().then(c => {
                         if ('navigate' in c) {

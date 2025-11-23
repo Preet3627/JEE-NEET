@@ -19,6 +19,7 @@ import ExamTypeSelectionModal from './components/ExamTypeSelectionModal';
 import { useMusicPlayer } from './context/MusicPlayerContext';
 import FullScreenMusicPlayer from './components/FullScreenMusicPlayer';
 import PersistentMusicPlayer from './components/PersistentMusicPlayer';
+import GlobalMusicVisualizer from './components/GlobalMusicVisualizer';
 
 declare global {
   interface Window {
@@ -51,7 +52,7 @@ const App: React.FC = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // --- Deep Link & Voice Action Integration ---
+    // --- Deep Link & Notification Action Integration ---
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const token = params.get('reset-token');
@@ -70,8 +71,8 @@ const App: React.FC = () => {
             setDeepLinkAction({ action: 'search', data: { query } });
             window.history.replaceState({}, document.title, window.location.pathname);
         } else if (taskId && (action === 'view_task' || action === 'start_practice')) {
+            // Pass the ID to the dashboard to open the relevant modal
             setDeepLinkAction({ action, data: { id: taskId } });
-            // Don't clear URL immediately if we want to persist state, but cleaning up is cleaner
             window.history.replaceState({}, document.title, window.location.pathname);
         } else if (action && dataStr) {
             const handleDeepLink = async (encodedData: string) => {
@@ -362,7 +363,6 @@ const App: React.FC = () => {
     };
 
     const checkBackend = useCallback(async (isInitialCheck: boolean) => {
-        // FIX: Replace NodeJS.Timeout with browser-compatible ReturnType
         let statusCheckTimeout: ReturnType<typeof setTimeout> | null = null;
         if (isInitialCheck && !currentUser) {
             statusCheckTimeout = setTimeout(() => {
@@ -394,8 +394,8 @@ const App: React.FC = () => {
     }, [googleClientId, currentUser]);
 
     useEffect(() => {
-        checkBackend(true); // Initial check with delay logic
-        const interval = setInterval(() => checkBackend(false), 30000); // Subsequent checks
+        checkBackend(true);
+        const interval = setInterval(() => checkBackend(false), 30000);
         return () => clearInterval(interval);
     }, [checkBackend]);
 
@@ -403,7 +403,7 @@ const App: React.FC = () => {
         if (currentUser) {
             const heartbeat = setInterval(() => {
                 api.heartbeat().catch(err => console.debug("Heartbeat failed, user might be offline.", err));
-            }, 60000); // every 1 minute
+            }, 60000);
             return () => clearInterval(heartbeat);
         }
     }, [currentUser]);
@@ -430,7 +430,6 @@ const App: React.FC = () => {
         }
     }, [backendStatus, isLoading, userRole, isDemoMode, currentUser]);
     
-    // Google API Init
     useEffect(() => {
         const initializeGoogleApis = () => {
             if (googleClientId && window.gapi && window.google) {
@@ -441,7 +440,6 @@ const App: React.FC = () => {
                     },
                     (error) => {
                         console.error("GAPI Init Error:", error);
-                        console.error("GAPI Init Error Object", JSON.stringify(error, null, 2));
                         setGoogleAuthStatus('unconfigured');
                     }
                 );
@@ -486,6 +484,7 @@ const App: React.FC = () => {
 
             return (
                  <div style={{'--accent-color': dashboardUser.CONFIG.settings.accentColor} as React.CSSProperties} className={`${dashboardUser.CONFIG.settings.blurEnabled === false ? 'no-blur' : ''} safe-padding-left safe-padding-right safe-padding-top safe-padding-bottom`}>
+                    <GlobalMusicVisualizer />
                     {isFullScreenPlayerOpen && <FullScreenMusicPlayer />}
                     <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 ${useToolbarLayout || currentTrack ? 'pb-24' : ''}`}>
                         <Header user={{ name: dashboardUser.fullName, id: dashboardUser.sid, profilePhoto: dashboardUser.profilePhoto }} onLogout={logout} backendStatus={backendStatus} isSyncing={isSyncing} />

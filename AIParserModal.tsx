@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import Icon from './Icon';
 import { api } from '../api/apiService';
@@ -79,7 +80,7 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
     
     // Attempt 3: Fallback to parsing as unstructured text online
     try {
-      const result = await api.parseText(text);
+      const result = await api.parseText(text, window.location.origin);
       handleResult(result);
     } catch (parseError: any) {
       console.error("AI Parser error:", parseError);

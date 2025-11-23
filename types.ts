@@ -221,9 +221,11 @@ export interface LocalPlaylist {
 export type ActiveTab = 'dashboard' | 'schedule' | 'today' | 'planner' | 'exams' | 'performance' | 'doubts' | 'flashcards' | 'material';
 
 export interface DashboardWidgetItem {
-    id: string; // Corresponds to a key in the widgetConfig map
+    id: string; // Corresponds to a key in the widgetConfig map or a customWidget ID
     wide?: boolean;
     translucent?: boolean;
+    minimized?: boolean;
+    customTitle?: string;
 }
 
 // Represents the structure of the encrypted JSON blob in the `user_configs` table

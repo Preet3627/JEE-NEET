@@ -1,10 +1,11 @@
+
 import React, { useRef, useEffect } from 'react';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
 
 const GlobalMusicVisualizer: React.FC = () => {
     const { analyser, isPlaying } = useMusicPlayer();
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const animationFrameId = useRef<number>();
+    const animationFrameId = useRef<number | null>(null);
 
     useEffect(() => {
         const canvas = canvasRef.current;

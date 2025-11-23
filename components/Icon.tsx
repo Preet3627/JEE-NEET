@@ -1,6 +1,7 @@
+
 import React from 'react';
 
-export type IconName = 'bell' | 'copy' | 'check' | 'trash' | 'play' | 'pause' | 'stop' | 'upload' | 'stopwatch' | 'logout' | 'dashboard' | 'users' | 'plus' | 'fixed' | 'login' | 'user-plus' | 'edit' | 'ellipsis' | 'forward' | 'trophy' | 'star' | 'streak' | 'send' | 'message' | 'settings' | 'schedule' | 'planner' | 'performance' | 'community' | 'calendar' | 'image' | 'book-open' | 'drive' | 'gemini' | 'marker' | 'cards' | 'folder' | 'file-text' | 'pin' | 'music' | 'lock-closed' | 'lock-open' | 'shuffle' | 'expand' | 'arrow-left' | 'arrow-right' | 'sound-wave';
+export type IconName = 'bell' | 'copy' | 'check' | 'trash' | 'play' | 'pause' | 'stop' | 'upload' | 'stopwatch' | 'logout' | 'dashboard' | 'users' | 'plus' | 'fixed' | 'login' | 'user-plus' | 'edit' | 'ellipsis' | 'forward' | 'trophy' | 'star' | 'streak' | 'send' | 'message' | 'settings' | 'schedule' | 'planner' | 'performance' | 'community' | 'calendar' | 'image' | 'book-open' | 'drive' | 'gemini' | 'marker' | 'cards' | 'folder' | 'file-text' | 'pin' | 'music' | 'lock-closed' | 'lock-open' | 'shuffle' | 'expand' | 'arrow-left' | 'arrow-right' | 'sound-wave' | 'search';
 
 interface IconProps {
   name: IconName;
@@ -249,7 +250,12 @@ const Icon: React.FC<IconProps> = ({ name, className = "w-5 h-5" }) => {
         <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 10v4M8 7v10M11 4v16M14 7v10M17 10v4M20 12h-2" />
         </svg>
-    )
+    ),
+    search: (
+      <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+    ),
   };
   return icons[name] || null;
 };

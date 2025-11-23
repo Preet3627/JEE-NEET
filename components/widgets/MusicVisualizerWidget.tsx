@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect } from 'react';
 import { useMusicPlayer } from '../../context/MusicPlayerContext';
 import Icon from '../Icon';
@@ -5,7 +6,7 @@ import Icon from '../Icon';
 const MusicVisualizerWidget: React.FC = () => {
     const { analyser, isPlaying } = useMusicPlayer();
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const animationFrameId = useRef<number>();
+    const animationFrameId = useRef<number | null>(null);
 
     useEffect(() => {
         const canvas = canvasRef.current;

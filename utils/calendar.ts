@@ -18,6 +18,9 @@ const getNextDateForDay = (dayString: string): Date => {
     const now = new Date();
     const currentDayIndex = now.getDay();
     let dayDifference = targetDayIndex - currentDayIndex;
+    // If today is the day, but the time has passed, usually we want next week, 
+    // but for export, we'll stick to "next occurrence" logic which might include today if valid.
+    // For simplicity here: if diff < 0, add 7.
     if (dayDifference < 0) dayDifference += 7;
 
     const nextDate = new Date();
@@ -30,6 +33,8 @@ export const exportCalendar = (items: ScheduleItem[], exams: ExamData[], student
         'BEGIN:VCALENDAR\r\n',
         'VERSION:2.0\r\n',
         'PRODID:-//JEE Scheduler Pro//EN\r\n',
+        'CALSCALE:GREGORIAN\r\n',
+        'METHOD:PUBLISH\r\n',
     ];
 
     items
@@ -40,15 +45,19 @@ export const exportCalendar = (items: ScheduleItem[], exams: ExamData[], student
             let startDate: Date;
             let recurrenceRule = '';
 
-            // LOGIC FIX: Only use RRULE if explicitly requested by AI/User (isRecurring flag)
+            // LOGIC FIX: Only use RRULE if explicitly requested (isRecurring flag)
             // Otherwise, export as a single event for the immediate next occurrence.
             if (timedItem.date) {
                 startDate = new Date(`${timedItem.date}T00:00:00`);
             } else {
                 startDate = getNextDateForDay(timedItem.DAY.EN);
-                // Only add recursion if explicitly marked, otherwise it's a one-time export for this week
+                
+                // Check if the specific time on this calculated date has passed? 
+                // If so, and it's a one-off export, maybe move to next week? 
+                // For now, we keep getNextDateForDay logic (today or future).
+
                 if (timedItem.isRecurring) {
-                    // Cap recursion at 2 years max
+                    // Cap recursion at 2 years max to avoid "Whole Life" infinite clutter
                     const endDate = new Date();
                     endDate.setFullYear(endDate.getFullYear() + 2);
                     const untilDate = toICSDate(endDate).split('T')[0]; 
@@ -57,18 +66,27 @@ export const exportCalendar = (items: ScheduleItem[], exams: ExamData[], student
             }
             
             startDate.setHours(hours, minutes, 0, 0);
-            const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+            const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // Default 1 hour duration
 
             const summary = timedItem.CARD_TITLE.EN.replace(/,/g, '\\,').replace(/;/g, '\\;');
+            
+            // Deep Link Logic
             const action = timedItem.type === 'HOMEWORK' ? 'start_practice' : 'view_task';
-            // Add External Link to description if present
-            let extLinkText = '';
+            const deepLink = `https://jee.ponsrischool.in/?action=${action}&id=${timedItem.ID}`;
+            
+            // External App Link (Zoom, etc.)
+            let externalLinkText = '';
+            let locationUrl = deepLink; // Default location is the deep link
+            
             if (timedItem.externalLink) {
-                extLinkText = `\\n\\nExternal Link: ${timedItem.externalLink}`;
+                externalLinkText = `\\n\\n[OPEN EXTERNAL APP]: ${timedItem.externalLink}`;
+                locationUrl = timedItem.externalLink; // Prioritize external link in location field for 1-click join
             }
 
-            const appLink = `https://jee.ponsrischool.in/?action=${action}&id=${timedItem.ID}`;
-            const description = `Open in App: ${appLink}${extLinkText}\\n\\n${timedItem.FOCUS_DETAIL.EN}`.replace(/,/g, '\\,').replace(/;/g, '\\;').replace(/\n/g, '\\n');
+            const description = `Open in JEE Scheduler: ${deepLink}${externalLinkText}\\n\\nDetails: ${timedItem.FOCUS_DETAIL.EN}`
+                .replace(/,/g, '\\,')
+                .replace(/;/g, '\\;')
+                .replace(/\n/g, '\\n');
 
             const eventParts = [
                 'BEGIN:VEVENT',
@@ -78,7 +96,8 @@ export const exportCalendar = (items: ScheduleItem[], exams: ExamData[], student
                 `DTEND:${toICSDate(endDate)}`,
                 `SUMMARY:${summary}`,
                 `DESCRIPTION:${description}`,
-                `URL:${timedItem.externalLink || appLink}`, // Prioritize External link for direct click
+                `URL:${locationUrl}`,
+                `LOCATION:${locationUrl}`,
                 'BEGIN:VALARM',
                 'TRIGGER:-PT15M',
                 'ACTION:DISPLAY',
@@ -94,16 +113,16 @@ export const exportCalendar = (items: ScheduleItem[], exams: ExamData[], student
             calendarParts.push(eventParts.join('\r\n') + '\r\n');
         });
     
-    // Exams Logic (unchanged)
+    // Exams Logic
     exams.forEach(exam => {
         const [hours, minutes] = exam.time.split(':').map(Number);
         const startDate = new Date(`${exam.date}T00:00:00`);
         startDate.setHours(hours, minutes, 0, 0);
         const endDate = new Date(startDate.getTime() + 3 * 60 * 60 * 1000);
         
-        const summary = exam.title.replace(/,/g, '\\,').replace(/;/g, '\\;');
-        const appLink = 'https://jee.ponsrischool.in/#/exams';
-        const description = `Open in App: ${appLink}\\n\\nSyllabus: ${exam.syllabus}`.replace(/,/g, '\\,').replace(/;/g, '\\;').replace(/\n/g, '\\n');
+        const summary = `EXAM: ${exam.title}`.replace(/,/g, '\\,').replace(/;/g, '\\;');
+        const appLink = 'https://jee.ponsrischool.in/?action=view_exams';
+        const description = `Syllabus: ${exam.syllabus}\\n\\nOpen App: ${appLink}`.replace(/,/g, '\\,').replace(/;/g, '\\;').replace(/\n/g, '\\n');
 
         const eventParts = [
             'BEGIN:VEVENT',

@@ -14,7 +14,9 @@ const FullScreenMusicPlayer: React.FC = () => {
         toggleFullScreenPlayer,
         seek,
         duration,
-        currentTime
+        currentTime,
+        isAutoMixEnabled,
+        toggleAutoMix
     } = useMusicPlayer();
     
     const [bgGradient, setBgGradient] = useState('from-gray-900 to-black');
@@ -93,7 +95,17 @@ const FullScreenMusicPlayer: React.FC = () => {
 
                     {/* Playback Buttons */}
                     <div className="flex justify-between items-center">
-                        <button className="p-2 text-gray-400 hover:text-white"><Icon name="shuffle" className="w-5 h-5" /></button>
+                        <button 
+                            onClick={toggleAutoMix}
+                            className={`p-2 transition-colors ${isAutoMixEnabled ? 'text-cyan-400' : 'text-gray-400 hover:text-white'}`}
+                            title={isAutoMixEnabled ? "Auto Mix On" : "Auto Mix Off"}
+                        >
+                            {/* Infinity Icon for Auto Mix */}
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                            </svg>
+                            <span className="text-[10px] block font-bold text-center">MIX</span>
+                        </button>
                         
                         <div className="flex items-center gap-8">
                             <button onClick={prevTrack} className="p-2 text-white hover:text-gray-300 transition-transform active:scale-90"><Icon name="arrow-left" className="w-8 h-8" /></button>

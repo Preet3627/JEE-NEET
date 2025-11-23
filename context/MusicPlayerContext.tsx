@@ -20,6 +20,8 @@ interface MusicPlayerContextType {
     duration: number;
     currentTime: number;
     playDjDrop: () => void;
+    isAutoMixEnabled: boolean;
+    toggleAutoMix: () => void;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
@@ -30,12 +32,14 @@ const DJ_DROP_URL = '/api/dj-drop';
 export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
     const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
+    const [gainNode, setGainNode] = useState<GainNode | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
     const [tracklist, setTracklist] = useState<Track[]>([]);
     const [isFullScreenPlayerOpen, setIsFullScreenPlayerOpen] = useState(false);
     const [duration, setDuration] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
+    const [isAutoMixEnabled, setIsAutoMixEnabled] = useState(false);
     
     const audioElementRef = useRef<HTMLAudioElement | null>(null);
     const djDropAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -47,9 +51,15 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
         if (!audioContext) {
             const context = new (window.AudioContext || (window as any).webkitAudioContext)();
             const analyserNode = context.createAnalyser();
+            const gain = context.createGain();
+            
+            // Chain: Source -> Gain -> Analyser -> Destination
+            gain.connect(analyserNode);
             analyserNode.connect(context.destination);
+            
             setAudioContext(context);
             setAnalyser(analyserNode);
+            setGainNode(gain);
         }
     }, [audioContext]);
     
@@ -63,10 +73,20 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const playTrack = useCallback(async (track: Track, newTracklist: Track[]) => {
         initializeAudioContext();
         
+        // Basic Auto-Mix Logic: Fade Out if playing and enabled
+        if (isAutoMixEnabled && isPlaying && gainNode && audioContext) {
+             // Ramp volume down over 1.5 seconds
+             gainNode.gain.setValueAtTime(1, audioContext.currentTime);
+             gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 1.5);
+             
+             // Wait for fade out before switching
+             await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+
         if (audioElementRef.current && audioContext && analyser) {
             
-            if (!isFirstPlayRef.current) {
-                playDjDrop();
+            if (!isFirstPlayRef.current && !isAutoMixEnabled) {
+                playDjDrop(); // Only play drop if manual switch or no automix
             }
             isFirstPlayRef.current = false;
             
@@ -105,9 +125,10 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
             audioElementRef.current.src = streamUrl;
             audioElementRef.current.crossOrigin = "anonymous";
             
-            if (!sourceNodeRef.current) {
+            // Connect source if not already connected
+            if (!sourceNodeRef.current && gainNode) {
                 sourceNodeRef.current = audioContext.createMediaElementSource(audioElementRef.current);
-                sourceNodeRef.current.connect(analyser);
+                sourceNodeRef.current.connect(gainNode);
             }
 
             audioElementRef.current.play().then(() => {
@@ -115,9 +136,18 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
                     audioContext.resume();
                 }
                 setIsPlaying(true);
+                
+                // Auto-Mix: Fade In
+                if (isAutoMixEnabled && gainNode) {
+                    gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                    gainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + 1.5);
+                } else if (gainNode) {
+                    gainNode.gain.setValueAtTime(1, audioContext.currentTime); // Instant volume for normal play
+                }
+
             }).catch(e => console.error("Audio playback error:", e));
         }
-    }, [audioContext, analyser, initializeAudioContext]);
+    }, [audioContext, analyser, gainNode, initializeAudioContext, isAutoMixEnabled, isPlaying]);
     
     const play = () => {
         if (audioElementRef.current) {
@@ -163,6 +193,10 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const toggleFullScreenPlayer = () => {
         setIsFullScreenPlayerOpen(prev => !prev);
     };
+    
+    const toggleAutoMix = () => {
+        setIsAutoMixEnabled(prev => !prev);
+    };
 
     useEffect(() => {
         if (!audioElementRef.current) {
@@ -192,7 +226,25 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     }, [nextTrack]);
 
 
-    const value = { audioElement: audioElementRef.current, analyser, isPlaying, currentTrack, isFullScreenPlayerOpen, playTrack, play, pause, nextTrack, prevTrack, toggleFullScreenPlayer, seek, duration, currentTime, playDjDrop };
+    const value = { 
+        audioElement: audioElementRef.current, 
+        analyser, 
+        isPlaying, 
+        currentTrack, 
+        isFullScreenPlayerOpen, 
+        playTrack, 
+        play, 
+        pause, 
+        nextTrack, 
+        prevTrack, 
+        toggleFullScreenPlayer, 
+        seek, 
+        duration, 
+        currentTime, 
+        playDjDrop,
+        isAutoMixEnabled,
+        toggleAutoMix
+    };
 
     return (
         <MusicPlayerContext.Provider value={value}>
