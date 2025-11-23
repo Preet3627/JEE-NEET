@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, ReactNode, useRef, useCallback, useEffect } from 'react';
 import { api } from '../api/apiService';
 import { Track } from '../types';
@@ -22,12 +21,13 @@ interface MusicPlayerContextType {
     playDjDrop: () => void;
     isAutoMixEnabled: boolean;
     toggleAutoMix: () => void;
+    updateTrackMetadata: (id: string, newTitle: string, newArtist: string) => void;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
 
-// Updated to use the local proxy to avoid CORS issues
 const DJ_DROP_URL = '/api/dj-drop';
+const DEFAULT_ART = 'https://ponsrischool.in/wp-content/uploads/2025/11/Gemini_Generated_Image_mtb6hbmtb6hbmtb6.png';
 
 export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
@@ -39,7 +39,7 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const [isFullScreenPlayerOpen, setIsFullScreenPlayerOpen] = useState(false);
     const [duration, setDuration] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
-    const [isAutoMixEnabled, setIsAutoMixEnabled] = useState(false);
+    const [isAutoMixEnabled, setIsAutoMixEnabled] = useState(true);
     
     const audioElementRef = useRef<HTMLAudioElement | null>(null);
     const djDropAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -52,11 +52,8 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
             const context = new (window.AudioContext || (window as any).webkitAudioContext)();
             const analyserNode = context.createAnalyser();
             const gain = context.createGain();
-            
-            // Chain: Source -> Gain -> Analyser -> Destination
             gain.connect(analyserNode);
             analyserNode.connect(context.destination);
-            
             setAudioContext(context);
             setAnalyser(analyserNode);
             setGainNode(gain);
@@ -66,42 +63,33 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const playDjDrop = () => {
         if (djDropAudioRef.current) {
             djDropAudioRef.current.currentTime = 0;
-            djDropAudioRef.current.play().catch(e => console.error("DJ drop playback error:", e));
+            djDropAudioRef.current.play().catch(e => console.error("DJ drop error", e));
         }
     };
 
     const playTrack = useCallback(async (track: Track, newTracklist: Track[]) => {
         initializeAudioContext();
         
-        // Basic Auto-Mix Logic: Fade Out if playing and enabled
         if (isAutoMixEnabled && isPlaying && gainNode && audioContext) {
-             // Ramp volume down over 1.5 seconds
              gainNode.gain.setValueAtTime(1, audioContext.currentTime);
-             gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 1.5);
-             
-             // Wait for fade out before switching
-             await new Promise(resolve => setTimeout(resolve, 1500));
+             gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 2);
+             await new Promise(resolve => setTimeout(resolve, 2000));
         }
 
         if (audioElementRef.current && audioContext && analyser) {
-            
             if (!isFirstPlayRef.current && !isAutoMixEnabled) {
-                playDjDrop(); // Only play drop if manual switch or no automix
+                playDjDrop();
             }
             isFirstPlayRef.current = false;
-            
             setTracklist(newTracklist);
 
             let streamUrl: string;
-            let coverArtUrl = 'https://ponsrischool.in/wp-content/uploads/2025/11/Gemini_Generated_Image_ujvnj5ujvnj5ujvn.png'; // Default art
+            let coverArtUrl = DEFAULT_ART;
 
             if (track.isLocal && track.file) {
-                if (currentObjectUrlRef.current) {
-                    URL.revokeObjectURL(currentObjectUrlRef.current);
-                }
+                if (currentObjectUrlRef.current) URL.revokeObjectURL(currentObjectUrlRef.current);
                 streamUrl = URL.createObjectURL(track.file);
                 currentObjectUrlRef.current = streamUrl;
-
                 try {
                     const metadata = await musicMetadata.parseBlob(track.file);
                     if (metadata.common.picture && metadata.common.picture.length > 0) {
@@ -109,100 +97,63 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
                         const blob = new Blob([picture.data], { type: picture.format });
                         coverArtUrl = URL.createObjectURL(blob);
                     }
-                } catch (e) {
-                    console.warn("Could not parse metadata for local file", e);
-                }
-
+                } catch (e) { /* ignore */ }
             } else {
-                 // Use the proxy endpoint to handle Nextcloud auth/CORS
                  streamUrl = api.getMusicContentUrl(track.id);
-                 coverArtUrl = api.getMusicContentUrl(track.coverArt);
+                 coverArtUrl = DEFAULT_ART; 
             }
 
-            const trackWithArtUrl = { ...track, coverArtUrl };
-            setCurrentTrack(trackWithArtUrl);
+            const trackWithArt = { ...track, coverArtUrl };
+            setCurrentTrack(trackWithArt);
 
             audioElementRef.current.src = streamUrl;
             audioElementRef.current.crossOrigin = "anonymous";
             
-            // Connect source if not already connected
             if (!sourceNodeRef.current && gainNode) {
                 sourceNodeRef.current = audioContext.createMediaElementSource(audioElementRef.current);
                 sourceNodeRef.current.connect(gainNode);
             }
 
             audioElementRef.current.play().then(() => {
-                if (audioContext.state === 'suspended') {
-                    audioContext.resume();
-                }
+                if (audioContext.state === 'suspended') audioContext.resume();
                 setIsPlaying(true);
-                
-                // Auto-Mix: Fade In
                 if (isAutoMixEnabled && gainNode) {
                     gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-                    gainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + 1.5);
+                    gainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + 2);
                 } else if (gainNode) {
-                    gainNode.gain.setValueAtTime(1, audioContext.currentTime); // Instant volume for normal play
+                    gainNode.gain.setValueAtTime(1, audioContext.currentTime);
                 }
-
-            }).catch(e => console.error("Audio playback error:", e));
+            }).catch(e => console.error("Playback error:", e));
         }
     }, [audioContext, analyser, gainNode, initializeAudioContext, isAutoMixEnabled, isPlaying]);
     
-    const play = () => {
-        if (audioElementRef.current) {
-            audioElementRef.current.play();
-            setIsPlaying(true);
-            if (audioContext?.state === 'suspended') {
-                audioContext.resume();
-            }
+    const updateTrackMetadata = (id: string, newTitle: string, newArtist: string) => {
+        const updatedList = tracklist.map(t => t.id === id ? { ...t, title: newTitle, artist: newArtist } : t);
+        setTracklist(updatedList);
+        if (currentTrack && currentTrack.id === id) {
+            setCurrentTrack({ ...currentTrack, title: newTitle, artist: newArtist });
         }
     };
 
-    const pause = () => {
-        if (audioElementRef.current) {
-            audioElementRef.current.pause();
-            setIsPlaying(false);
-        }
-    };
+    const play = () => { audioElementRef.current?.play(); setIsPlaying(true); audioContext?.resume(); };
+    const pause = () => { audioElementRef.current?.pause(); setIsPlaying(false); };
+    const seek = (time: number) => { if(audioElementRef.current) audioElementRef.current.currentTime = time; };
+    const toggleFullScreenPlayer = () => setIsFullScreenPlayerOpen(prev => !prev);
+    const toggleAutoMix = () => setIsAutoMixEnabled(prev => !prev);
 
-    const seek = (time: number) => {
-        if (audioElementRef.current) {
-            audioElementRef.current.currentTime = time;
-        }
-    };
-    
     const navigateTrack = (direction: 'next' | 'prev') => {
         if (!currentTrack || tracklist.length === 0) return;
-        
         const currentIndex = tracklist.findIndex(t => t.id === currentTrack.id);
         if (currentIndex === -1) return;
-        
-        let newIndex;
-        if (direction === 'next') {
-            newIndex = (currentIndex + 1) % tracklist.length;
-        } else {
-            newIndex = (currentIndex - 1 + tracklist.length) % tracklist.length;
-        }
+        let newIndex = direction === 'next' ? (currentIndex + 1) % tracklist.length : (currentIndex - 1 + tracklist.length) % tracklist.length;
         playTrack(tracklist[newIndex], tracklist);
     };
-
-    const nextTrack = useCallback(() => navigateTrack('next'), [currentTrack, tracklist, playTrack]);
-    const prevTrack = () => navigateTrack('prev');
-
-    const toggleFullScreenPlayer = () => {
-        setIsFullScreenPlayerOpen(prev => !prev);
-    };
     
-    const toggleAutoMix = () => {
-        setIsAutoMixEnabled(prev => !prev);
-    };
-
     useEffect(() => {
         if (!audioElementRef.current) {
             const audio = new Audio();
             audioElementRef.current = audio;
-            audio.addEventListener('ended', nextTrack);
+            audio.addEventListener('ended', () => navigateTrack('next')); // Autoplay next
             audio.addEventListener('timeupdate', () => setCurrentTime(audio.currentTime));
             audio.addEventListener('loadedmetadata', () => setDuration(audio.duration));
         }
@@ -211,52 +162,19 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
             drop.crossOrigin = "anonymous";
             djDropAudioRef.current = drop;
         }
-        
-        const audio = audioElementRef.current;
-        return () => {
-            if (audio) {
-                audio.removeEventListener('ended', nextTrack);
-                audio.removeEventListener('timeupdate', () => {});
-                audio.removeEventListener('loadedmetadata', () => {});
-            }
-             if (currentObjectUrlRef.current) {
-                URL.revokeObjectURL(currentObjectUrlRef.current);
-            }
-        };
-    }, [nextTrack]);
-
+    }, [tracklist, currentTrack]);
 
     const value = { 
-        audioElement: audioElementRef.current, 
-        analyser, 
-        isPlaying, 
-        currentTrack, 
-        isFullScreenPlayerOpen, 
-        playTrack, 
-        play, 
-        pause, 
-        nextTrack, 
-        prevTrack, 
-        toggleFullScreenPlayer, 
-        seek, 
-        duration, 
-        currentTime, 
-        playDjDrop,
-        isAutoMixEnabled,
-        toggleAutoMix
+        audioElement: audioElementRef.current, analyser, isPlaying, currentTrack, isFullScreenPlayerOpen, 
+        playTrack, play, pause, nextTrack: () => navigateTrack('next'), prevTrack: () => navigateTrack('prev'), 
+        toggleFullScreenPlayer, seek, duration, currentTime, playDjDrop, isAutoMixEnabled, toggleAutoMix, updateTrackMetadata 
     };
 
-    return (
-        <MusicPlayerContext.Provider value={value}>
-            {children}
-        </MusicPlayerContext.Provider>
-    );
+    return <MusicPlayerContext.Provider value={value}>{children}</MusicPlayerContext.Provider>;
 };
 
-export const useMusicPlayer = (): MusicPlayerContextType => {
+export const useMusicPlayer = () => {
     const context = useContext(MusicPlayerContext);
-    if (context === undefined) {
-        throw new Error('useMusicPlayer must be used within a MusicPlayerProvider');
-    }
+    if (context === undefined) throw new Error('useMusicPlayer must be used within a MusicPlayerProvider');
     return context;
 };

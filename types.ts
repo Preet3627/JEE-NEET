@@ -1,4 +1,3 @@
-
 export type Language = 'EN' | 'GU';
 
 export interface LocalizedString {
@@ -223,6 +222,7 @@ export type ActiveTab = 'dashboard' | 'schedule' | 'today' | 'planner' | 'exams'
 export interface DashboardWidgetItem {
     id: string; // Corresponds to a key in the widgetConfig map or a customWidget ID
     wide?: boolean;
+    tall?: boolean; // Added for increasable length
     translucent?: boolean;
     minimized?: boolean;
     customTitle?: string;

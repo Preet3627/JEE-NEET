@@ -1,5 +1,3 @@
-
-
 declare const gapi: any;
 declare const google: any;
 
@@ -16,6 +14,11 @@ export function initClient(
     onStatusChange: (isSignedIn: boolean) => void, 
     onError: (error: any) => void
 ) {
+    if (!window.gapi || !window.google) {
+        console.error("Google API scripts not loaded");
+        return;
+    }
+
     gapi.load('client', async () => {
         try {
             await gapi.client.init({
@@ -55,7 +58,7 @@ export function initClient(
  */
 export const handleSignIn = (): void => {
     if (tokenClient) {
-        tokenClient.requestAccessToken({});
+        tokenClient.requestAccessToken({ prompt: 'consent' });
     } else {
         console.error("Token client not initialized.");
         alert("Google services are not ready. Please try again in a moment.");

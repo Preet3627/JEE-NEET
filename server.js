@@ -1,4 +1,3 @@
-
 import express from 'express';
 import mysql from 'mysql2/promise';
 import cors from 'cors';
@@ -18,9 +17,11 @@ import { knowledgeBase } from './data/knowledgeBase.js';
 const app = express();
 
 // Fix for Cross-Origin-Opener-Policy blocking Google Sign-In popup
+// RELAXED POLICY: 'unsafe-none' allows popups to communicate back to the window
 app.use((req, res, next) => {
-    res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+    res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
     res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
+    res.setHeader("Referrer-Policy", "no-referrer-when-downgrade");
     next();
 });
 
@@ -839,10 +840,10 @@ apiRouter.post('/ai/chat', authMiddleware, async (req, res) => {
         const model = 'gemini-2.5-flash';
         const systemInstruction = `You are a helpful AI assistant. ${getKnowledgeBaseForUser(config)}`;
         
-        // Construct history compatible with SDK
+        // Construct history compatible with SDK and sanitize roles
         const chatHistory = history.map(h => ({
-            role: h.role,
-            parts: h.parts
+            role: h.role === 'model' ? 'model' : 'user', // Strict role validation
+            parts: h.parts.map(p => ({ text: p.text || '' }))
         }));
 
         const chat = ai.chats.create({
@@ -857,7 +858,6 @@ apiRouter.post('/ai/chat', authMiddleware, async (req, res) => {
         }
 
         const result = await chat.sendMessage({ message: parts });
-        // Use .text getter
         res.json({ role: 'model', parts: [{ text: result.response.text }] });
     } catch (error) {
         console.error("AI Chat Error:", error);
@@ -964,7 +964,8 @@ apiRouter.get('/music/content', async (req, res) => {
         // Enable CORS for Web Audio API access
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Range');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
         // stream.pipe(res) handles backpressure automatically
         stream.pipe(res);

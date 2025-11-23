@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { StudentData, ScheduleItem, ActivityData, Config, StudySession, HomeworkData, ExamData, ResultData, DoubtData, FlashcardDeck, Flashcard, StudyMaterialItem, ScheduleCardData, PracticeQuestion, ActiveTab, DashboardWidgetItem } from '../types';
 import ScheduleList from './ScheduleList';
@@ -318,12 +317,13 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                         if (!widget) return null;
                         
                         const isLarge = ['countdown', 'dailyInsight', 'quote', 'clock'].includes(item.id) || item.wide;
+                        const isTall = item.tall;
                         const isMinimized = item.minimized;
 
                         return (
                             <div 
                                 key={item.id} 
-                                className={`${isLarge ? 'md:col-span-2' : ''} transition-all duration-300 widget-container ${isMinimized ? 'widget-minimized' : ''} ${isEditLayoutMode ? 'cursor-move ring-2 ring-dashed ring-cyan-500/50 rounded-xl scale-95' : ''}`}
+                                className={`${isLarge ? 'md:col-span-2' : ''} ${isTall ? 'row-span-2' : ''} transition-all duration-300 widget-container ${isMinimized ? 'widget-minimized' : ''} ${isEditLayoutMode ? 'cursor-move ring-2 ring-dashed ring-cyan-500/50 rounded-xl scale-95' : ''}`}
                                 draggable={isEditLayoutMode}
                                 onDragStart={() => handleDragStart(index)}
                                 onDragEnter={() => handleDragEnter(index)}

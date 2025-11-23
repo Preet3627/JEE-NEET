@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useMusicPlayer } from '../../context/MusicPlayerContext';
 import Icon from '../Icon';

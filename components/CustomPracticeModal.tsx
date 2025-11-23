@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import McqTimer from './McqTimer';
 import Icon from './Icon';
@@ -265,17 +264,6 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
     return parseAnswers(correctAnswersText);
   }, [correctAnswersText, jeeMainsCorrectAnswersText, initialTask, activeTab]);
 
-  // Calculate question numbers ensuring a strict number[] return type
-  const finalQuestionNumbers: number[] = useMemo(() => {
-      if (practiceQuestions) {
-          return practiceQuestions.map(q => Number(q.number));
-      }
-      if (practiceMode === 'jeeMains') {
-          return Array.from({ length: 75 }, (_, i) => i + 1);
-      }
-      return questionNumbers;
-  }, [practiceQuestions, practiceMode, questionNumbers]);
-
   return (
     <>
       <div
@@ -288,18 +276,20 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
           onClick={(e) => e.stopPropagation()}
         >
           {theme === 'liquid-glass' && (
-            <div className="flex-shrink-0 flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-black/20">
-              <button onClick={handleClose} className="w-3 h-3 rounded-full bg-[#ff5f56] hover:bg-[#ff5f56]/80 shadow-inner"></button>
-              <div className="w-3 h-3 rounded-full bg-[#ffbd2e] shadow-inner"></div>
-              <div className="w-3 h-3 rounded-full bg-[#27c93f] shadow-inner"></div>
-              <span className="ml-2 text-xs font-medium text-gray-400 tracking-wide">Practice Session</span>
+            <div className="flex-shrink-0 flex items-center p-3 border-b border-[var(--glass-border)]">
+              <div className="flex gap-2">
+                <button onClick={handleClose} className="w-3 h-3 rounded-full bg-red-500"></button>
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+              </div>
+              <h2 className="text-sm font-semibold text-white text-center flex-grow -ml-12">Practice Session</h2>
             </div>
           )}
           
           <div className="p-6 overflow-y-auto max-h-[80vh]">
             {isTimerStarted ? (
               <McqTimer 
-                questionNumbers={finalQuestionNumbers}
+                questionNumbers={practiceQuestions ? practiceQuestions.map(q => Number(q.number)) : practiceMode === 'jeeMains' ? Array.from({ length: 75 }, (_, i) => i + 1) : questionNumbers.map(Number)}
                 questions={practiceQuestions || undefined}
                 perQuestionTime={perQuestionTime}
                 onClose={handleClose} 
@@ -316,150 +306,113 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
                 initialTask={initialTask}
               />
             ) : (
-              <div className="space-y-6">
+              <div>
                 <div className="flex justify-between items-center">
-                  {theme !== 'liquid-glass' && <h2 className="text-2xl font-bold text-white">Practice Session</h2>}
-                  <button onClick={() => setIsAiParserOpen(true)} className="text-xs font-semibold text-cyan-400 hover:underline flex items-center gap-1"><Icon name="upload" /> Import Text/JSON</button>
+                  {theme !== 'liquid-glass' && <h2 className="text-2xl font-bold text-white mb-4">Practice Session</h2>}
+                  <button onClick={() => setIsAiParserOpen(true)} className="text-xs font-semibold text-cyan-400 hover:underline flex items-center gap-1"><Icon name="upload" /> Import from Text/JSON</button>
                 </div>
                 
-                {/* Tabs */}
-                <div className="flex p-1 rounded-xl bg-black/40 border border-white/5">
-                  {[
-                      { id: 'jeeMains', label: 'JEE Full Test' },
-                      { id: 'ai', label: 'AI Quiz' },
-                      { id: 'mistakes', label: 'Mistakes' },
-                      { id: 'manual', label: 'Manual' }
-                  ].map(tab => (
-                      <button 
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id as any)} 
-                        disabled={tab.id === 'ai' && !!initialTask}
-                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === tab.id ? 'bg-gray-700/80 text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5 disabled:opacity-30'}`}
-                      >
-                          {tab.label}
-                      </button>
-                  ))}
+                <div className="flex items-center gap-2 p-1 rounded-full bg-gray-900/50 my-4 overflow-x-auto">
+                  <button onClick={() => setActiveTab('jeeMains')} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-full whitespace-nowrap px-2 ${activeTab === 'jeeMains' ? 'bg-purple-600 text-white' : 'text-gray-300'}`}>JEE Full Test</button>
+                  <button onClick={() => setActiveTab('ai')} disabled={!!initialTask} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-full disabled:opacity-50 whitespace-nowrap px-2 ${activeTab === 'ai' ? 'bg-cyan-600 text-white' : 'text-gray-300'}`}>AI Quiz</button>
+                  <button onClick={() => setActiveTab('mistakes')} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-full whitespace-nowrap px-2 ${activeTab === 'mistakes' ? 'bg-red-600 text-white' : 'text-gray-300'}`}>Mistakes</button>
+                  <button onClick={() => setActiveTab('manual')} className={`flex-1 text-center text-sm font-semibold py-1.5 rounded-full whitespace-nowrap px-2 ${activeTab === 'manual' ? 'bg-gray-600 text-white' : 'text-gray-300'}`}>Manual</button>
                 </div>
                 
-                {/* Content based on Tab */}
-                <div className="min-h-[200px]">
-                    {activeTab === 'manual' && (
-                        <div className="space-y-4 animate-fadeIn">
-                            <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Question Ranges</label>
-                                <input 
-                                    value={qRanges} 
-                                    onChange={(e) => setQRanges(e.target.value)} 
-                                    className="w-full mt-2 bg-gray-900/50 border border-gray-700 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-cyan-500 outline-none transition-all" 
-                                    placeholder="e.g., 1-15; 20-25" 
-                                />
-                            </div>
-                            {!initialTask && (
-                                <div>
-                                    <div className="flex justify-between items-center mb-2">
-                                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Answer Key (Optional)</label>
-                                        <div className="flex gap-3">
-                                            <input type="file" accept=".json" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
-                                            <button type="button" onClick={() => fileInputRef.current?.click()} className="text-xs text-cyan-400 hover:text-cyan-300">Upload JSON</button>
-                                            <button type="button" onClick={() => setIsAiKeyModalOpen(true)} className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1"><Icon name="gemini" className="w-3 h-3" /> AI Gen</button>
-                                        </div>
-                                    </div>
-                                    <textarea 
-                                        value={correctAnswersText} 
-                                        onChange={(e) => setCorrectAnswersText(e.target.value)} 
-                                        className="w-full h-24 bg-gray-900/50 border border-gray-700 rounded-lg px-4 py-3 text-sm font-mono focus:ring-2 focus:ring-cyan-500 outline-none transition-all resize-none" 
-                                        placeholder="1:A, 2:C, 3:12.5" 
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {activeTab === 'ai' && (
-                        <div className="space-y-4 animate-fadeIn">
-                            <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Topic</label>
-                                <input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} className="w-full mt-2 bg-gray-900/50 border border-gray-700 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-cyan-500 outline-none" placeholder="e.g., Rotational Motion" />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Count</label>
-                                    <input type="number" value={aiNumQuestions} onChange={(e) => setAiNumQuestions(parseInt(e.target.value))} className="w-full mt-2 bg-gray-900/50 border border-gray-700 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-cyan-500 outline-none" />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Difficulty</label>
-                                    <select value={aiDifficulty} onChange={e => setAiDifficulty(e.target.value)} className="w-full mt-2 bg-gray-900/50 border border-gray-700 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-cyan-500 outline-none">
-                                        <option>Easy</option>
-                                        <option>Medium</option>
-                                        <option>Hard</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'mistakes' && (
-                        <div className="text-center py-6 animate-fadeIn space-y-4">
-                            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-2">
-                                <Icon name="stopwatch" className="w-8 h-8 text-red-400" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-bold text-white">Mistake Remediation</h3>
-                                <p className="text-sm text-gray-400">Targeting <span className="text-white font-bold">{allMistakes.length}</span> active weak areas.</p>
-                            </div>
-                            {allMistakes.length > 0 ? (
-                                <div className="bg-black/30 rounded-lg p-3 text-left max-h-32 overflow-y-auto border border-white/5">
-                                    <p className="text-xs text-gray-500 mb-2 font-bold uppercase">Focus Areas:</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {allMistakes.map((m, i) => <span key={i} className="text-xs bg-red-900/30 text-red-300 px-2 py-1 rounded border border-red-800/50">{m}</span>)}
+                {activeTab === 'manual' && (
+                    <>
+                      <div className="mt-4">
+                        <label className="text-sm font-bold text-gray-400">Question Ranges (e.g., 1-15; 20-25)</label>
+                        <textarea value={qRanges} onChange={(e) => setQRanges(e.target.value)} className="w-full h-20 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 mt-1" placeholder="e.g., 1-25; 30-35;" />
+                      </div>
+                       {!initialTask && (
+                            <div className="mt-4">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-sm font-bold text-gray-400">Correct Answers (Optional)</label>
+                                    <div className="flex gap-2">
+                                       <input type="file" accept=".json" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+                                       <button type="button" onClick={() => fileInputRef.current?.click()} className="text-xs font-semibold text-cyan-400 hover:underline">Upload JSON</button>
+                                       <button type="button" onClick={() => setIsAiKeyModalOpen(true)} className="text-xs font-semibold text-cyan-400 hover:underline flex items-center gap-1"><Icon name="gemini" className="w-3 h-3" /> AI Gen</button>
                                     </div>
                                 </div>
-                            ) : (
-                                <p className="text-sm text-green-400">No mistakes recorded! Good job.</p>
-                            )}
+                                <textarea value={correctAnswersText} onChange={(e) => setCorrectAnswersText(e.target.value)} className="w-full h-20 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 mt-1" placeholder="1:A, 2:C, 3:12.5 OR A C 12.5" />
+                            </div>
+                       )}
+                    </>
+                )}
+                {activeTab === 'ai' && (
+                    <div className="space-y-4">
+                       <div>
+                          <label className="text-sm font-bold text-gray-400">Topic</label>
+                           <input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} className="w-full px-3 py-2 mt-1 text-gray-200 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500" placeholder="e.g., Rotational Motion" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="text-sm font-bold text-gray-400"># of Questions</label>
+                              <input type="number" value={aiNumQuestions} onChange={(e) => setAiNumQuestions(parseInt(e.target.value))} className="w-full px-3 py-2 mt-1 text-gray-200 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg" />
+                          </div>
+                          <div>
+                              <label className="text-sm font-bold text-gray-400">Difficulty</label>
+                              <select value={aiDifficulty} onChange={e => setAiDifficulty(e.target.value)} className="w-full px-3 py-2 mt-1 text-gray-200 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg">
+                                  <option>Easy</option>
+                                  <option>Medium</option>
+                                  <option>Hard</option>
+                              </select>
+                          </div>
+                      </div>
+                    </div>
+                )}
+                {activeTab === 'mistakes' && (
+                    <div className="space-y-4 text-center py-4">
+                        <Icon name="stopwatch" className="w-12 h-12 text-red-400 mx-auto mb-2" />
+                        <h3 className="text-lg font-bold text-white">Mistake Remediation</h3>
+                        <p className="text-sm text-gray-300">You have <span className="font-bold text-red-400">{allMistakes.length}</span> active mistakes.</p>
+                        <p className="text-xs text-gray-500">The AI will generate specific practice questions targeting these weak areas.</p>
+                        {allMistakes.length > 0 && (
+                            <div className="text-left max-h-32 overflow-y-auto bg-gray-900/50 p-2 rounded border border-gray-700 text-xs text-gray-400 mt-2">
+                                {allMistakes.join(', ')}
+                            </div>
+                        )}
+                    </div>
+                )}
+                {activeTab === 'jeeMains' && (
+                  <div className="space-y-4">
+                     <div className="text-center p-4 bg-purple-900/30 border border-purple-500/50 rounded-lg">
+                        <Icon name="trophy" className="w-8 h-8 mx-auto text-purple-400 mb-2"/>
+                        <h3 className="font-bold text-white">JEE Mains Full Test Simulation</h3>
+                        <p className="text-xs text-gray-400">This is a 3-hour, 75-question test. After completion, you'll upload the answer key for AI-powered analysis.</p>
+                     </div>
+                     <div>
+                        <label className="text-sm font-bold text-gray-400">Syllabus</label>
+                         <textarea value={syllabus} onChange={(e) => setSyllabus(e.target.value)} className="w-full h-24 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 mt-1" placeholder="Enter the comma-separated list of chapters for this test, e.g., Kinematics, NLM, Rotational Motion..." />
+                    </div>
+                    <div className="mt-4">
+                        <div className="flex justify-between items-center">
+                            <label className="text-sm font-bold text-gray-400">Correct Answers (Optional)</label>
+                            <div className="flex gap-2">
+                                <input type="file" accept=".json" ref={jeeMainsFileInputRef} onChange={handleJeeMainsFileUpload} className="hidden" />
+                                <button type="button" onClick={() => jeeMainsFileInputRef.current?.click()} className="text-xs font-semibold text-cyan-400 hover:underline">Upload JSON</button>
+                                <button type="button" onClick={() => setIsAiKeyModalOpen(true)} className="text-xs font-semibold text-cyan-400 hover:underline flex items-center gap-1"><Icon name="gemini" className="w-3 h-3" /> AI Gen</button>
+                            </div>
                         </div>
-                    )}
+                        <textarea value={jeeMainsCorrectAnswersText} onChange={(e) => setJeeMainsCorrectAnswersText(e.target.value)} className="w-full h-20 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 mt-1" placeholder="Provide answers for instant feedback..." />
+                        <p className="text-xs text-gray-500 mt-1">If provided, you'll get instant feedback. You can still use AI Grade later for detailed analysis.</p>
+                    </div>
+                  </div>
+              )}
 
-                    {activeTab === 'jeeMains' && (
-                        <div className="space-y-4 animate-fadeIn">
-                            <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 text-center">
-                                <Icon name="trophy" className="w-8 h-8 mx-auto text-purple-400 mb-2"/>
-                                <h3 className="font-bold text-white">Full Mock Simulation</h3>
-                                <p className="text-xs text-purple-300 mt-1">3 Hours • 75 Questions • Negative Marking</p>
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Syllabus Covered</label>
-                                <textarea value={syllabus} onChange={(e) => setSyllabus(e.target.value)} className="w-full mt-2 h-24 bg-gray-900/50 border border-gray-700 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-cyan-500 outline-none resize-none" placeholder="e.g. Full 11th Physics, Organic Chemistry..." />
-                            </div>
-                            <div>
-                                <div className="flex justify-between items-center mb-2">
-                                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Answer Key (Optional)</label>
-                                    <div className="flex gap-3">
-                                        <input type="file" accept=".json" ref={jeeMainsFileInputRef} onChange={handleJeeMainsFileUpload} className="hidden" />
-                                        <button type="button" onClick={() => jeeMainsFileInputRef.current?.click()} className="text-xs text-cyan-400 hover:text-cyan-300">Upload JSON</button>
-                                        <button type="button" onClick={() => setIsAiKeyModalOpen(true)} className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1"><Icon name="gemini" className="w-3 h-3" /> AI Gen</button>
-                                    </div>
-                                </div>
-                                <textarea value={jeeMainsCorrectAnswersText} onChange={(e) => setJeeMainsCorrectAnswersText(e.target.value)} className="w-full h-20 bg-gray-900/50 border border-gray-700 rounded-lg px-4 py-3 text-sm font-mono focus:ring-2 focus:ring-cyan-500 outline-none resize-none" placeholder="For instant feedback during test..." />
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {error && <p className="text-sm text-red-400 text-center bg-red-900/20 py-2 rounded-lg border border-red-900/50">{error}</p>}
+              {error && <p className="text-sm text-red-400 mt-2 text-center">{error}</p>}
               
-                <div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-                    <button type="button" onClick={handleClose} className="px-6 py-2.5 text-sm font-semibold rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors">Cancel</button>
-                    <button onClick={handleStart} disabled={isLoading || (activeTab === 'manual' && totalQuestions === 0) || (activeTab === 'mistakes' && allMistakes.length === 0)} className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 text-white hover:opacity-90 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
-                        {isLoading ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Generating...</> : <><Icon name="play" className="w-4 h-4" /> Start Session</>}
-                    </button>
-                </div>
+              <div className="flex justify-end gap-4 pt-4 mt-4 border-t border-[var(--glass-border)]">
+                <button type="button" onClick={handleClose} className="px-5 py-2 text-sm font-semibold rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600 transition-colors">Cancel</button>
+                <button onClick={handleStart} disabled={isLoading || (activeTab === 'manual' && totalQuestions === 0)} className="flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-[var(--accent-color)] to-[var(--gradient-purple)] text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed">
+                  {isLoading ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Generating...</> : <><Icon name="play" className="w-4 h-4" /> Start</>}
+                </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
-
       {isAiKeyModalOpen && (
           <AIGenerateAnswerKeyModal
               onClose={() => setIsAiKeyModalOpen(false)}
@@ -476,10 +429,12 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
           <AIParserModal
             onClose={() => setIsAiParserOpen(false)}
             onDataReady={handleDataFromParser}
-            onPracticeTestReady={() => {}} 
-            onOpenGuide={() => {}} 
+            onPracticeTestReady={() => {}} // This will be handled by the StudentDashboard
+            onOpenGuide={() => {}} // This will be handled by the StudentDashboard
           />
       )}
     </>
   );
 };
+
+export default CustomPracticeModal;
