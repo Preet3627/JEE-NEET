@@ -9,7 +9,7 @@ interface InteractiveFlashcardWidgetProps {
   onUpdateConfig: (config: Partial<Config>) => void;
   onAddCard?: () => void;
   onReviewDeck?: (deckId: string) => void;
-  onOpenDeck?: (deckId: string) => void; // New prop
+  onOpenDeck?: (deckId: string) => void; 
 }
 
 const subjectColors: Record<string, string> = {
@@ -80,7 +80,7 @@ const InteractiveFlashcardWidget: React.FC<InteractiveFlashcardWidgetProps> = ({
             <h2 className="text-xl font-semibold text-[var(--accent-color)] tracking-widest uppercase">Quick Review</h2>
             <div className="flex gap-2">
                 {onOpenDeck && (
-                    <button onClick={handleOpenDeckView} className="p-1.5 bg-gray-700 hover:bg-purple-600 rounded-full text-white transition-colors" title={`Manage Deck: ${currentDeckName}`}>
+                    <button onClick={handleOpenDeckView} className="p-1.5 bg-gray-700 hover:bg-purple-600 rounded-full text-white transition-colors" title={`Open Deck: ${currentDeckName}`}>
                         <Icon name="book-open" className="w-4 h-4" />
                     </button>
                 )}
@@ -95,7 +95,7 @@ const InteractiveFlashcardWidget: React.FC<InteractiveFlashcardWidgetProps> = ({
         <div className="flashcard-container cursor-pointer flex-grow min-h-[10rem]" onClick={() => setIsFlipped(!isFlipped)}>
             <div className={`flashcard-inner ${isFlipped ? 'flashcard-flipped' : ''}`}>
                 <div className={`flashcard-front bg-gray-900/50 border-2 ${cardColorClass} overflow-y-auto flex flex-col justify-center`}>
-                    <p className="text-xs text-gray-500 font-bold absolute top-2 left-2 uppercase">{currentDeckName}</p>
+                    <p className="text-xs text-gray-500 font-bold absolute top-2 left-2 uppercase opacity-70">{currentDeckName}</p>
                     <div 
                         className="text-lg text-white line-clamp-6 prose prose-invert prose-sm text-center"
                         dangerouslySetInnerHTML={{ __html: renderMarkdown(currentCard.front) }}

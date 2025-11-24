@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; img-src 'self' data: https: blob:; connect-src 'self' https://*.googleapis.com https://accounts.google.com https://ponsrischool.in https://nc.ponsrischool.in; frame-src 'self' https://accounts.google.com https://content.googleapis.com blob:; media-src 'self' https://nc.ponsrischool.in blob:;">
     <link rel="icon" type="image/png" href="https://ponsrischool.in/wp-content/uploads/2025/11/Gemini_Generated_Image_ujvnj5ujvnj5ujvn.png" crossorigin="anonymous" />
+    <link rel="manifest" href="/manifest.json">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
@@ -86,6 +87,26 @@
         background-position: center;
         font-family: var(--font-sans);
         -webkit-font-smoothing: antialiased;
+        overflow-x: hidden; /* Prevent horizontal scroll during transitions */
+      }
+
+      /* Navigation Transitions */
+      .animate-slide-in-right {
+        animation: slideInRight 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      }
+      
+      .animate-slide-in-left {
+        animation: slideInLeft 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      }
+
+      @keyframes slideInRight {
+        from { opacity: 0; transform: translateX(20px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+
+      @keyframes slideInLeft {
+        from { opacity: 0; transform: translateX(-20px); }
+        to { opacity: 1; transform: translateX(0); }
       }
 
       /* MacOS Traffic Lights */

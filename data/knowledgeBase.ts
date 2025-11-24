@@ -45,37 +45,81 @@ export const knowledgeBase = {
       - **Reaction Mechanisms:** SN1 (unimolecular, carbocation intermediate) vs SN2 (bimolecular, concerted, inversion of configuration).
     `,
     MATHS: `
-      **Calculus:**
-      - **Differentiation:** 
-        - d/dx(x^n) = n*x^{n-1}
-        - d/dx(sin x) = cos x, d/dx(cos x) = -sin x
-        - Chain Rule: d/dx[f(g(x))] = f'(g(x)) * g'(x)
-      - **Integration:** 
-        - ∫x^n dx = (x^{n+1})/(n+1) + C (n ≠ -1)
-        - ∫(1/x) dx = ln|x| + C
-        - Integration by Parts: ∫u dv = uv - ∫v du
-      - **Definite Integrals:** Area under curve from a to b.
+      **Sets, Relations and Functions:**
+      - **Sets:** Union (A ∪ B), Intersection (A ∩ B), Complement (A').
+      - **Functions:** Domain, Co-domain, Range. Injective (One-to-one), Surjective (Onto), Bijective.
+      - **Composition:** (fog)(x) = f(g(x)).
 
-      **Trigonometry:**
-      - **Identities:** sin^2(x) + cos^2(x) = 1, 1 + tan^2(x) = sec^2(x)
-      - **Double Angle:** sin(2A) = 2sinAcosA, cos(2A) = cos^2A - sin^2A
-      - **Sum/Diff:** sin(A+B) = sinAcosB + cosAsinB
-      - **General Solutions:** If sin x = sin α, then x = nπ + (-1)^n α.
+      **Complex Numbers:**
+      - Standard form: z = a + ib.
+      - Modulus: |z| = sqrt(a^2 + b^2).
+      - Argument: tan(θ) = b/a.
+      - Euler's form: z = r(cos θ + i sin θ) = re^{iθ}.
+      - Cube roots of unity: 1, ω, ω^2 where 1 + ω + ω^2 = 0 and ω^3 = 1.
 
-      **Algebra:**
-      - **Quadratic Formula:** For ax^2 + bx + c = 0, x = [-b ± sqrt(b^2 - 4ac)] / (2a).
-      - **Sequence & Series:** AP sum S_n = n/2 [2a + (n-1)d]; GP sum S_n = a(r^n - 1)/(r-1).
-      - **Binomial Theorem:** (x+y)^n = Σ [nCr * x^{n-r} * y^r]
-      - **Complex Numbers:** z = a + ib, modulus |z| = sqrt(a^2 + b^2). Euler's form: e^{iθ} = cos θ + i sin θ.
+      **Quadratic Equations:**
+      - Roots of ax^2 + bx + c = 0 are x = [-b ± sqrt(b^2 - 4ac)] / 2a.
+      - Sum of roots (α + β) = -b/a.
+      - Product of roots (αβ) = c/a.
+      - Discriminant (D) = b^2 - 4ac. If D > 0 (real distinct), D = 0 (real equal), D < 0 (imaginary).
+
+      **Matrices and Determinants:**
+      - Matrix multiplication is not commutative (AB ≠ BA usually).
+      - Transpose properties: (AB)' = B'A'.
+      - Inverse: A^{-1} = adj(A) / |A|. Exists if |A| ≠ 0.
+      - Cramer's Rule for solving linear equations.
+
+      **Permutations and Combinations:**
+      - nPr = n! / (n-r)!
+      - nCr = n! / [r!(n-r)!]
+      - Circular permutation: (n-1)!
+
+      **Binomial Theorem:**
+      - (x+y)^n = Σ [nCr * x^{n-r} * y^r] for r = 0 to n.
+      - General term: T_{r+1} = nCr * x^{n-r} * y^r.
+
+      **Sequence and Series:**
+      - **AP:** T_n = a + (n-1)d; S_n = n/2 [2a + (n-1)d].
+      - **GP:** T_n = ar^{n-1}; S_n = a(r^n - 1)/(r-1).
+      - **AM-GM Inequality:** AM ≥ GM (for positive numbers).
+
+      **Limit, Continuity and Differentiability:**
+      - L'Hospital's Rule: If lim f(x)/g(x) is 0/0 or ∞/∞, take derivatives of num and den.
+      - Continuity: lim(x->a-) f(x) = lim(x->a+) f(x) = f(a).
+
+      **Integral Calculus:**
+      - **Standard Integrals:** ∫x^n dx, ∫e^x dx, ∫1/x dx, ∫sin x dx.
+      - **Integration by Parts:** ∫u dv = uv - ∫v du. (ILATE rule).
+      - **Definite Integrals:** Properties like ∫_a^b f(x)dx = ∫_a^b f(a+b-x)dx.
+      - **Area Under Curve:** ∫_a^b y dx.
+
+      **Differential Equations:**
+      - Variable Separable form.
+      - Homogeneous Differential Equations (y = vx).
+      - Linear Differential Equation: dy/dx + Py = Q. Integrating Factor (IF) = e^{∫P dx}. Solution: y(IF) = ∫(Q * IF) dx + C.
 
       **Coordinate Geometry:**
-      - **Straight Line:** y = mx + c (slope-intercept), ax + by + c = 0.
-      - **Circle:** (x-h)^2 + (y-k)^2 = r^2.
-      - **Conic Sections:** Parabola (y^2 = 4ax), Ellipse (x^2/a^2 + y^2/b^2 = 1), Hyperbola (x^2/a^2 - y^2/b^2 = 1).
-      
-      **Vectors & 3D:**
-      - **Dot Product:** A · B = |A||B|cosθ.
-      - **Cross Product:** A × B = |A||B|sinθ n_cap.
+      - **Straight Lines:** Slope m = tan θ. Point-slope form: y-y1 = m(x-x1). Distance formula.
+      - **Circles:** (x-h)^2 + (y-k)^2 = r^2. Tangent conditions.
+      - **Parabola:** y^2 = 4ax. Focus (a, 0).
+      - **Ellipse:** x^2/a^2 + y^2/b^2 = 1. Eccentricity e < 1.
+      - **Hyperbola:** x^2/a^2 - y^2/b^2 = 1. Eccentricity e > 1.
+
+      **Three Dimensional Geometry:**
+      - Direction Cosines (l, m, n) where l^2 + m^2 + n^2 = 1.
+      - Equation of a line in space: (x-x1)/a = (y-y1)/b = (z-z1)/c.
+      - Equation of a plane: ax + by + cz + d = 0.
+      - Shortest distance between skew lines.
+
+      **Vector Algebra:**
+      - Dot Product: A · B = |A||B|cosθ. (Scalar product).
+      - Cross Product: A × B = |A||B|sinθ n_cap. (Vector product).
+      - Projection of A on B = (A · B) / |B|.
+
+      **Statistics and Probability:**
+      - Mean, Variance, Standard Deviation.
+      - Conditional Probability: P(A|B) = P(A ∩ B) / P(B).
+      - Bayes' Theorem.
     `,
     BIOLOGY: `
       **Cell Biology:**

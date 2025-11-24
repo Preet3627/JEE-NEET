@@ -181,7 +181,7 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                 <div className="bg-gray-900/50 p-3 rounded-lg border border-gray-700/50 space-y-3">
                     <div>
                         <label className="text-xs font-bold text-gray-400">Mobile Layout</label>
-                        <select value={mobileLayout} onChange={e => setMobileLayout(e.target.value)} className={inputClass + " text-sm py-1"}>
+                        <select value={mobileLayout} onChange={e => setMobileLayout(e.target.value as 'standard' | 'toolbar')} className={inputClass + " text-sm py-1"}>
                             <option value="toolbar">Bottom Toolbar (Simplified)</option>
                             <option value="standard">Standard Tab Bar</option>
                         </select>

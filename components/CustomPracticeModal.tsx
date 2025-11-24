@@ -251,7 +251,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
               <h2 className="text-sm font-semibold text-white text-center flex-grow -ml-12">Practice Session</h2>
             </div>
           )}
-          <div className="p-6 overflow-y-auto max-h-[80vh]">
+          <div className="p-6 overflow-y-auto">
             {isTimerStarted ? (
               <McqTimer 
                 questionNumbers={practiceQuestions ? practiceQuestions.map(q => q.number) : practiceMode === 'jeeMains' ? Array.from({ length: 75 }, (_, i) => i + 1) : questionNumbers}
@@ -362,7 +362,6 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
               </div>
             </div>
           )}
-          </div>
         </div>
       </div>
       {isAiKeyModalOpen && (

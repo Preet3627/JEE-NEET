@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { StudentData, ScheduleItem, ActivityData, Config, StudySession, HomeworkData, ExamData, ResultData, DoubtData, FlashcardDeck, Flashcard, StudyMaterialItem, ScheduleCardData, PracticeQuestion, ActiveTab, DashboardWidgetItem } from '../types';
 import ScheduleList from './ScheduleList';
@@ -151,9 +152,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     const dragItemRef = useRef<number | null>(null);
     const dragOverItemRef = useRef<number | null>(null);
 
-    // Mobile Layout Check: Default to 'toolbar' if not set
-    const useToolbarLayout = isMobile && (student.CONFIG.settings.mobileLayout === 'toolbar' || !student.CONFIG.settings.mobileLayout);
-    
+    const useToolbarLayout = isMobile && student.CONFIG.settings.mobileLayout === 'toolbar';
     const taskItems = student.SCHEDULE_ITEMS;
     const activityItems = student.SCHEDULE_ITEMS.filter(item => item.type === 'ACTIVITY') as ActivityData[];
 
@@ -337,10 +336,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                     } else {
                         alert("Please create a deck first.");
                     }
-                }}
-                onOpenDeck={(deckId) => {
-                    const deck = student.CONFIG.flashcardDecks?.find(d => d.id === deckId);
-                    if (deck) setViewingDeck(deck);
                 }}
             />,
             'readingHours': <ReadingHoursWidget student={student} />,
@@ -552,7 +547,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             )}
             
             {useToolbarLayout ? (
-                <div className="flex items-center justify-between mb-6 px-4">
+                <div className="flex items-center justify-between mb-6">
                     <h2 className="text-2xl font-bold capitalize text-white font-sf-display">{activeTab}</h2>
                     <div className="flex items-center gap-2">
                         <button onClick={() => setIsSettingsModalOpen(true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700"><Icon name="settings" /></button>
