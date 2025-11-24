@@ -9,7 +9,7 @@ import MistakeManager from './MistakeManager';
 import TodaysAgendaWidget from './widgets/TodaysAgendaWidget';
 import ReadingHoursWidget from './widgets/ReadingHoursWidget';
 import ScoreTrendWidget from './widgets/MarksAnalysisWidget';
-import { CustomPracticeModal } from './CustomPracticeModal';
+import CustomPracticeModal from './CustomPracticeModal';
 import HomeworkWidget from './widgets/HomeworkWidget';
 import ActivityTracker from './ActivityTracker';
 import PerformanceMetrics from './PerformanceMetrics';
@@ -157,12 +157,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     const taskItems = student.SCHEDULE_ITEMS;
     const activityItems = student.SCHEDULE_ITEMS.filter(item => item.type === 'ACTIVITY') as ActivityData[];
 
-
-    useEffect(() => {
-        const handleResize = () => setIsMobile(window.innerWidth < 768);
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
 
     useEffect(() => {
         if (student.CONFIG.settings.dashboardLayout) {
@@ -319,7 +313,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             'countdown': <CountdownWidget items={student.SCHEDULE_ITEMS} />,
             'dailyInsight': <DailyInsightWidget weaknesses={student.CONFIG.WEAK} exams={student.EXAMS} />,
             'quote': <MotivationalQuoteWidget quote="The expert in anything was once a beginner." />,
-            'music': <MusicPlayerWidget onOpenLibrary={() => toggleLibrary()} />,
+            'music': <MusicPlayerWidget onOpenLibrary={toggleLibrary} />,
             'practice': <PracticeLauncherWidget onLaunch={() => setIsPracticeModalOpen(true)} />,
             'subjectAllocation': <SubjectAllocationWidget items={student.SCHEDULE_ITEMS} />,
             'scoreTrend': <ScoreTrendWidget results={student.RESULTS} />,
@@ -574,7 +568,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             {isAiChatOpen && <AIChatPopup history={aiChatHistory} onSendMessage={handleAiChatMessage} onClose={() => setIsAiChatOpen(false)} isLoading={isAiChatLoading} />}
             {viewingReport && <TestReportModal result={viewingReport} onClose={() => setViewingReport(null)} onUpdateWeaknesses={onUpdateWeaknesses} student={student} onSaveDeck={handleSaveDeck} />}
             {isMoveModalOpen && <MoveTasksModal onClose={() => setIsMoveModalOpen(false)} onConfirm={handleMoveSelected} selectedCount={selectedTaskIds.length} />}
-            {isLibraryOpen && <MusicLibraryModal onClose={() => toggleLibrary()} />}
+            {isLibraryOpen && <MusicLibraryModal onClose={toggleLibrary} />}
             {deepLinkData && (
                 <DeepLinkConfirmationModal
                     data={deepLinkData}

@@ -245,6 +245,22 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                     <input type="password" value={geminiApiKey} onChange={(e) => setGeminiApiKey(e.target.value)} className={inputClass} placeholder="Gemini API Key" />
                 </div>
             </div>
+
+            <div className="border-t border-gray-700/50"></div>
+
+            <div>
+                <h3 className="text-base font-bold text-gray-300 mb-2">Help & Guides</h3>
+                <div className="grid grid-cols-2 gap-3">
+                    <button type="button" onClick={onOpenAssistantGuide} className="flex flex-col items-center justify-center gap-2 p-3 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-600 transition-colors text-center h-full">
+                        <Icon name="gemini" className="w-6 h-6 text-cyan-400" />
+                        <span className="text-xs font-bold text-gray-200">Voice Commands</span>
+                    </button>
+                    <button type="button" onClick={onOpenAiGuide} className="flex flex-col items-center justify-center gap-2 p-3 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-600 transition-colors text-center h-full">
+                        <Icon name="book-open" className="w-6 h-6 text-purple-400" />
+                        <span className="text-xs font-bold text-gray-200">AI Data Guide</span>
+                    </button>
+                </div>
+            </div>
             
             <div className="flex justify-end gap-4 pt-4">
                 <button type="button" onClick={handleClose} className="px-5 py-2 text-sm font-semibold rounded-lg bg-gray-700">Cancel</button>

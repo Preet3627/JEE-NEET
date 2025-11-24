@@ -51,7 +51,7 @@ const parseAnswers = (text: string): Record<string, string> => {
 };
 
 
-export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) => {
+const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) => {
   const { onClose, onSessionComplete, initialTask, aiPracticeTest, aiInitialTopic, defaultPerQuestionTime, onLogResult, student, onUpdateWeaknesses, onSaveTask, animationOrigin } = props;
   const { currentUser } = useAuth();
   const theme = currentUser?.CONFIG.settings.theme;
@@ -361,8 +361,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
                 </button>
               </div>
             </div>
-            )}
-          </div>
+          )}
         </div>
       </div>
       {isAiKeyModalOpen && (
@@ -388,3 +387,5 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
     </>
   );
 };
+
+export default CustomPracticeModal;

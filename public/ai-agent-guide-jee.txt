@@ -115,4 +115,4 @@ You can render common scientific and mathematical symbols using LaTeX-like comma
 | `\delta`   | δ          |
 | `\Delta`   | Δ          |
 
-**Diagrams:** The system **cannot render image-based diagrams**. However, you can create textual descriptions or ASCII art to represent diagrams (e.g., Free Body Diagrams), which will be rendered in a pre-formatted block.
+**Diagrams:** The system **cannot render image-based diagrams**. However, you can create textual descriptions or ASCII art to represent diagrams (e.g. Free Body Diagrams), which will be rendered in a pre-formatted block.

@@ -1,14 +1,14 @@
 
 # Universal Data Documentation for AI Agents (JEE Scheduler Pro)
-# Version: 14.0.0 (Search Integration)
+# Version: 14.4.0 (Expanded Schema with Exams & Gradients)
 
 ## 1. Core Concept: The Internal Knowledge Base
-The AI now operates with a comprehensive, built-in library for Physics, Chemistry, and Maths. All academic content generation (tips, flashcards, MCQs, explanations) **must be sourced from this internal knowledge base**. This ensures accuracy and consistency.
+The AI now operates with a comprehensive, built-in library for **Physics**, **Chemistry**, and **Mathematics**. All academic content generation (tips, flashcards, MCQs, explanations) **must be sourced from this internal knowledge base**. This ensures accuracy and consistency.
 
 **How to Interact:**
 - When a user asks for academic content, frame your request to the AI by referencing its library.
 - **Example:** "Generate 5 MCQs from the 'Rotational Motion' section of your library."
-- **Example:** "Explain 'Hybridization' using your internal knowledge base."
+- **Example:** "Explain 'Integration by Parts' using your internal MATHS knowledge base."
 - **Example:** "Create a flashcard deck for 'Trigonometric Identities' based on your library content."
 
 ---
@@ -17,37 +17,28 @@ To ensure formulas and chemical equations are rendered correctly, use the follow
 
 | Notation | Format | Example Input | Renders As |
 |---|---|---|---|
+| **Bold** | `**text**` | `**Important Formula**` | **Important Formula** |
+| **Italics** | `*text*` | `*definition*` | *definition* |
 | **Subscript** | `_{...}` or `_` | `H_2O`, `C_6H_{12}O_6` | H₂O, C₆H₁₂O₆ |
 | **Superscript**| `^{...}` or `^` | `x^2`, `Fe^{2+}` | x², Fe²⁺ |
 | **Logarithm** | `log_{b}(x)` | `log_{10}(100)` | log₁₀(100) |
 | **Square Root**| `sqrt(...)` | `sqrt(b^2 - 4ac)` | sqrt(b² - 4ac) |
 
 ---
-## 3. Output Formats: Deep Link vs. JSON Block
+## 3. Custom Widgets
+You can instruct the AI to generate content for a custom widget on the dashboard. This is useful for creating quick reference panels, notes, or lists. The output should be a simple title and markdown-compatible content.
 
-### A. Deep Links (for Quick, Single Actions)
-- **Use Case:** Creating a *single* task, logging a *single* score, or **initiating a search**.
-- **URL Structure:** `https://jee.ponsrischool.in/?action={ACTION_TYPE}&data={URL_ENCODED_JSON}`
-  - `{ACTION_TYPE}`: `new_schedule`, `log_score`, `create_homework`, `flashcard_review`, `search`.
-  - `{URL_ENCODED_JSON}`: A URL-encoded JSON object for one task (see schema below).
+**Example Request:** "Create a custom widget with the key formulas for Conic Sections."
 
-**Deep Link `data` object schema:**
-| Key | Type | Description |
-|---|---|---|
-| `subject` | string | `Physics`, `Chemistry`, `Math`. |
-| `topic` | string | Specific chapter or concept. |
-| `date` | string | `YYYY-MM-DD`. |
-| `time` | string | **For `new_schedule` & `flashcard_review`**. `HH:MM` format. |
-| `details`| string | Notes for the task. |
-| `score` | number | **For `log_score`**. |
-| `max_score`| number | **For `log_score`**. |
-| `query` | string | **For `search`**. The search term (e.g., "Homework", "Exams"). |
-
-**Search Example:** If a user asks "Where are my homework tasks?", generate a deep link with action `search` and data `{"query": "Homework"}`.
-
-### B. JSON Code Block (for Large, Complex, or Specific Generation)
-- **Use Case:** Batch imports (schedules, exams), or generating a **Practice Test**, **Flashcard Deck**, or **Full Homework Assignment**.
-- **Format:** Your entire response **MUST** be a single, raw JSON object inside a markdown code block.
+**Example JSON Output:**
+```json
+{
+  "custom_widget": {
+    "title": "Conic Sections",
+    "content": "* **Parabola:** `y^2 = 4ax`\n* **Ellipse:** `x^2/a^2 + y^2/b^2 = 1`\n* **Hyperbola:** `x^2/a^2 - y^2/b^2 = 1`"
+  }
+}
+```
 
 ---
 ## 4. Full JSON Schema (for Code Blocks)
@@ -63,14 +54,27 @@ Your entire output must be a single JSON object with these top-level keys. Provi
 | Key | Type | Description |
 |---|---|---|
 | `id` | string | Unique ID (e.g., "A101"). |
-| `type` | string | `"ACTION"` or `"HOMEWORK"`. |
+| `type` | string | `"ACTION"` or `"HOMEWORK"`. **Rule:** If the user requests 'PYQs', 'questions', or 'problems', you **MUST** use `HOMEWORK`. |
 | `day` | string | Full day name, e.g., `"MONDAY"`. |
 | `date` | string | Optional `YYYY-MM-DD` for one-off tasks. |
+| `time` | string | Optional for `HOMEWORK`. `HH:MM` format. |
 | `title` | string | Task title. Use advanced formatting. |
 | `detail`| string | Description. Use advanced formatting. |
 | `subject`| string| `"PHYSICS"`, `"CHEMISTRY"`, `"MATHS"`. |
+| `category`| string| **For `HOMEWORK`**. `Level-1`, `Level-2`, `PYQ`, etc. |
 | `q_ranges`| string | **For `HOMEWORK`**. E.g., `"1-15; 20-25"`. |
-| `answers`| string | Stringified JSON, e.g., `"{\"1\":\"A\", \"2\":\"C\"}"`. |
+| `answers`| string | **For `HOMEWORK`**. Stringified JSON, e.g., `"{\"1\":\"A\", \"2\":\"C\"}"`. |
+| `externalLink` | string | Optional URL for online class/resource (e.g. Zoom link). |
+| `gradient` | string | Optional Tailwind colors for card background, e.g., `"from-blue-500 to-cyan-500"`. |
+
+### `exams` Object Schema
+| Key | Type | Description |
+|---|---|---|
+| `title` | string | Exam name (e.g. "Mock Test 5"). |
+| `subject` | string | `"PHYSICS"`, `"CHEMISTRY"`, `"MATHS"` or `"FULL"`. |
+| `date` | string | `YYYY-MM-DD` format. |
+| `time` | string | `HH:MM` format. |
+| `syllabus` | string | Topics covered in the exam. |
 
 ### `flashcard_deck` Object Schema
 | Key | Type | Description |
@@ -85,7 +89,7 @@ Your entire output must be a single JSON object with these top-level keys. Provi
 |---|---|---|
 | `questions`| array | Array of question objects. |
 | `answers` | string | Stringified JSON of question number to correct answer. |
-| `solutions`| string | **For `homework_assignment`**. Stringified JSON of question number to detailed solution. |
+| `solutions`| string | **For `homework_assignment` (Optional)**. Stringified JSON of question number to detailed solution. |
 
 **Question Object Schema (inside `questions` array):**
 | Key | Type | Description |
@@ -95,44 +99,8 @@ Your entire output must be a single JSON object with these top-level keys. Provi
 | `options`| array | For `MCQ`, array of 4 strings. For `NUM`, `[]`. |
 | `type` | string | `"MCQ"` or `"NUM"`. |
 
-**NCERT-Specific Requests:**
-If a user asks for homework from an NCERT textbook (e.g., "schedule NCERT Physics chapter 2, questions 1 to 5"), you must generate a `homework_assignment` using your internal knowledge base to find the question text, answers, and solutions.
-
 ---
-## 5. Generating Flashcard Decks
-To create a flashcard deck, provide a JSON object with the `flashcard_deck` key.
-
-**Example Request:** "Create flashcards for Physics chapter on Thermodynamics"
-
-**Example JSON Output:**
-```json
-{
-  "schedules": [],
-  "exams": [],
-  "metrics": [],
-  "practice_test": null,
-  "flashcard_deck": {
-    "name": "Thermodynamics Basics",
-    "subject": "PHYSICS",
-    "chapter": "Thermodynamics",
-    "cards": [
-      {
-        "front": "What is the First Law of Thermodynamics?",
-        "back": "The change in internal energy of a system is equal to the heat added to the system minus the work done by the system (ΔU = q + w)."
-      },
-      {
-        "front": "What is Enthalpy (ΔH)?",
-        "back": "Enthalpy is the heat change of a reaction at constant pressure. A negative ΔH indicates an exothermic reaction."
-      }
-    ]
-  },
-  "homework_assignment": null
-}
-```
----
-## 6. Scientific Symbols & Diagrams
-
-### A. Symbols
+## 5. Scientific Symbols & Diagrams
 You can render common scientific and mathematical symbols using LaTeX-like commands in any text field.
 
 | Command    | Renders As |
@@ -147,20 +115,4 @@ You can render common scientific and mathematical symbols using LaTeX-like comma
 | `\delta`   | δ          |
 | `\Delta`   | Δ          |
 
-### B. Diagrams
-The system **cannot render image-based diagrams** directly from your JSON output. However, you can create textual descriptions or ASCII art to represent diagrams, which will be rendered in a pre-formatted block.
-
-**Example for a Free Body Diagram:**
-"Create a textual diagram for a block on an inclined plane. Show the normal force (N) perpendicular to the surface, gravity (mg) pointing straight down, and friction (f) pointing up the incline."
-
-Your response inside a `detail` field could be:
-\`\`\`
-      /N
-     /
-    /
-   /______
-  / \      \
- /   \ mg    \
-/_____\_______\
-   f
-\`\`\`
+**Diagrams:** The system **cannot render image-based diagrams**. However, you can create textual descriptions or ASCII art to represent diagrams (e.g. Free Body Diagrams), which will be rendered in a pre-formatted block.
