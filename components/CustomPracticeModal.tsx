@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import McqTimer from './McqTimer';
 import Icon from './Icon';
@@ -362,6 +363,7 @@ const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) => {
             </div>
           )}
         </div>
+      </div>
       </div>
       {isAiKeyModalOpen && (
           <AIGenerateAnswerKeyModal
