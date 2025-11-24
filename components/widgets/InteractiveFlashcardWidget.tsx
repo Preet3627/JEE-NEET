@@ -8,7 +8,8 @@ interface InteractiveFlashcardWidgetProps {
   student: StudentData;
   onUpdateConfig: (config: Partial<Config>) => void;
   onAddCard?: () => void;
-  onReviewDeck?: (deckId: string) => void; // New prop
+  onReviewDeck?: (deckId: string) => void;
+  onOpenDeck?: (deckId: string) => void; // New prop
 }
 
 const subjectColors: Record<string, string> = {
@@ -19,14 +20,13 @@ const subjectColors: Record<string, string> = {
   DEFAULT: 'border-purple-500',
 };
 
-const InteractiveFlashcardWidget: React.FC<InteractiveFlashcardWidgetProps> = ({ student, onUpdateConfig, onAddCard, onReviewDeck }) => {
+const InteractiveFlashcardWidget: React.FC<InteractiveFlashcardWidgetProps> = ({ student, onUpdateConfig, onAddCard, onReviewDeck, onOpenDeck }) => {
   const { settings, flashcardDecks = [] } = student.CONFIG;
   const [isFlipped, setIsFlipped] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const activeCards = useMemo(() => {
     const selectedDeckIds = settings.dashboardFlashcardDeckIds || [];
-    // If no specific decks selected, use all decks
     const targetDecks = selectedDeckIds.length > 0 
         ? flashcardDecks.filter(d => selectedDeckIds.includes(d.id))
         : flashcardDecks;
@@ -67,10 +67,10 @@ const InteractiveFlashcardWidget: React.FC<InteractiveFlashcardWidgetProps> = ({
   const handleNext = (e: React.MouseEvent) => { e.stopPropagation(); setIsFlipped(false); setTimeout(() => setCurrentIndex(prev => (prev + 1) % activeCards.length), 150); };
   const handlePrev = (e: React.MouseEvent) => { e.stopPropagation(); setIsFlipped(false); setTimeout(() => setCurrentIndex(prev => (prev - 1 + activeCards.length) % activeCards.length), 150); };
   
-  const handleOpenDeck = (e: React.MouseEvent) => {
+  const handleOpenDeckView = (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (onReviewDeck && currentDeckId) {
-          onReviewDeck(currentDeckId);
+      if (onOpenDeck && currentDeckId) {
+          onOpenDeck(currentDeckId);
       }
   };
 
@@ -79,8 +79,8 @@ const InteractiveFlashcardWidget: React.FC<InteractiveFlashcardWidgetProps> = ({
         <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-[var(--accent-color)] tracking-widest uppercase">Quick Review</h2>
             <div className="flex gap-2">
-                {onReviewDeck && (
-                    <button onClick={handleOpenDeck} className="p-1.5 bg-gray-700 hover:bg-purple-600 rounded-full text-white transition-colors" title={`Open Deck: ${currentDeckName}`}>
+                {onOpenDeck && (
+                    <button onClick={handleOpenDeckView} className="p-1.5 bg-gray-700 hover:bg-purple-600 rounded-full text-white transition-colors" title={`Manage Deck: ${currentDeckName}`}>
                         <Icon name="book-open" className="w-4 h-4" />
                     </button>
                 )}

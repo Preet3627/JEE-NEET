@@ -1,13 +1,14 @@
+
 # Universal Data Documentation for AI Agents (JEE Scheduler Pro)
-# Version: 13.0.0 (Rich Text & Homework Rule)
+# Version: 14.1.0 (Maths Library Update)
 
 ## 1. Core Concept: The Internal Knowledge Base
-The AI now operates with a comprehensive, built-in library for Physics, Chemistry, and Maths. All academic content generation (tips, flashcards, MCQs, explanations) **must be sourced from this internal knowledge base**. This ensures accuracy and consistency.
+The AI now operates with a comprehensive, built-in library for **Physics**, **Chemistry**, and **Mathematics**. All academic content generation (tips, flashcards, MCQs, explanations) **must be sourced from this internal knowledge base**. This ensures accuracy and consistency.
 
 **How to Interact:**
 - When a user asks for academic content, frame your request to the AI by referencing its library.
 - **Example:** "Generate 5 MCQs from the 'Rotational Motion' section of your library."
-- **Example:** "Explain 'Hybridization' using your internal knowledge base."
+- **Example:** "Explain 'Integration by Parts' using your internal MATHS knowledge base."
 - **Example:** "Create a flashcard deck for 'Trigonometric Identities' based on your library content."
 
 ---
@@ -18,7 +19,6 @@ To ensure formulas and chemical equations are rendered correctly, use the follow
 |---|---|---|---|
 | **Bold** | `**text**` | `**Important Formula**` | **Important Formula** |
 | **Italics** | `*text*` | `*definition*` | *definition* |
-| **Font Size** | `[size=16]text[/size]` | `[size=18]Main Point[/size]` | Main Point (larger) |
 | **Subscript** | `_{...}` or `_` | `H_2O`, `C_6H_{12}O_6` | H₂O, C₆H₁₂O₆ |
 | **Superscript**| `^{...}` or `^` | `x^2`, `Fe^{2+}` | x², Fe²⁺ |
 | **Logarithm** | `log_{b}(x)` | `log_{10}(100)` | log₁₀(100) |
@@ -28,14 +28,14 @@ To ensure formulas and chemical equations are rendered correctly, use the follow
 ## 3. Custom Widgets
 You can instruct the AI to generate content for a custom widget on the dashboard. This is useful for creating quick reference panels, notes, or lists. The output should be a simple title and markdown-compatible content.
 
-**Example Request:** "Create a custom widget with the key formulas for Kinematics."
+**Example Request:** "Create a custom widget with the key formulas for Conic Sections."
 
 **Example JSON Output:**
 ```json
 {
   "custom_widget": {
-    "title": "Kinematics Formulas",
-    "content": "1. `v = u + at`\n2. `s = ut + 1/2 * at^2`\n3. `v^2 = u^2 + 2as`"
+    "title": "Conic Sections",
+    "content": "* **Parabola:** `y^2 = 4ax`\n* **Ellipse:** `x^2/a^2 + y^2/b^2 = 1`\n* **Hyperbola:** `x^2/a^2 - y^2/b^2 = 1`"
   }
 }
 ```

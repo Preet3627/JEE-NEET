@@ -52,10 +52,6 @@ export const exportCalendar = (items: ScheduleItem[], exams: ExamData[], student
             } else {
                 startDate = getNextDateForDay(timedItem.DAY.EN);
                 
-                // Check if the specific time on this calculated date has passed? 
-                // If so, and it's a one-off export, maybe move to next week? 
-                // For now, we keep getNextDateForDay logic (today or future).
-
                 if (timedItem.isRecurring) {
                     // Cap recursion at 2 years max to avoid "Whole Life" infinite clutter
                     const endDate = new Date();
@@ -74,16 +70,16 @@ export const exportCalendar = (items: ScheduleItem[], exams: ExamData[], student
             const action = timedItem.type === 'HOMEWORK' ? 'start_practice' : 'view_task';
             const deepLink = `https://jee.ponsrischool.in/?action=${action}&id=${timedItem.ID}`;
             
-            // External App Link (Zoom, etc.)
+            // External App Link (Zoom, Unacademy, etc.)
             let externalLinkText = '';
             let locationUrl = deepLink; // Default location is the deep link
             
             if (timedItem.externalLink) {
-                externalLinkText = `\\n\\n[OPEN EXTERNAL APP]: ${timedItem.externalLink}`;
+                externalLinkText = `\\n\\n[EXTERNAL RESOURCE]: ${timedItem.externalLink}`;
                 locationUrl = timedItem.externalLink; // Prioritize external link in location field for 1-click join
             }
 
-            const description = `Open in JEE Scheduler: ${deepLink}${externalLinkText}\\n\\nDetails: ${timedItem.FOCUS_DETAIL.EN}`
+            const description = `Details: ${timedItem.FOCUS_DETAIL.EN}\\n\\nOpen in App: ${deepLink}${externalLinkText}`
                 .replace(/,/g, '\\,')
                 .replace(/;/g, '\\;')
                 .replace(/\n/g, '\\n');

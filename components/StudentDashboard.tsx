@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { StudentData, ScheduleItem, ActivityData, Config, StudySession, HomeworkData, ExamData, ResultData, DoubtData, FlashcardDeck, Flashcard, StudyMaterialItem, ScheduleCardData, PracticeQuestion, ActiveTab, DashboardWidgetItem } from '../types';
 import ScheduleList from './ScheduleList';
@@ -152,10 +151,18 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     const dragItemRef = useRef<number | null>(null);
     const dragOverItemRef = useRef<number | null>(null);
 
-    const useToolbarLayout = isMobile && student.CONFIG.settings.mobileLayout === 'toolbar';
+    // Mobile Layout Check: Default to 'toolbar' if not set
+    const useToolbarLayout = isMobile && (student.CONFIG.settings.mobileLayout === 'toolbar' || !student.CONFIG.settings.mobileLayout);
+    
     const taskItems = student.SCHEDULE_ITEMS;
     const activityItems = student.SCHEDULE_ITEMS.filter(item => item.type === 'ACTIVITY') as ActivityData[];
 
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     useEffect(() => {
         if (student.CONFIG.settings.dashboardLayout) {
@@ -215,53 +222,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             return;
         }
 
-        // Normalize schedule data
-        let finalData = { ...data };
-        
-        // Fix 1: Singular 'schedule' to 'schedules'
-        const rawSchedules = data.schedules || data.schedule || [];
-        
-        // Fix 2: Normalize complex "Day Plan" objects into standard ScheduleItems
-        const normalizedSchedules: ScheduleItem[] = [];
-        
-        if (Array.isArray(rawSchedules)) {
-            rawSchedules.forEach((item: any) => {
-                if (item.morning_task || item.afternoon_task || item.evening_task) {
-                    // It's a complex day plan, flatten it
-                    const date = item.date;
-                    const dayName = date ? new Date(date).toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase() : 'MONDAY'; 
-
-                    const addTask = (taskData: any, time: string, defaultTitle: string) => {
-                        if (taskData && taskData.subject !== 'N/A') {
-                            normalizedSchedules.push({
-                                ID: `IMP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                                type: 'ACTION',
-                                SUB_TYPE: 'DEEP_DIVE',
-                                isUserCreated: true,
-                                DAY: { EN: dayName, GU: '' },
-                                date: date,
-                                TIME: time,
-                                CARD_TITLE: { EN: taskData.topic || defaultTitle, GU: '' },
-                                FOCUS_DETAIL: { EN: `Source: ${taskData.source}`, GU: '' },
-                                SUBJECT_TAG: { EN: taskData.subject?.toUpperCase() || 'GENERAL', GU: '' }
-                            } as ScheduleCardData);
-                        }
-                    };
-
-                    addTask(item.morning_task, '09:00', 'Morning Session');
-                    addTask(item.afternoon_task, '14:00', 'Afternoon Session');
-                    addTask(item.evening_task, '19:00', 'Evening Session');
-                    addTask(item.school_mcq_blitz, '21:00', 'MCQ Blitz');
-                } else {
-                    // Assume it's already close to standard format or let existing logic handle it
-                    normalizedSchedules.push(item);
-                }
-            });
-        }
-        
-        finalData.schedules = normalizedSchedules;
-
-        setDeepLinkData(finalData);
+        setDeepLinkData(data);
         setisAiParserModalOpen(false);
     };
 
@@ -376,6 +337,10 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                     } else {
                         alert("Please create a deck first.");
                     }
+                }}
+                onOpenDeck={(deckId) => {
+                    const deck = student.CONFIG.flashcardDecks?.find(d => d.id === deckId);
+                    if (deck) setViewingDeck(deck);
                 }}
             />,
             'readingHours': <ReadingHoursWidget student={student} />,
@@ -587,7 +552,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             )}
             
             {useToolbarLayout ? (
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-6 px-4">
                     <h2 className="text-2xl font-bold capitalize text-white font-sf-display">{activeTab}</h2>
                     <div className="flex items-center gap-2">
                         <button onClick={() => setIsSettingsModalOpen(true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700"><Icon name="settings" /></button>

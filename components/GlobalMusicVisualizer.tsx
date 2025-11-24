@@ -43,14 +43,9 @@ const GlobalMusicVisualizer: React.FC = () => {
                 const center = totalWidth / 2;
                 const barWidth = 6;
                 
-                // Calculate average volume for dynamic sizing effect (optional)
-                // let sum = 0; for(let i=0;i<bufferLength;i++) sum+=dataArray[i];
-                // const avg = sum/bufferLength;
-
                 ctx.lineCap = 'round';
 
                 for (let i = 0; i < barsToDraw; i++) {
-                    // Map low freq to center, high to edges
                     const dataIndex = Math.floor(i * (bufferLength / barsToDraw)); 
                     const value = dataArray[dataIndex];
                     const percent = Math.max(0.1, Math.pow(value / 255, 1.8)); 

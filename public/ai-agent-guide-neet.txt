@@ -1,5 +1,6 @@
+
 # Universal Data Documentation for AI Agents (NEET Scheduler Pro)
-# Version: 13.0.0 (Rich Text & Homework Rule)
+# Version: 14.1.0 (Formatting Update)
 
 ## 1. Core Concept: The Internal Knowledge Base
 The AI now operates with a comprehensive, built-in library for Physics, Chemistry, and Biology (Botany & Zoology). All academic content generation (tips, flashcards, MCQs, explanations) **must be sourced from this internal knowledge base**. This ensures accuracy and consistency for the NEET curriculum.
@@ -18,7 +19,6 @@ To ensure formulas and chemical equations are rendered correctly, use the follow
 |---|---|---|---|
 | **Bold** | `**text**` | `**Important Formula**` | **Important Formula** |
 | **Italics** | `*text*` | `*definition*` | *definition* |
-| **Font Size** | `[size=16]text[/size]` | `[size=18]Main Point[/size]` | Main Point (larger) |
 | **Subscript** | `_{...}` or `_` | `H_2O`, `C_6H_{12}O_6` | H₂O, C₆H₁₂O₆ |
 | **Superscript**| `^{...}` or `^` | `x^2`, `Fe^{2+}` | x², Fe²⁺ |
 | **Logarithm** | `log_{b}(x)` | `log_{10}(100)` | log₁₀(100) |

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Config, FlashcardDeck, DashboardWidgetItem, NotchSettings, VisualizerSettings } from '../types';
 import Icon from './Icon';
@@ -31,7 +32,7 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
 
   const [accentColor, setAccentColor] = useState(settings.accentColor || '#0891b2');
   const [blurEnabled, setBlurEnabled] = useState(settings.blurEnabled !== false);
-  const [mobileLayout, setMobileLayout] = useState(settings.mobileLayout || 'standard');
+  const [mobileLayout, setMobileLayout] = useState(settings.mobileLayout || 'toolbar');
   const [forceOfflineMode, setForceOfflineMode] = useState(settings.forceOfflineMode || false);
   const [perQuestionTime, setPerQuestionTime] = useState(settings.perQuestionTime || 180);
   const [showAiChat, setShowAiChat] = useState(settings.showAiChatAssistant !== false);
@@ -178,6 +179,13 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
             <div className="space-y-4">
                 <h3 className="text-base font-bold text-gray-300">Appearance</h3>
                 <div className="bg-gray-900/50 p-3 rounded-lg border border-gray-700/50 space-y-3">
+                    <div>
+                        <label className="text-xs font-bold text-gray-400">Mobile Layout</label>
+                        <select value={mobileLayout} onChange={e => setMobileLayout(e.target.value)} className={inputClass + " text-sm py-1"}>
+                            <option value="toolbar">Bottom Toolbar (Simplified)</option>
+                            <option value="standard">Standard Tab Bar</option>
+                        </select>
+                    </div>
                     <div>
                         <label className="text-xs font-bold text-gray-400">Background URL</label>
                         <input value={bgImage} onChange={e => setBgImage(e.target.value)} className={inputClass + " text-sm py-1"} placeholder="https://..." />
