@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { FlashcardDeck, Flashcard } from '../../types';
 import Icon from '../Icon';
+import { renderMarkdown } from '../../utils/markdownParser';
 
 interface DeckViewModalProps {
   deck: FlashcardDeck;
@@ -29,22 +30,27 @@ const DeckViewModal: React.FC<DeckViewModalProps> = ({ deck, onClose, onAddCard,
         <header className="flex-shrink-0 mb-4">
             <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                 {deck.name}
-                {/* FIX: The 'title' prop does not exist on the Icon component. Moved it to a wrapping span. */}
                 {deck.isLocked && <span title="This deck is locked and cannot be edited."><Icon name="lock-closed" className="w-5 h-5 text-yellow-400" /></span>}
             </h2>
             <p className="text-sm text-cyan-400 font-semibold">{deck.subject} {deck.chapter && ` - ${deck.chapter}`}</p>
         </header>
 
-        <main className="flex-grow overflow-y-auto space-y-3 pr-2">
+        <main className="flex-grow overflow-y-auto space-y-3 pr-2 custom-scrollbar">
             {deck.cards.length > 0 ? (
                 deck.cards.map(card => (
                     <div key={card.id} className="bg-gray-900/50 p-3 rounded-lg flex justify-between items-start gap-2 group">
                         <div className="flex-grow">
                             <p className="text-xs text-gray-500 font-semibold">FRONT</p>
-                            <p className="text-sm text-gray-200">{card.front}</p>
+                            <div 
+                                className="text-sm text-gray-200 prose prose-invert prose-sm"
+                                dangerouslySetInnerHTML={{ __html: renderMarkdown(card.front) }}
+                            />
                             <div className="border-t border-gray-700 my-2"></div>
                             <p className="text-xs text-gray-500 font-semibold">BACK</p>
-                            <p className="text-sm text-gray-300">{card.back}</p>
+                            <div 
+                                className="text-sm text-gray-300 prose prose-invert prose-sm"
+                                dangerouslySetInnerHTML={{ __html: renderMarkdown(card.back) }}
+                            />
                         </div>
                         {!deck.isLocked && (
                             <div className="flex-shrink-0 flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { StudentData, Config } from '../../types';
 import Icon from '../Icon';
+import { renderMarkdown } from '../../utils/markdownParser';
 
 interface InteractiveFlashcardWidgetProps {
   student: StudentData;
@@ -70,11 +71,17 @@ const InteractiveFlashcardWidget: React.FC<InteractiveFlashcardWidgetProps> = ({
         </div>
         <div className="flashcard-container cursor-pointer h-40" onClick={() => setIsFlipped(!isFlipped)}>
             <div className={`flashcard-inner ${isFlipped ? 'flashcard-flipped' : ''}`}>
-                <div className={`flashcard-front bg-gray-900/50 border-2 ${cardColorClass}`}>
-                    <p className="text-lg text-white line-clamp-4">{currentCard.front}</p>
+                <div className={`flashcard-front bg-gray-900/50 border-2 ${cardColorClass} overflow-y-auto`}>
+                    <div 
+                        className="text-lg text-white line-clamp-4 prose prose-invert prose-sm"
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(currentCard.front) }}
+                    />
                 </div>
-                <div className={`flashcard-back bg-gray-800/80 border-2 ${cardColorClass}`}>
-                    <p className="text-sm text-gray-300 line-clamp-5">{currentCard.back}</p>
+                <div className={`flashcard-back bg-gray-800/80 border-2 ${cardColorClass} overflow-y-auto`}>
+                    <div 
+                        className="text-sm text-gray-300 line-clamp-5 prose prose-invert prose-sm"
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(currentCard.back) }}
+                    />
                 </div>
             </div>
         </div>

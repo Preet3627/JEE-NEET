@@ -9,7 +9,7 @@ import MistakeManager from './MistakeManager';
 import TodaysAgendaWidget from './widgets/TodaysAgendaWidget';
 import ReadingHoursWidget from './widgets/ReadingHoursWidget';
 import ScoreTrendWidget from './widgets/MarksAnalysisWidget';
-import CustomPracticeModal from './CustomPracticeModal';
+import { CustomPracticeModal } from './CustomPracticeModal';
 import HomeworkWidget from './widgets/HomeworkWidget';
 import ActivityTracker from './ActivityTracker';
 import PerformanceMetrics from './PerformanceMetrics';
@@ -215,7 +215,53 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             return;
         }
 
-        setDeepLinkData(data);
+        // Normalize schedule data
+        let finalData = { ...data };
+        
+        // Fix 1: Singular 'schedule' to 'schedules'
+        const rawSchedules = data.schedules || data.schedule || [];
+        
+        // Fix 2: Normalize complex "Day Plan" objects into standard ScheduleItems
+        const normalizedSchedules: ScheduleItem[] = [];
+        
+        if (Array.isArray(rawSchedules)) {
+            rawSchedules.forEach((item: any) => {
+                if (item.morning_task || item.afternoon_task || item.evening_task) {
+                    // It's a complex day plan, flatten it
+                    const date = item.date;
+                    const dayName = date ? new Date(date).toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase() : 'MONDAY'; 
+
+                    const addTask = (taskData: any, time: string, defaultTitle: string) => {
+                        if (taskData && taskData.subject !== 'N/A') {
+                            normalizedSchedules.push({
+                                ID: `IMP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                                type: 'ACTION',
+                                SUB_TYPE: 'DEEP_DIVE',
+                                isUserCreated: true,
+                                DAY: { EN: dayName, GU: '' },
+                                date: date,
+                                TIME: time,
+                                CARD_TITLE: { EN: taskData.topic || defaultTitle, GU: '' },
+                                FOCUS_DETAIL: { EN: `Source: ${taskData.source}`, GU: '' },
+                                SUBJECT_TAG: { EN: taskData.subject?.toUpperCase() || 'GENERAL', GU: '' }
+                            } as ScheduleCardData);
+                        }
+                    };
+
+                    addTask(item.morning_task, '09:00', 'Morning Session');
+                    addTask(item.afternoon_task, '14:00', 'Afternoon Session');
+                    addTask(item.evening_task, '19:00', 'Evening Session');
+                    addTask(item.school_mcq_blitz, '21:00', 'MCQ Blitz');
+                } else {
+                    // Assume it's already close to standard format or let existing logic handle it
+                    normalizedSchedules.push(item);
+                }
+            });
+        }
+        
+        finalData.schedules = normalizedSchedules;
+
+        setDeepLinkData(finalData);
         setisAiParserModalOpen(false);
     };
 

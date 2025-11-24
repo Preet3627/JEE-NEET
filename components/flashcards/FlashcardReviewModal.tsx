@@ -1,6 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { FlashcardDeck, Flashcard } from '../../types';
 import Icon from '../Icon';
+import { renderMarkdown } from '../../utils/markdownParser';
 
 interface FlashcardReviewModalProps {
   deck: FlashcardDeck;
@@ -117,11 +119,17 @@ const FlashcardReviewModal: React.FC<FlashcardReviewModalProps> = ({ deck, onClo
                 </div>
             ) : (
                 <div className={`flashcard-inner ${isFlipped ? 'flashcard-flipped' : ''}`}>
-                    <div className={`flashcard-front bg-[var(--glass-bg)] border-2 ${cardColorClass}`}>
-                        <p className="text-2xl text-white">{currentCard?.front}</p>
+                    <div className={`flashcard-front bg-[var(--glass-bg)] border-2 ${cardColorClass} flex items-center justify-center p-6 overflow-y-auto`}>
+                        <div 
+                            className="text-2xl text-white prose prose-invert prose-xl text-center break-words w-full"
+                            dangerouslySetInnerHTML={{ __html: renderMarkdown(currentCard?.front || '') }}
+                        />
                     </div>
-                    <div className={`flashcard-back bg-gray-800/80 border-2 ${cardColorClass}`}>
-                        <p className="text-xl text-gray-300">{currentCard?.back}</p>
+                    <div className={`flashcard-back bg-gray-800/80 border-2 ${cardColorClass} flex items-center justify-center p-6 overflow-y-auto`}>
+                        <div 
+                            className="text-xl text-gray-300 prose prose-invert prose-lg text-center break-words w-full"
+                            dangerouslySetInnerHTML={{ __html: renderMarkdown(currentCard?.back || '') }}
+                        />
                     </div>
                 </div>
             )}
