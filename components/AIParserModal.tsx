@@ -24,57 +24,34 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
     setIsExiting(true);
     setTimeout(onClose, theme === 'liquid-glass' ? 500 : 300);
   };
+  
+  const processResult = (result: any): boolean => {
+    if (!result || typeof result !== 'object') {
+        return false;
+    }
 
-  // Robust local parser for simple text schedules
-  const localParse = (text: string) => {
-      const lines = text.split('\n');
-      const schedules: any[] = [];
-      let currentDay = 'MONDAY'; 
-      
-      // Detects lines like "Monday", "Mon:", etc.
-      const dayRegex = /^(MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY|SUNDAY)/i;
-      // Detects time like "10:00", "2pm", "14.30"
-      const timeRegex = /(\d{1,2}[:.]\d{2}|\d{1,2}\s?(?:am|pm))/i;
-      
-      const subjectRegex = /(PHYSICS|CHEMISTRY|MATHS|MATH|BIOLOGY|BOTANY|ZOOLOGY)/i;
+    const testData = result.practice_test || result.homework_assignment;
+    if (testData?.questions && Array.isArray(testData.questions)) {
+        onPracticeTestReady(testData);
+        return true;
+    }
+    
+    if (result.flashcard_deck?.cards && Array.isArray(result.flashcard_deck.cards)) {
+        onDataReady(result);
+        return true;
+    }
+    
+    if (result.custom_widget) {
+        onDataReady(result);
+        return true;
+    }
 
-      lines.forEach(line => {
-          const trimmed = line.trim();
-          if (!trimmed) return;
+    if (result.schedules?.length || result.exams?.length || result.metrics?.length) {
+        onDataReady(result);
+        return true;
+    }
 
-          const dayMatch = trimmed.match(dayRegex);
-          if (dayMatch) {
-              currentDay = dayMatch[0].toUpperCase();
-              return;
-          }
-
-          const timeMatch = trimmed.match(timeRegex);
-          const subjectMatch = trimmed.match(subjectRegex);
-
-          if (timeMatch && subjectMatch) {
-              let normalizedSubject = subjectMatch[0].toUpperCase();
-              if(normalizedSubject === 'MATH') normalizedSubject = 'MATHS';
-
-              // Normalize time to HH:MM
-              let timeStr = timeMatch[0].replace('.', ':');
-              if (!timeStr.includes(':')) timeStr += ':00'; // "2pm" -> "2:00pm" handled by date parser usually, but simple "10" -> "10:00"
-
-              schedules.push({
-                  id: `OFFLINE_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                  type: 'ACTION',
-                  day: currentDay,
-                  time: timeStr, // UI handles standardizing this later or we can use a helper
-                  title: `${normalizedSubject} Session`,
-                  detail: trimmed,
-                  subject: normalizedSubject
-              });
-          }
-      });
-
-      if (schedules.length > 0) {
-          return { schedules };
-      }
-      return null;
+    return false;
   };
 
   const handleParse = async () => {
@@ -86,83 +63,41 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
     setError('');
 
     const text = inputText.trim();
-    
-    const processResult = (result: any) => {
-        if (!result || typeof result !== 'object') {
-             throw new Error("Invalid data format.");
-        }
 
-        // Check for Practice Test / Homework
-        if (result.practice_test || result.homework_assignment) {
-            const testData = result.practice_test || result.homework_assignment;
-            if (testData.questions && Array.isArray(testData.questions)) {
-                onPracticeTestReady({ practice_test: testData }); // Pass wrapped object for consistency
-                return true;
-            }
-        } 
-        
-        // Check for Flashcards
-        if (result.flashcard_deck) {
-             // Ensure it has cards
-             if (result.flashcard_deck.cards && Array.isArray(result.flashcard_deck.cards)) {
-                 onDataReady(result); // StudentDashboard handles { flashcard_deck: ... }
-                 return true;
-             }
-        }
-        
-        // Check for Schedules/Exams/Metrics
-        if ((result.schedules && Array.isArray(result.schedules)) || 
-            (result.exams && Array.isArray(result.exams)) || 
-            (result.metrics && Array.isArray(result.metrics))) {
-            onDataReady(result);
-            return true;
-        }
-
-        return false;
-    };
-
+    // Attempt 1: Parse as valid JSON (works offline)
     try {
-        // 1. Try parsing as JSON directly
-        try {
-            const jsonData = JSON.parse(text);
-            if (processResult(jsonData)) {
-                setIsLoading(false);
-                return;
-            }
-        } catch (e) { /* Not JSON */ }
+      const jsonData = JSON.parse(text);
+      if (processResult(jsonData)) {
+        setIsLoading(false);
+        return;
+      }
+    } catch (e) { /* Not valid JSON, proceed to AI parsing. */ }
 
-        // 2. Try AI Correction/Parsing
-        // If it looks like JSON but failed, ask AI to fix it.
-        if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
-             const fixed = await api.correctJson(text);
-             const fixedJson = JSON.parse(fixed.correctedJson || fixed); // Backend might return object or string
-             if (processResult(fixedJson)) {
-                 setIsLoading(false);
-                 return;
-             }
-        }
-
-        // 3. Full Text AI Parse
-        const aiResult = await api.parseText(text, window.location.origin);
-        if (processResult(aiResult)) {
-             setIsLoading(false);
-             return;
-        }
-
-        // 4. Local Fallback
-        const localData = localParse(text);
-        if (localData && processResult(localData)) {
+    // Attempt 2: If it looks like broken JSON, try to correct it
+    if (text.startsWith('{') || text.startsWith('[')) {
+      try {
+        const { correctedJson } = await api.correctJson(text);
+        const fixedJson = JSON.parse(correctedJson);
+        if (processResult(fixedJson)) {
             setIsLoading(false);
             return;
         }
-        
-        throw new Error("Could not extract any valid schedules, tests, or flashcards.");
-
-    } catch (err: any) {
-        console.error("Import failed:", err);
-        setError(err.message || "Failed to parse data. Please check the format.");
+      } catch (correctionError) {
+        console.warn("AI JSON correction failed, falling back to text parser:", correctionError);
+      }
+    }
+    
+    // Attempt 3: Fallback to parsing as unstructured text
+    try {
+      const result = await api.parseText(text, window.location.origin);
+      if (!processResult(result)) {
+         throw new Error("Could not extract any valid data. Please check the Guide for formatting examples.");
+      }
+    } catch (parseError: any) {
+      console.error("AI Parser error:", parseError);
+      setError(parseError.error || 'Failed to parse data. The AI service may be unavailable or the format is unrecognized.');
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   };
   

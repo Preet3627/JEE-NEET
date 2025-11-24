@@ -24,11 +24,13 @@ const TestReportModal: React.FC<TestReportModalProps> = ({ result, onClose, stud
   const handleSaveFlashcards = () => {
     if (!result.analysis?.suggestedFlashcards) return;
     
+    // FIX: Added the missing 'isLocked' property to conform to the FlashcardDeck type.
     const newDeck: FlashcardDeck = {
         id: `deck_mistakes_${result.ID}`,
         name: `Mistakes from ${new Date(result.DATE).toLocaleDateString()}`,
         subject: 'MIXED',
-        cards: result.analysis.suggestedFlashcards.map((card, i) => ({...card, id: `card_${Date.now()}_${i}`}))
+        cards: result.analysis.suggestedFlashcards.map((card, i) => ({...card, id: `card_${Date.now()}_${i}`})),
+        isLocked: false,
     };
     onSaveDeck(newDeck);
     alert(`New deck "${newDeck.name}" created with ${newDeck.cards.length} flashcards!`);

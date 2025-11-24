@@ -1,7 +1,6 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
 import Icon from './Icon';
-import MusicVisualizerWidget from './widgets/MusicVisualizerWidget';
 
 const PersistentMusicPlayer: React.FC = () => {
     const { 
@@ -28,7 +27,10 @@ const PersistentMusicPlayer: React.FC = () => {
           className="fixed bottom-0 left-0 right-0 bg-gray-900/70 border-t border-[var(--glass-border)] backdrop-blur-lg z-40 md:hidden h-20"
           style={{ paddingBottom: 'var(--safe-area-inset-bottom)' }}
         >
-            <progress value={progress} max="100" className="absolute top-0 left-0 w-full h-0.5 appearance-none persistent-music-player-progress"></progress>
+            <div className="absolute top-0 left-0 w-full h-0.5 bg-white/10">
+              <div className="bg-cyan-400 h-full" style={{ width: `${progress}%` }}></div>
+            </div>
+            
             <div className="flex items-center h-full px-2 gap-3">
                 <button onClick={toggleFullScreenPlayer} className="flex-shrink-0">
                     <img src={currentTrack.coverArtUrl} alt={currentTrack.title} className="w-14 h-14 rounded-md object-cover" />

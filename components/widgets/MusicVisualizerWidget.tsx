@@ -1,4 +1,5 @@
 
+
 import React, { useRef, useEffect } from 'react';
 import { useMusicPlayer } from '../../context/MusicPlayerContext';
 import Icon from '../Icon';
@@ -11,6 +12,9 @@ const MusicVisualizerWidget: React.FC = () => {
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas || !analyser || !isPlaying) {
+             if (animationFrameId.current) {
+                cancelAnimationFrame(animationFrameId.current);
+            }
             return;
         }
 
@@ -22,7 +26,6 @@ const MusicVisualizerWidget: React.FC = () => {
         const dataArray = new Uint8Array(bufferLength);
 
         const draw = () => {
-            // FIX: `requestAnimationFrame` requires a callback argument. Passed the `draw` function to create the animation loop.
             animationFrameId.current = requestAnimationFrame(draw);
             analyser.getByteFrequencyData(dataArray);
 

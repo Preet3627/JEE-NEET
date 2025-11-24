@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState } from 'react';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
 import Icon from './Icon';
@@ -40,7 +41,7 @@ const FullScreenMusicPlayer: React.FC = () => {
     const formatTime = (seconds: number) => {
         const m = Math.floor(seconds / 60);
         const s = Math.floor(seconds % 60).toString().padStart(2, '0');
-        return `${m}:${s}`;
+        return isNaN(m) ? '0:00' : `${m}:${s}`;
     };
 
     if (!currentTrack) return null;
@@ -51,7 +52,7 @@ const FullScreenMusicPlayer: React.FC = () => {
             {/* Close Button */}
             <div className="absolute top-6 left-6 z-20">
                 <button onClick={toggleFullScreenPlayer} className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-all hover:rotate-90">
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
 

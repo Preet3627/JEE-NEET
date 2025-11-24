@@ -97,82 +97,28 @@ export interface ResultData {
   syllabus?: string;
   timings?: Record<number, number>;
   analysis?: {
-    subjectTimings: Record<'PHYSICS' | 'CHEMISTRY' | 'MATHS' | 'OTHER', number>;
-    chapterScores: Record<string, { correct: number; incorrect: number; accuracy: number }>;
+    subjectTimings: Record<string, number>;
+    chapterScores: Record<string, { correct: number, incorrect: number, accuracy: number }>;
     aiSuggestions: string;
-    incorrectQuestionNumbers?: number[];
+    incorrectQuestionNumbers: number[];
     suggestedFlashcards?: { front: string; back: string; }[];
-  };
-  detailedMistakes?: {
-    qNumber: number;
-    analysis: {
-        topic: string;
-        explanation: string;
-    };
-  }[];
-}
-
-export interface ExamData {
-  ID: string;
-  subject: 'PHYSICS' | 'CHEMISTRY' | 'MATHS' | 'FULL';
-  title: string;
-  date: string;
-  time: string;
-  syllabus: string;
-}
-
-export interface SolutionData {
-  id: string;
-  doubt_id: string;
-  user_sid: string;
-  solution: string;
-  solution_image?: string;
-  created_at: string;
-  solver_name: string;
-  solver_photo: string;
-}
-
-export interface DoubtData {
-  id: string;
-  user_sid: string;
-  question: string;
-  question_image?: string;
-  created_at: string;
-  author_name: string;
-  author_photo: string;
-  solutions: SolutionData[];
-  status?: 'active' | 'archived' | 'deleted';
-}
-
-export interface MessageData {
-  id: number;
-  sender_sid: string;
-  recipient_sid: string;
-  content: string;
-  created_at: string;
+  }
 }
 
 export interface StudySession {
   date: string;
-  duration: number;
+  duration: number; // in seconds
   questions_solved: number;
   questions_skipped: number[];
 }
 
-export interface Track {
-  id: string;
+export interface ExamData {
+  ID: string;
   title: string;
-  artist: string;
-  album: string;
-  track: string;
-  coverArt: string;
-  duration: string;
-  size: string;
-  coverArtUrl?: string;
-  isLocal?: boolean;
-  file?: File;
-  path?: string;
-  genre?: string;
+  subject: 'PHYSICS' | 'CHEMISTRY' | 'MATHS' | 'FULL';
+  date: string;
+  time: string;
+  syllabus: string;
 }
 
 export interface Flashcard {
@@ -185,30 +131,9 @@ export interface FlashcardDeck {
   id: string;
   name: string;
   subject: string;
-  cards: Flashcard[];
   chapter?: string;
-  isLocked?: boolean;
-}
-
-export interface StudyMaterialItem {
-    name: string;
-    type: 'file' | 'folder';
-    path: string;
-    size: number;
-    modified: string;
-}
-
-export interface PracticeQuestion {
-  number: number;
-  text: string;
-  options: string[];
-  type: 'MCQ' | 'NUM';
-}
-
-export interface CustomWidget {
-  id: string;
-  title: string;
-  content: string;
+  cards: Flashcard[];
+  isLocked: boolean;
 }
 
 export interface LocalPlaylist {
@@ -217,86 +142,144 @@ export interface LocalPlaylist {
   trackIds: string[];
 }
 
-export type ActiveTab = 'dashboard' | 'schedule' | 'today' | 'planner' | 'exams' | 'performance' | 'doubts' | 'flashcards' | 'material';
-
 export interface DashboardWidgetItem {
-    id: string;
-    wide?: boolean;
-    tall?: boolean; 
-    translucent?: boolean;
-    minimized?: boolean;
-    customTitle?: string;
+  id: string;
+  wide?: boolean;
+  tall?: boolean;
+  minimized?: boolean;
 }
 
 export interface NotchSettings {
-    position: 'top' | 'bottom';
-    size: 'small' | 'medium' | 'large';
-    width: number; 
+  position: 'top' | 'bottom';
+  size: 'small' | 'medium' | 'large';
+  width: number;
+  enabled?: boolean;
 }
 
 export interface VisualizerSettings {
-    preset: 'bars' | 'wave' | 'circle';
-    colorMode: 'rgb' | 'album' | 'mono';
+  preset: 'bars' | 'wave' | 'circle';
+  colorMode: 'rgb' | 'album' | 'mono';
 }
 
 export interface DjDropSettings {
-    enabled: boolean;
-    autoTrigger: boolean; 
-    customDropUrl?: string; 
+  enabled: boolean;
+  autoTrigger: boolean;
+  customDropUrl?: string;
 }
 
 export interface Config {
-    WAKE: string;
-    SCORE: string;
-    WEAK: string[];
-    UNACADEMY_SUB: boolean;
-    googleDriveFileId?: string;
-    driveLastSync?: string;
-    isCalendarSyncEnabled?: boolean;
-    calendarLastSync?: string;
-    geminiApiKey?: string;
-    flashcardDecks?: FlashcardDeck[];
-    pinnedMaterials?: string[];
-    customWidgets?: CustomWidget[];
-    localPlaylists?: LocalPlaylist[];
-    settings: {
-        accentColor: string;
-        blurEnabled: boolean;
-        mobileLayout: 'standard' | 'toolbar';
-        forceOfflineMode: boolean;
-        perQuestionTime: number;
-        hasGeminiKey?: boolean;
-        showAiChatAssistant?: boolean;
-        creditSaver?: boolean;
-        examType?: 'JEE' | 'NEET';
-        theme?: 'default' | 'liquid-glass' | 'midnight';
-        dashboardLayout?: DashboardWidgetItem[];
-        dashboardFlashcardDeckIds?: string[];
-        musicPlayerWidgetLayout?: 'minimal' | 'expanded';
-        widgetSettings?: { [widgetId: string]: { translucent?: boolean; wide?: boolean } };
-        dashboardBackgroundImage?: string;
-        dashboardTransparency?: number;
-        alwaysShowMusicPopup?: boolean;
-        notchSettings?: NotchSettings;
-        visualizerSettings?: VisualizerSettings;
-        djDropSettings?: DjDropSettings;
-    };
+  WAKE: string;
+  SCORE: string;
+  WEAK: string[];
+  UNACADEMY_SUB: boolean;
+  isCalendarSyncEnabled?: boolean;
+  calendarLastSync?: string;
+  googleDriveFileId?: string;
+  driveLastSync?: string;
+  geminiApiKey?: string;
+  flashcardDecks?: FlashcardDeck[];
+  pinnedMaterials?: string[];
+  customWidgets?: { id: string, title: string, content: string }[];
+  localPlaylists?: LocalPlaylist[];
+  settings: {
+    accentColor: string;
+    blurEnabled: boolean;
+    mobileLayout: 'standard' | 'toolbar';
+    forceOfflineMode: boolean;
+    perQuestionTime: number;
+    showAiChatAssistant?: boolean;
+    hasGeminiKey?: boolean;
+    examType?: 'JEE' | 'NEET';
+    theme?: 'default' | 'liquid-glass' | 'midnight';
+    dashboardLayout?: DashboardWidgetItem[];
+    dashboardFlashcardDeckIds?: string[];
+    musicPlayerWidgetLayout?: 'minimal' | 'expanded';
+    dashboardBackgroundImage?: string;
+    dashboardTransparency?: number;
+    notchSettings?: NotchSettings;
+    visualizerSettings?: VisualizerSettings;
+    djDropSettings?: DjDropSettings;
+  }
 }
 
 export interface StudentData {
-    id: number;
-    sid: string;
-    email: string;
-    fullName: string;
-    profilePhoto: string;
-    isVerified: boolean;
-    role: 'student' | 'admin';
-    apiToken?: string;
-    last_seen?: string;
-    CONFIG: Config;
-    SCHEDULE_ITEMS: ScheduleItem[];
-    RESULTS: ResultData[];
-    EXAMS: ExamData[];
-    STUDY_SESSIONS: StudySession[];
-    DOUBTS: DoubtData[];
+  id: number;
+  sid: string;
+  email: string;
+  fullName: string;
+  profilePhoto?: string;
+  isVerified: boolean;
+  role: 'student' | 'admin';
+  last_seen?: string;
+  apiToken?: string;
+  CONFIG: Config;
+  SCHEDULE_ITEMS: ScheduleItem[];
+  RESULTS: ResultData[];
+  EXAMS: ExamData[];
+  STUDY_SESSIONS: StudySession[];
+  DOUBTS: DoubtData[];
 }
+
+export interface SolutionData {
+  id: string;
+  user_sid: string;
+  solution: string;
+  solution_image?: string;
+  created_at: string;
+  solver_name: string;
+  solver_photo?: string;
+}
+
+export interface DoubtData {
+  id: string;
+  user_sid: string;
+  question: string;
+  question_image?: string;
+  created_at: string;
+  author_name: string;
+  author_photo?: string;
+  solutions: SolutionData[];
+  status?: 'active' | 'archived' | 'deleted';
+}
+
+export interface MessageData {
+    id: number;
+    sender_sid: string;
+    recipient_sid: string;
+    content: string;
+    created_at: string;
+    is_read: boolean;
+}
+
+export interface StudyMaterialItem {
+  name: string;
+  type: 'folder' | 'file';
+  path: string;
+  size: number;
+  modified: string;
+}
+
+export interface PracticeQuestion {
+    number: number;
+    text: string;
+    options: string[];
+    type: 'MCQ' | 'NUM';
+}
+
+export interface Track {
+    id: string;
+    title: string;
+    artist: string;
+    album: string;
+    genre: string;
+    track: string;
+    coverArt: string;
+    coverArtUrl?: string;
+    duration: string;
+    size: string;
+    path?: string;
+    isLocal: boolean;
+    file?: File;
+}
+
+export type ActiveTab = 'dashboard' | 'today' | 'schedule' | 'planner' | 'material' | 'flashcards' | 'exams' | 'performance' | 'doubts';
