@@ -1,3 +1,4 @@
+
 import express from 'express';
 import mysql from 'mysql2/promise';
 import cors from 'cors';
@@ -17,7 +18,6 @@ import { knowledgeBase } from './data/knowledgeBase.js';
 const app = express();
 
 // Fix for Cross-Origin-Opener-Policy blocking Google Sign-In popup
-// RELAXED POLICY: 'unsafe-none' allows popups to communicate back to the window
 app.use((req, res, next) => {
     res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
     res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
@@ -89,8 +89,6 @@ const initDB = async () => {
     if (!pool) return;
     try {
         const connection = await pool.getConnection();
-        
-        // 1. Users Table
         await connection.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -105,8 +103,6 @@ const initDB = async () => {
                 last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         `);
-
-        // 2. User Configs
         await connection.query(`
             CREATE TABLE IF NOT EXISTS user_configs (
                 user_id INT PRIMARY KEY,
@@ -114,8 +110,6 @@ const initDB = async () => {
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         `);
-
-        // 3. Data Tables (Encrypted Blobs)
         const dataTables = ['schedule_items', 'results', 'exams', 'study_sessions'];
         for (const table of dataTables) {
             await connection.query(`
@@ -127,8 +121,6 @@ const initDB = async () => {
                 )
             `);
         }
-
-        // 4. Doubts (Community)
         await connection.query(`
             CREATE TABLE IF NOT EXISTS doubts (
                 id VARCHAR(255) PRIMARY KEY,
@@ -141,8 +133,6 @@ const initDB = async () => {
                 status VARCHAR(50) DEFAULT 'active'
             )
         `);
-
-        // 5. Solutions
         await connection.query(`
             CREATE TABLE IF NOT EXISTS doubt_solutions (
                 id VARCHAR(255) PRIMARY KEY,
@@ -156,7 +146,6 @@ const initDB = async () => {
                 FOREIGN KEY (doubt_id) REFERENCES doubts(id) ON DELETE CASCADE
             )
         `);
-
         console.log("Database tables initialized successfully.");
         connection.release();
     } catch (error) {
@@ -178,7 +167,6 @@ if (isConfigured) {
             charset: 'utf8mb4'
         });
         
-        // Run DB Init
         initDB();
         
         googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -243,33 +231,26 @@ const getUserData = async (userId) => {
     if (userRows.length === 0) return null;
     const user = userRows[0];
 
-    // Fetch Config
     const [configRows] = await pool.query("SELECT config FROM user_configs WHERE user_id = ?", [userId]);
     let config = { settings: { accentColor: '#0891b2', theme: 'default' } };
     
     if (configRows.length > 0) {
         const rawConfig = configRows[0].config;
         const decrypted = decrypt(rawConfig);
-        
-        // Handle unencrypted JSON strings (e.g. from SQL insertions)
         if (typeof decrypted === 'string') {
             try {
                 const parsed = JSON.parse(decrypted);
                 config = { ...config, ...parsed, settings: { ...config.settings, ...parsed.settings } };
-            } catch (e) {
-                console.warn(`Failed to parse config for user ${userId}`, e);
-            }
+            } catch (e) { console.warn("Config parse error", e); }
         } else if (typeof decrypted === 'object' && decrypted !== null) {
             config = { ...config, ...decrypted, settings: { ...config.settings, ...decrypted.settings } };
         }
     }
 
-    // Ensure settings exist to prevent frontend crash
     if (!config.settings) config.settings = {};
     if (!config.settings.accentColor) config.settings.accentColor = '#0891b2';
     if (!config.settings.theme) config.settings.theme = 'default';
 
-    // Fetch Related Data
     const tables = ['schedule_items', 'results', 'exams', 'study_sessions'];
     const data = {};
     
@@ -277,9 +258,7 @@ const getUserData = async (userId) => {
         try {
             const [rows] = await pool.query(`SELECT data FROM ${table} WHERE user_id = ?`, [userId]);
             data[table.toUpperCase()] = rows.map(r => decrypt(r.data));
-        } catch (e) {
-            data[table.toUpperCase()] = [];
-        }
+        } catch (e) { data[table.toUpperCase()] = []; }
     }
 
     return {
@@ -297,7 +276,7 @@ const getUserData = async (userId) => {
         RESULTS: data.RESULTS || [],
         EXAMS: data.EXAMS || [],
         STUDY_SESSIONS: data.STUDY_SESSIONS || [],
-        DOUBTS: [] // Loaded separately
+        DOUBTS: []
     };
 };
 
@@ -331,24 +310,16 @@ apiRouter.get('/dj-drop', async (req, res) => {
 });
 
 apiRouter.get('/config/public', (req, res) => {
-    try {
-        res.json({
-            googleClientId: process.env.GOOGLE_CLIENT_ID || '',
-            isNextcloudConfigured: isNextcloudConfigured
-        });
-    } catch (e) {
-        res.status(500).json({ error: "Failed to load config" });
-    }
+    res.json({
+        googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+        isNextcloudConfigured: isNextcloudConfigured
+    });
 });
 
 // --- AUTH ROUTES ---
-
-// Google Login
 apiRouter.post('/auth/google', async (req, res) => {
     const { credential } = req.body;
-    if (!credential || !googleClient || !pool) {
-        return res.status(400).json({ error: "Service unavailable" });
-    }
+    if (!credential || !googleClient || !pool) return res.status(400).json({ error: "Service unavailable" });
 
     try {
         const ticket = await googleClient.verifyIdToken({
@@ -364,20 +335,17 @@ apiRouter.post('/auth/google', async (req, res) => {
         let user = users[0];
 
         if (!user) {
-            // Auto-register
             const sid = `S${Date.now().toString().slice(-6)}`;
             const [result] = await pool.query(
                 "INSERT INTO users (sid, email, full_name, profile_photo, is_verified, role) VALUES (?, ?, ?, ?, 1, 'student')",
                 [sid, email, payload.name, payload.picture]
             );
             const userId = result.insertId;
-            
             const initialConfig = {
                 WAKE: '06:00', SCORE: '0/300', WEAK: [], UNACADEMY_SUB: false,
                 settings: { accentColor: '#0891b2', blurEnabled: true, mobileLayout: 'standard', forceOfflineMode: false, perQuestionTime: 180, examType: 'JEE' }
             };
             await pool.query("INSERT INTO user_configs (user_id, config) VALUES (?, ?)", [userId, encrypt(initialConfig)]);
-            
             [users] = await pool.query("SELECT * FROM users WHERE id = ?", [userId]);
             user = users[0];
         }
@@ -387,7 +355,6 @@ apiRouter.post('/auth/google', async (req, res) => {
         res.json({ token, user: userData });
 
     } catch (error) {
-        console.error("Google Auth Error:", error);
         res.status(401).json({ error: "Authentication failed" });
     }
 });
@@ -436,7 +403,6 @@ apiRouter.post('/heartbeat', authMiddleware, async (req, res) => {
     }
 });
 
-// Auto-Verify Register
 apiRouter.post('/register', async (req, res) => {
     const { fullName, sid, email, password } = req.body;
     if (!pool) return res.status(503);
@@ -451,21 +417,17 @@ apiRouter.post('/register', async (req, res) => {
             [sid, email, fullName, hash]
         );
         const userId = result.insertId;
-        
         const initialConfig = { WAKE: '06:00', SCORE: '0/300', WEAK: [], settings: { accentColor: '#0891b2' } };
         await pool.query("INSERT INTO user_configs (user_id, config) VALUES (?, ?)", [userId, encrypt(initialConfig)]);
 
-        // Generate Token Immediately
         const token = jwt.sign({ id: userId, sid, role: 'student' }, JWT_SECRET, { expiresIn: '30d' });
         res.json({ token });
     } catch(e) {
-        console.error("Register Error", e);
         res.status(500).json({ error: e.message });
     }
 });
 
 // --- ADMIN ROUTES ---
-
 apiRouter.get('/admin/students', adminMiddleware, async (req, res) => {
     if (!pool) return res.status(503);
     try {
@@ -480,11 +442,8 @@ apiRouter.get('/admin/students', adminMiddleware, async (req, res) => {
                 } else {
                     s.CONFIG = decrypted;
                 }
-            } else {
-                s.CONFIG = { settings: {} };
             }
-            if (!s.CONFIG) s.CONFIG = {};
-            if (!s.CONFIG.settings) s.CONFIG.settings = {};
+            if (!s.CONFIG) s.CONFIG = { settings: {} };
         }
         res.json(students);
     } catch (e) {
@@ -510,7 +469,6 @@ apiRouter.post('/admin/broadcast-task', adminMiddleware, async (req, res) => {
     try {
         let query = "SELECT id FROM users WHERE role = 'student'";
         const [users] = await pool.query(query);
-        
         for (const u of users) {
             await pool.query("INSERT INTO schedule_items (user_id, data) VALUES (?, ?)", [u.id, encrypt(task)]);
         }
@@ -547,7 +505,6 @@ apiRouter.post('/admin/students/:sid/clear-data', adminMiddleware, async (req, r
 });
 
 // --- USER DATA ROUTES ---
-
 apiRouter.post('/schedule-items', authMiddleware, async (req, res) => {
     const { task } = req.body;
     try {
@@ -600,7 +557,6 @@ apiRouter.post('/config', authMiddleware, async (req, res) => {
             }
         }
         
-        // Deep merge simplistic
         const newConfig = { 
             ...currentConfig, 
             ...req.body, 
@@ -618,11 +574,9 @@ apiRouter.post('/config', authMiddleware, async (req, res) => {
     }
 });
 
-// Full Sync
 apiRouter.post('/user-data/full-sync', authMiddleware, async (req, res) => {
     const { userData } = req.body;
     const uid = req.userId;
-    
     try {
         await pool.query("DELETE FROM user_configs WHERE user_id = ?", [uid]);
         await pool.query("INSERT INTO user_configs (user_id, config) VALUES (?, ?)", [uid, encrypt(userData.CONFIG)]);
@@ -650,7 +604,6 @@ apiRouter.post('/user-data/full-sync', authMiddleware, async (req, res) => {
             const values = userData.STUDY_SESSIONS.map(i => [uid, encrypt(i)]);
             await pool.query("INSERT INTO study_sessions (user_id, data) VALUES ?", [values]);
         }
-
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -659,7 +612,6 @@ apiRouter.post('/user-data/full-sync', authMiddleware, async (req, res) => {
 
 // --- DOUBTS ---
 const DOUBTS_CACHE = []; 
-
 apiRouter.get('/doubts/all', async (req, res) => {
     try {
         if (pool) {
@@ -673,21 +625,13 @@ apiRouter.get('/doubts/all', async (req, res) => {
             res.json(DOUBTS_CACHE);
         }
     } catch (e) {
-        console.error("Error fetching doubts:", e);
         res.json(DOUBTS_CACHE);
     }
 });
 
 apiRouter.post('/doubts', authMiddleware, async (req, res) => {
     const { question, question_image } = req.body;
-    const newDoubt = {
-        id: `D${Date.now()}`,
-        user_sid: req.userSid,
-        question,
-        question_image,
-        created_at: new Date(),
-    };
-    
+    const newDoubt = { id: `D${Date.now()}`, user_sid: req.userSid, question, question_image, created_at: new Date() };
     try {
         const [userRows] = await pool.query("SELECT full_name, profile_photo FROM users WHERE sid = ?", [req.userSid]);
         if (userRows.length > 0) {
@@ -701,7 +645,6 @@ apiRouter.post('/doubts', authMiddleware, async (req, res) => {
             res.status(404).json({ error: "User not found" });
         }
     } catch (e) {
-        console.error(e);
         res.status(500).json({ error: e.message });
     }
 });
@@ -709,7 +652,6 @@ apiRouter.post('/doubts', authMiddleware, async (req, res) => {
 apiRouter.post('/doubts/:id/solutions', authMiddleware, async (req, res) => {
     const { id } = req.params;
     const { solution, solution_image } = req.body;
-    
     try {
         const [userRows] = await pool.query("SELECT full_name, profile_photo FROM users WHERE sid = ?", [req.userSid]);
         if (userRows.length > 0) {
@@ -724,7 +666,6 @@ apiRouter.post('/doubts/:id/solutions', authMiddleware, async (req, res) => {
             res.status(404).json({ error: "User not found" });
         }
     } catch (e) {
-        console.error(e);
         res.status(500).json({ error: e.message });
     }
 });
@@ -793,12 +734,8 @@ const commonAIHandler = async (req, res, promptBuilder) => {
             config: chatConfig
         });
 
-        // Correct SDK response access
         let text = response.text;
-        
-        if (!text) {
-             throw new Error("AI returned empty response (possibly blocked by safety settings).");
-        }
+        if (!text) throw new Error("AI returned empty response.");
 
         if (jsonResponse) {
             text = text.replace(/```json\n?|\n?```/g, '').trim();
@@ -815,10 +752,9 @@ const commonAIHandler = async (req, res, promptBuilder) => {
 apiRouter.post('/ai/parse-text', authMiddleware, async (req, res) => {
     commonAIHandler(req, res, ({ text, domain }, kb) => ({
         systemInstruction: `You are a helpful AI study assistant. Base URL: ${domain || 'https://jee.ponsrischool.in'}.
-        Parse the text into JSON. You can generate:
-        1. 'schedules': Array of tasks.
-        2. 'custom_widget': Object { "title": "Widget Title", "content": "Markdown content..." }.
-        3. 'practice_test': Object with questions/answers.
+        Parse text into STRICT JSON. 
+        Supports: 'schedules' (array), 'custom_widget', 'practice_test', 'flashcard_deck'.
+        Use Markdown for titles/details (Subscript: H_2O, Superscript: x^2).
         ${kb}`,
         userPrompt: text,
         jsonResponse: true
@@ -827,50 +763,41 @@ apiRouter.post('/ai/parse-text', authMiddleware, async (req, res) => {
 
 apiRouter.post('/ai/daily-insight', authMiddleware, async (req, res) => {
     commonAIHandler(req, res, ({ weaknesses, syllabus }, kb) => ({
-        systemInstruction: `Generate a motivational quote and a specific study tip based on weaknesses: ${weaknesses.join(', ')} and syllabus: ${syllabus}. ${kb}`,
+        systemInstruction: `Generate a motivational quote and a tip based on weaknesses: ${weaknesses.join(', ')}. ${kb}`,
         userPrompt: "Give me today's insight.",
         jsonResponse: true
     }));
 });
 
 apiRouter.post('/ai/chat', authMiddleware, async (req, res) => {
-    const { history, prompt, imageBase64, domain } = req.body;
+    const { history, prompt, imageBase64 } = req.body;
     const { apiKey, config } = await getApiKeyAndConfigForUser(req.userId);
     if (!apiKey) return res.status(500).json({ error: "AI service not configured" });
 
     try {
         const ai = new GoogleGenAI({ apiKey });
         const model = 'gemini-2.5-flash';
-        const systemInstruction = `You are a helpful AI assistant. ${getKnowledgeBaseForUser(config)}`;
+        const systemInstruction = `You are a helpful AI assistant. Use standard markdown. Format math like H_2O, x^2. ${getKnowledgeBaseForUser(config)}`;
         
         const chatHistory = history.map(h => ({
             role: h.role === 'model' ? 'model' : 'user',
             parts: h.parts.map(p => ({ text: p.text || '' }))
         }));
 
-        const chat = ai.chats.create({
-            model,
-            config: { systemInstruction },
-            history: chatHistory
-        });
-
+        const chat = ai.chats.create({ model, config: { systemInstruction }, history: chatHistory });
         const parts = [{ text: prompt }];
-        if (imageBase64) {
-            parts.push({ inlineData: { mimeType: 'image/jpeg', data: imageBase64 } });
-        }
+        if (imageBase64) parts.push({ inlineData: { mimeType: 'image/jpeg', data: imageBase64 } });
 
         const result = await chat.sendMessage({ message: parts });
-        // Corrected access: use .text, not .response.text
         res.json({ role: 'model', parts: [{ text: result.text }] });
     } catch (error) {
-        console.error("AI Chat Error:", error);
         res.status(500).json({ error: error.message });
     }
 });
 
 apiRouter.post('/ai/analyze-mistake', authMiddleware, async (req, res) => {
     commonAIHandler(req, res, ({ prompt, imageBase64 }, kb) => ({
-        systemInstruction: `Analyze the student's mistake. Return JSON: { "mistake_topic": "Topic Name", "explanation": "Detailed explanation in markdown" }. ${kb}`,
+        systemInstruction: `Analyze mistake. Return JSON: { "mistake_topic": "Topic Name", "explanation": "Detailed explanation in markdown with formulas like H_2O, x^2" }. ${kb}`,
         userPrompt: prompt,
         imageBase64,
         jsonResponse: true
@@ -879,25 +806,16 @@ apiRouter.post('/ai/analyze-mistake', authMiddleware, async (req, res) => {
 
 apiRouter.post('/ai/solve-doubt', authMiddleware, async (req, res) => {
     commonAIHandler(req, res, ({ prompt, imageBase64 }, kb) => ({
-        systemInstruction: `Solve the student's doubt using the internal knowledge base. Return markdown. ${kb}`,
+        systemInstruction: `Solve doubt using KB. Return markdown. Use H_2O, x^2 style. ${kb}`,
         userPrompt: prompt,
         imageBase64,
         jsonResponse: false
     }));
 });
 
-apiRouter.post('/ai/analyze-test-results', authMiddleware, async (req, res) => {
-    commonAIHandler(req, res, ({ userAnswers, timings, syllabus, imageBase64 }, kb) => ({
-        systemInstruction: `Grade the test. User answers: ${JSON.stringify(userAnswers)}. Syllabus: ${syllabus}. Return JSON with score, totalMarks, incorrectQuestionNumbers, subjectTimings, chapterScores, aiSuggestions. ${kb}`,
-        userPrompt: "Analyze my test.",
-        imageBase64, 
-        jsonResponse: true
-    }));
-});
-
 apiRouter.post('/ai/generate-flashcards', authMiddleware, async (req, res) => {
     commonAIHandler(req, res, ({ topic }, kb) => ({
-        systemInstruction: `Generate flashcards for '${topic}'. Return JSON: { "flashcards": [{ "front": "...", "back": "..." }] }. ${kb}`,
+        systemInstruction: `Generate 5-10 flashcards for '${topic}'. Return JSON: { "flashcards": [{ "front": "...", "back": "..." }] }. Use internal KB. Format formulas clearly. ${kb}`,
         userPrompt: "Generate cards.",
         jsonResponse: true
     }));
@@ -905,165 +823,59 @@ apiRouter.post('/ai/generate-flashcards', authMiddleware, async (req, res) => {
 
 apiRouter.post('/ai/generate-practice-test', authMiddleware, async (req, res) => {
     commonAIHandler(req, res, ({ topic, numQuestions, difficulty }, kb) => ({
-        systemInstruction: `Generate a practice test on '${topic}' with ${numQuestions} questions, difficulty ${difficulty}. Return JSON: { "questions": [...], "answers": {...} }. ${kb}`,
+        systemInstruction: `Generate practice test on '${topic}'. ${numQuestions} Qs, ${difficulty}. Return JSON: { "questions": [{ "number": 1, "text": "...", "options": ["A) ..","B).."], "type": "MCQ" }], "answers": { "1": "A" } }. Use rich text formatting. ${kb}`,
         userPrompt: "Generate test.",
-        jsonResponse: true
-    }));
-});
-
-apiRouter.post('/ai/generate-answer-key', authMiddleware, async (req, res) => {
-    commonAIHandler(req, res, ({ prompt }, kb) => ({
-        systemInstruction: `Generate an answer key JSON object { "1": "A", "2": "B"... } based on the description.`,
-        userPrompt: prompt,
         jsonResponse: true
     }));
 });
 
 apiRouter.post('/ai/correct-json', authMiddleware, async (req, res) => {
     commonAIHandler(req, res, ({ brokenJson }, kb) => ({
-        systemInstruction: "Fix the malformed JSON string and return valid JSON.",
+        systemInstruction: "Fix malformed JSON. Return valid JSON.",
         userPrompt: brokenJson,
         jsonResponse: true
     }));
 });
 
-// --- Study Material & Music (WebDAV) ---
-
+// --- WebDAV ---
 apiRouter.get('/music/browse', authMiddleware, async (req, res) => {
     if (!musicWebdavClient) return res.json([]);
-    const path = req.query.path || '/';
     try {
-        const contents = await musicWebdavClient.getDirectoryContents(path);
-        const files = contents.map(item => ({
-            name: item.basename,
-            type: item.type === 'directory' ? 'folder' : 'file',
-            path: item.filename,
-            size: item.size
-        }));
-        res.json(files);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
+        const contents = await musicWebdavClient.getDirectoryContents(req.query.path || '/');
+        res.json(contents.map(item => ({
+            name: item.basename, type: item.type === 'directory' ? 'folder' : 'file',
+            path: item.filename, size: item.size
+        })));
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 apiRouter.get('/music/content', async (req, res) => {
-    const token = req.query.token;
+    const { token, path } = req.query;
+    if (!token || !path) return res.status(400).send('Bad Request');
+    try { jwt.verify(token, JWT_SECRET); } catch { return res.status(401).send('Unauthorized'); }
     
-    if (!token) return res.status(401).send('Unauthorized');
-    try {
-        jwt.verify(token, JWT_SECRET);
-    } catch {
-        return res.status(401).send('Invalid Token');
-    }
-
-    const path = req.query.path;
-    if (!musicWebdavClient || !path) return res.status(404).send('Not found');
-    
+    if (!musicWebdavClient) return res.status(404).send('Not configured');
     try {
         const stream = musicWebdavClient.createReadStream(path);
-        
+        // IMPORTANT: Allow CORS for audio visualization
         res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Range');
-        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-
         stream.pipe(res);
-        
-        stream.on('error', (err) => {
-            console.error("Stream Error:", err);
-            if (!res.headersSent) {
-                res.status(500).send("Stream Error");
-            }
-        });
-    } catch (e) {
-        console.error("Music Content Error:", e);
-        if (!res.headersSent) {
-            res.status(500).send("Internal Server Error");
-        }
-    }
+    } catch (e) { res.status(500).send(); }
 });
 
 apiRouter.get('/music/album-art', async (req, res) => {
-    const token = req.query.token;
-    if (!token) return res.status(401).send('Unauthorized');
+    const { token, path } = req.query;
+    if (!token || !path) return res.status(400).send('Bad Request');
+    try { jwt.verify(token, JWT_SECRET); } catch { return res.status(401).send('Unauthorized'); }
+
+    if (!musicWebdavClient) return res.status(404).send('Not configured');
     try {
-        jwt.verify(token, JWT_SECRET);
-    } catch {
-        return res.status(401).send('Invalid Token');
-    }
-
-    const path = req.query.path;
-    if (!musicWebdavClient || !path) return res.status(404).send('Not found');
-
-    try {
-        // Read 3MB for metadata
-        const options = { range: { start: 0, end: 3145727 } }; 
-        const stream = musicWebdavClient.createReadStream(path, options);
-
+        // Fetch small chunk for metadata
+        const stream = musicWebdavClient.createReadStream(path, { range: { start: 0, end: 3145727 } });
         res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        
         stream.pipe(res);
-        
-        stream.on('error', (err) => {
-             console.error("Album Art Stream Error:", err);
-             if (!res.headersSent) res.status(500).send("Stream Error");
-        });
-
-    } catch (e) {
-        console.error("Album Art Proxy Error:", e);
-        if (!res.headersSent) res.status(500).send("Internal Server Error");
-    }
+    } catch (e) { res.status(500).send(); }
 });
-
-apiRouter.get('/study-material/browse', authMiddleware, async (req, res) => {
-    if (!webdavClient) return res.json([]);
-    const path = req.query.path || '/';
-    try {
-        const contents = await webdavClient.getDirectoryContents(path);
-        const files = contents.map(item => ({
-            name: item.basename,
-            type: item.type === 'directory' ? 'folder' : 'file',
-            path: item.filename,
-            size: item.size,
-            modified: item.lastmod
-        }));
-        res.json(files);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-apiRouter.get('/study-material/content', authMiddleware, async (req, res) => {
-    const path = req.query.path;
-    if (!webdavClient || !path) return res.status(404).send('Not found');
-    try {
-        const stream = webdavClient.createReadStream(path);
-        stream.pipe(res);
-    } catch (e) {
-        res.status(500).send();
-    }
-});
-
-apiRouter.post('/study-material/details', authMiddleware, async (req, res) => {
-    if (!webdavClient) return res.json([]);
-    const { paths } = req.body;
-    const results = [];
-    for (const path of paths) {
-        try {
-            const stat = await webdavClient.stat(path);
-            results.push({
-                name: stat.basename,
-                type: stat.type === 'directory' ? 'folder' : 'file',
-                path: stat.filename,
-                size: stat.size,
-                modified: stat.lastmod
-            });
-        } catch (e) { /* ignore errors for missing files */ }
-    }
-    res.json(results);
-});
-
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const PORT = process.env.PORT || 3001;

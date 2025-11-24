@@ -9,7 +9,7 @@ import MistakeManager from './MistakeManager';
 import TodaysAgendaWidget from './widgets/TodaysAgendaWidget';
 import ReadingHoursWidget from './widgets/ReadingHoursWidget';
 import ScoreTrendWidget from './widgets/MarksAnalysisWidget';
-import { CustomPracticeModal } from './CustomPracticeModal';
+import CustomPracticeModal from './CustomPracticeModal';
 import HomeworkWidget from './widgets/HomeworkWidget';
 import ActivityTracker from './ActivityTracker';
 import PerformanceMetrics from './PerformanceMetrics';
@@ -219,7 +219,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         setisAiParserModalOpen(false);
     };
 
-    // ... (Keep other handlers like handleEditClick, handleAiChatMessage etc. as they were) ...
     const handleEditClick = (item: ScheduleItem) => { setEditingTask(item); setIsCreateModalOpen(true); };
     const handleAiPracticeTest = (data: any) => { setAiPracticeTest(data); setisAiParserModalOpen(false); setTimeout(() => setIsPracticeModalOpen(true), 300); };
     const handleCompleteTask = (task: ScheduleCardData) => { onDeleteTask(task.ID); };

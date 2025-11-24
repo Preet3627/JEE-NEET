@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './context/AuthContext';
 import { StudentData, ScheduleItem, StudySession, Config, ResultData, ExamData, DoubtData } from './types';
@@ -53,7 +52,6 @@ const App: React.FC = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // --- Deep Link & Notification Action Integration ---
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const token = params.get('reset-token');
@@ -67,12 +65,10 @@ const App: React.FC = () => {
         const dataStr = params.get('data');
         const taskId = params.get('id');
 
-        // Support for direct task viewing or starting practice from notifications/calendar
         if (action === 'search' && query) {
             setDeepLinkAction({ action: 'search', data: { query } });
             window.history.replaceState({}, document.title, window.location.pathname);
         } else if (taskId && (action === 'view_task' || action === 'start_practice')) {
-            // Pass the ID to the dashboard to open the relevant modal
             setDeepLinkAction({ action, data: { id: taskId } });
             window.history.replaceState({}, document.title, window.location.pathname);
         } else if (action && dataStr) {
@@ -83,15 +79,12 @@ const App: React.FC = () => {
                     const data = JSON.parse(decodedData);
                     setDeepLinkAction({ action, data });
                 } catch (e) {
-                    console.error("Failed to parse deep link data, attempting AI correction:", e);
                     try {
                         const correctionResult = await api.correctJson(decodedData);
                         const correctedData = JSON.parse(correctionResult.correctedJson);
                         setDeepLinkAction({ action, data: correctedData });
-                        console.log("AI correction successful!");
                     } catch (correctionError) {
-                        console.error("AI correction failed:", correctionError);
-                        alert("The data from the link is malformed and could not be automatically corrected. Please check the source.");
+                        alert("The data from the link is malformed.");
                     }
                 } finally {
                     window.history.replaceState({}, document.title, window.location.pathname);
@@ -102,11 +95,8 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        // Apply theme class to body
         const theme = currentUser?.CONFIG.settings.theme || 'default';
         document.body.className = `theme-${theme}`;
-
-        // If a user is logged in but hasn't selected an exam type, show the selection modal.
         if (currentUser && userRole === 'student' && !isDemoMode && !currentUser.CONFIG.settings.examType) {
             setIsExamTypeModalOpen(true);
         }
@@ -120,13 +110,12 @@ const App: React.FC = () => {
     };
 
     const handleGapiError = (error: any, contextMessage?: string) => {
-        console.error("Google API Error:", error);
         const status = error.status || error.code || (error.result && error.result.error && error.result.error.code);
         if (status === 401 || status === 403) {
-            alert("Your Google session has expired or permissions have changed. Please sign in again to use Google services.");
+            alert("Your Google session has expired. Please sign in again.");
             handleGoogleSignOut();
         } else {
-            alert(contextMessage || "An error occurred while communicating with Google services. Please check your connection and try again.");
+            alert(contextMessage || "Google API Error.");
         }
     };
 
@@ -144,9 +133,9 @@ const App: React.FC = () => {
                 }
                 (taskToSave as any).googleEventId = eventId;
             } catch (syncError) {
-                handleGapiError(syncError, "Failed to sync task with Google Calendar. Please check permissions and try again.");
+                handleGapiError(syncError);
                 setIsSyncing(false);
-                return; // Stop the save process if sync fails
+                return;
             } finally {
                 setIsSyncing(false);
             }
@@ -167,7 +156,7 @@ const App: React.FC = () => {
                 setIsSyncing(true);
                 await gcal.deleteEvent(taskToDelete.googleEventId);
             } catch (syncError) {
-                handleGapiError(syncError, "Failed to remove task from Google Calendar, but it will be deleted from the app. You may need to remove it manually from your calendar.");
+                handleGapiError(syncError);
             } finally {
                 setIsSyncing(false);
             }
@@ -177,7 +166,10 @@ const App: React.FC = () => {
     };
     
     const handleFullCalendarSync = async () => {
-        if (!currentUser || googleAuthStatus !== 'signed_in') return;
+        if (!currentUser || googleAuthStatus !== 'signed_in') {
+            if(googleAuthStatus !== 'signed_in') alert("Please connect your Google Account in Settings first.");
+            return;
+        }
         setIsSyncing(true);
         try {
             const tasksToUpdate: ScheduleItem[] = [];
@@ -188,22 +180,18 @@ const App: React.FC = () => {
                     try {
                         const eventId = await gcal.createEvent(task);
                         tasksToUpdate.push({ ...task, googleEventId: eventId });
-                    } catch (error) {
-                        console.warn(`Failed to sync task ${task.ID}:`, error);
-                    }
+                    } catch (error) { console.warn(error); }
                 }
             }
 
-            if (tasksToUpdate.length > 0) {
-                await handleSaveBatchTasks(tasksToUpdate);
-            }
+            if (tasksToUpdate.length > 0) await handleSaveBatchTasks(tasksToUpdate);
 
             await api.updateConfig({ isCalendarSyncEnabled: true, calendarLastSync: new Date().toISOString() });
             await refreshUser();
-            alert(`Successfully synced ${tasksToUpdate.length} new tasks to Google Calendar.`);
+            alert(`Synced ${tasksToUpdate.length} tasks.`);
 
         } catch (error) {
-            handleGapiError(error, "An error occurred during the full calendar sync.");
+            handleGapiError(error, "Calendar sync failed.");
         } finally {
             setIsSyncing(false);
         }
@@ -212,18 +200,13 @@ const App: React.FC = () => {
 
     const handleUpdateConfig = async (configUpdate: Partial<Config>) => {
         if (!currentUser) return;
-        
         const wasSyncDisabled = !currentUser.CONFIG.isCalendarSyncEnabled;
         const isSyncBeingEnabled = configUpdate.isCalendarSyncEnabled === true;
-
         await api.updateConfig(configUpdate);
         await refreshUser();
-
         if (wasSyncDisabled && isSyncBeingEnabled) {
              setTimeout(() => {
-                if (window.confirm("Enable Google Calendar Sync? This will add all your scheduled tasks (as repeating weekly events) to your primary Google Calendar.")) {
-                    handleFullCalendarSync();
-                }
+                if (window.confirm("Sync all existing tasks to Google Calendar now?")) handleFullCalendarSync();
             }, 100);
         }
     };
@@ -274,20 +257,24 @@ const App: React.FC = () => {
     const handleBatchImport = async (data: { schedules: ScheduleItem[], exams: ExamData[], results: ResultData[], weaknesses: string[] }) => {
         if (!currentUser) return;
         
-        const updatedUser = JSON.parse(JSON.stringify(currentUser));
+        // Regenerate IDs to prevent collisions
+        const safeSchedules = data.schedules.map((s, i) => ({ ...s, ID: `IMP_S_${Date.now()}_${i}` }));
+        const safeExams = data.exams.map((e, i) => ({ ...e, ID: `IMP_E_${Date.now()}_${i}` }));
+        const safeResults = data.results.map((r, i) => ({ ...r, ID: `IMP_R_${Date.now()}_${i}` }));
 
-        updatedUser.SCHEDULE_ITEMS.push(...data.schedules);
-        updatedUser.EXAMS.push(...data.exams);
-        updatedUser.RESULTS.push(...data.results);
+        const updatedUser = JSON.parse(JSON.stringify(currentUser));
+        updatedUser.SCHEDULE_ITEMS.push(...safeSchedules);
+        updatedUser.EXAMS.push(...safeExams);
+        updatedUser.RESULTS.push(...safeResults);
 
         const newWeaknesses = new Set([...updatedUser.CONFIG.WEAK, ...data.weaknesses]);
-        data.results.forEach(r => {
+        safeResults.forEach((r: ResultData) => {
             r.MISTAKES.forEach(m => newWeaknesses.add(m));
         });
         updatedUser.CONFIG.WEAK = Array.from(newWeaknesses);
 
-        if (data.results.length > 0) {
-            const sortedResults = [...updatedUser.RESULTS].sort((a, b) => new Date(b.DATE).getTime() - new Date(a.DATE).getTime());
+        if (safeResults.length > 0) {
+            const sortedResults = [...updatedUser.RESULTS].sort((a: ResultData, b: ResultData) => new Date(b.DATE).getTime() - new Date(a.DATE).getTime());
             updatedUser.CONFIG.SCORE = sortedResults[0].SCORE;
         }
 
@@ -295,9 +282,7 @@ const App: React.FC = () => {
         await refreshUser();
 
         if (currentUser.CONFIG.isCalendarSyncEnabled) {
-            if (window.confirm("Batch import complete. Do you want to sync the newly added schedule items to your Google Calendar?")) {
-                handleFullCalendarSync();
-            }
+            if (window.confirm("Sync imported tasks to Google Calendar?")) handleFullCalendarSync();
         }
     };
 
@@ -332,13 +317,13 @@ const App: React.FC = () => {
             refreshUser();
             alert('Backup successful!');
         } catch (error) {
-            handleGapiError(error, 'Backup failed. Please try again.');
+            handleGapiError(error, 'Backup failed.');
         }
     };
     
     const onRestoreFromDrive = async () => {
         if (!currentUser?.CONFIG.googleDriveFileId || googleAuthStatus !== 'signed_in') return;
-        if (!window.confirm("This will overwrite your current local schedule and results data. Are you sure?")) return;
+        if (!window.confirm("Overwrite local data?")) return;
         try {
             const dataStr = await gdrive.downloadData(currentUser.CONFIG.googleDriveFileId);
             const restoredData = JSON.parse(dataStr);
@@ -347,18 +332,17 @@ const App: React.FC = () => {
             refreshUser();
             alert('Restore successful!');
         } catch (error) {
-            handleGapiError(error, 'Restore failed. Please try again.');
+            handleGapiError(error, 'Restore failed.');
         }
     };
     
     const onDeleteUser = async (sid: string) => {
-        if (window.confirm(`Are you SURE you want to permanently delete user ${sid}? All their data will be lost forever.`)) {
+        if (window.confirm(`Permanently delete user ${sid}?`)) {
             try {
                 await api.deleteStudent(sid);
                 setAllStudents(prev => prev.filter(s => s.sid !== sid));
-                alert(`Student ${sid} deleted.`);
             } catch (error: any) {
-                alert(`Failed to delete student: ${error.message}`);
+                alert(`Failed: ${error.message}`);
             }
         }
     };
@@ -403,7 +387,7 @@ const App: React.FC = () => {
     useEffect(() => {
         if (currentUser) {
             const heartbeat = setInterval(() => {
-                api.heartbeat().catch(err => console.debug("Heartbeat failed, user might be offline.", err));
+                api.heartbeat().catch(err => console.debug("Heartbeat failed", err));
             }, 60000);
             return () => clearInterval(heartbeat);
         }
@@ -468,7 +452,7 @@ const App: React.FC = () => {
 
     const renderContent = () => {
         if (isLoading) {
-            return <div className="flex items-center justify-center min-h-screen"><div className="text-xl animate-pulse">Initializing Interface...</div></div>;
+            return <div className="flex items-center justify-center min-h-screen"><div className="text-xl animate-pulse">Loading...</div></div>;
         }
 
         if (isExamTypeModalOpen) {
@@ -505,7 +489,7 @@ const App: React.FC = () => {
                  <div style={{'--accent-color': '#0891b2'} as React.CSSProperties} className="safe-padding-left safe-padding-right safe-padding-top safe-padding-bottom">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                         <Header user={{ name: 'Admin', id: 'ADMIN_DEMO', profilePhoto: currentUser?.profilePhoto }} onLogout={logout} backendStatus={backendStatus} isSyncing={isSyncing} />
-                        <TeacherDashboard students={allStudents} onToggleUnacademySub={()=>{}} onDeleteUser={() => alert("Deletion disabled in demo mode")} onBroadcastTask={() => alert("Broadcast disabled in demo mode")} />
+                        <TeacherDashboard students={allStudents} onToggleUnacademySub={()=>{}} onDeleteUser={() => alert("Disabled in demo mode")} onBroadcastTask={() => alert("Disabled in demo mode")} />
                     </div>
                 </div>
             );

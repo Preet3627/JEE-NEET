@@ -33,6 +33,10 @@ interface MusicPlayerContextType {
     playlists: LocalPlaylist[];
     createPlaylist: (name: string) => void;
     addToPlaylist: (playlistId: string, track: Track) => void;
+    queue: Track[];
+    addToQueue: (track: Track) => void;
+    removeFromQueue: (index: number) => void;
+    clearQueue: () => void;
 }
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
@@ -50,6 +54,7 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const [isPlaying, setIsPlaying] = useState(false);
     const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
     const [tracklist, setTracklist] = useState<Track[]>([]);
+    const [queue, setQueue] = useState<Track[]>([]); // Queue System
     const [isFullScreenPlayerOpen, setIsFullScreenPlayerOpen] = useState(false);
     const [duration, setDuration] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
@@ -91,6 +96,10 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const addToPlaylist = (playlistId: string, track: Track) => {
         setPlaylists(prev => prev.map(pl => pl.id === playlistId && !pl.trackIds.includes(track.id) ? { ...pl, trackIds: [...pl.trackIds, track.id] } : pl));
     };
+
+    const addToQueue = (track: Track) => setQueue(prev => [...prev, track]);
+    const removeFromQueue = (index: number) => setQueue(prev => prev.filter((_, i) => i !== index));
+    const clearQueue = () => setQueue([]);
     
     const initializeAudioContext = useCallback(() => {
         if (!audioContext) {
@@ -109,9 +118,15 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
             
             // Setup Media Source immediately if audio element exists
             if(audioElementRef.current && !sourceNodeRef.current) {
-                 const source = context.createMediaElementSource(audioElementRef.current);
-                 source.connect(gain);
-                 sourceNodeRef.current = source;
+                 // IMPORTANT: crossOrigin must be set BEFORE creating source
+                 audioElementRef.current.crossOrigin = "anonymous";
+                 try {
+                    const source = context.createMediaElementSource(audioElementRef.current);
+                    source.connect(gain);
+                    sourceNodeRef.current = source;
+                 } catch (e) {
+                     console.warn("Could not attach media source (likely CORS issue)", e);
+                 }
             }
         } else if (audioContext.state === 'suspended') {
             audioContext.resume();
@@ -121,13 +136,11 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const playDjDrop = () => {
         if (djDropSettings.enabled && djDropAudioRef.current && gainNode && audioContext) {
             djDropAudioRef.current.currentTime = 0;
-            // Set source for drop
             const targetSrc = djDropSettings.customDropUrl || DJ_DROP_URL;
             if (djDropAudioRef.current.src !== targetSrc && !djDropAudioRef.current.src.endsWith(targetSrc)) {
                  djDropAudioRef.current.src = targetSrc;
             }
 
-            // Ducking effect
             const now = audioContext.currentTime;
             gainNode.gain.cancelScheduledValues(now);
             gainNode.gain.setValueAtTime(gainNode.gain.value, now);
@@ -135,7 +148,6 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
             
             djDropAudioRef.current.play().then(() => {
                  setTimeout(() => {
-                     // Restore volume
                      if (gainNode && audioContext) {
                         const restoreTime = audioContext.currentTime;
                         gainNode.gain.cancelScheduledValues(restoreTime);
@@ -183,7 +195,7 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
              const now = audioContext.currentTime;
              gainNode.gain.cancelScheduledValues(now);
              gainNode.gain.setValueAtTime(1, now);
-             gainNode.gain.linearRampToValueAtTime(0, now + 3); // 3s fade out
+             gainNode.gain.linearRampToValueAtTime(0, now + 3); 
              
              if (djDropSettings.enabled && djDropSettings.autoTrigger) {
                  setTimeout(() => playDjDrop(), 500); 
@@ -201,7 +213,6 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
                 if (currentObjectUrlRef.current) URL.revokeObjectURL(currentObjectUrlRef.current);
                 streamUrl = URL.createObjectURL(track.file);
                 currentObjectUrlRef.current = streamUrl;
-                // Extract metadata locally for local files
                 try {
                     const metadata = await musicMetadata.parseBlob(track.file);
                     if (metadata.common.picture?.[0]) {
@@ -211,7 +222,6 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
                 } catch(e) {}
             } else {
                  streamUrl = api.getMusicContentUrl(track.id);
-                 // Async fetch art, update state later if needed, but start playing immediately
                  fetchAlbumArt(track).then(url => {
                      if (currentTrackIdRef.current === track.id) {
                          const updatedTrack = { ...track, coverArtUrl: url };
@@ -225,20 +235,21 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
             setCurrentTrack(trackWithArt);
             currentTrackIdRef.current = track.id;
             
-            audioElementRef.current.src = streamUrl;
+            // CRITICAL: CORS for Visualizer
             audioElementRef.current.crossOrigin = "anonymous";
+            audioElementRef.current.src = streamUrl;
             
-            // Re-connect source if needed (should be handled by init but safety check)
             if (audioContext && !sourceNodeRef.current && gainNode) {
-                sourceNodeRef.current = audioContext.createMediaElementSource(audioElementRef.current);
-                sourceNodeRef.current.connect(gainNode);
+                try {
+                    sourceNodeRef.current = audioContext.createMediaElementSource(audioElementRef.current);
+                    sourceNodeRef.current.connect(gainNode);
+                } catch(e) { console.warn("Source node error", e) }
             }
 
             audioElementRef.current.play().then(() => {
                 if (audioContext?.state === 'suspended') audioContext.resume();
                 setIsPlaying(true);
                 
-                // Auto-Mix Fade In
                 if (isAutoMixEnabled && gainNode && audioContext) {
                     const now = audioContext.currentTime;
                     gainNode.gain.cancelScheduledValues(now);
@@ -278,12 +289,20 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const toggleAutoMix = () => setIsAutoMixEnabled(prev => !prev);
 
     const navigateTrack = useCallback((direction: 'next' | 'prev') => {
+        // Check Queue first
+        if (direction === 'next' && queue.length > 0) {
+            const nextQ = queue[0];
+            removeFromQueue(0);
+            playTrack(nextQ, tracklist); // Keep current tracklist context
+            return;
+        }
+
         if (!currentTrack || tracklist.length === 0) return;
         const currentIndex = tracklist.findIndex(t => t.id === currentTrack.id);
         if (currentIndex === -1) return;
         let newIndex = direction === 'next' ? (currentIndex + 1) % tracklist.length : (currentIndex - 1 + tracklist.length) % tracklist.length;
         playTrack(tracklist[newIndex], tracklist);
-    }, [currentTrack, tracklist, playTrack]);
+    }, [currentTrack, tracklist, playTrack, queue]);
     
     useEffect(() => {
         if (!audioElementRef.current) {
@@ -301,7 +320,6 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
         }
     }, [navigateTrack]);
 
-    // Setup Media Session Handlers separately
     useEffect(() => {
         if ('mediaSession' in navigator) {
             navigator.mediaSession.setActionHandler('play', () => play());
@@ -319,7 +337,8 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
         playTrack, play, pause, nextTrack: () => navigateTrack('next'), prevTrack: () => navigateTrack('prev'), 
         toggleFullScreenPlayer, seek, duration, currentTime, playDjDrop, isAutoMixEnabled, toggleAutoMix, 
         updateTrackMetadata, notchSettings, visualizerSettings, djDropSettings, playlists, createPlaylist, addToPlaylist,
-        setNotchSettings: handleSetNotchSettings, setVisualizerSettings: handleSetVisualizerSettings, setDjDropSettings: handleSetDjDropSettings
+        setNotchSettings: handleSetNotchSettings, setVisualizerSettings: handleSetVisualizerSettings, setDjDropSettings: handleSetDjDropSettings,
+        queue, addToQueue, removeFromQueue, clearQueue
     };
 
     return <MusicPlayerContext.Provider value={value}>{children}</MusicPlayerContext.Provider>;
