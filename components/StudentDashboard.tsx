@@ -574,7 +574,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             {isAiChatOpen && <AIChatPopup history={aiChatHistory} onSendMessage={handleAiChatMessage} onClose={() => setIsAiChatOpen(false)} isLoading={isAiChatLoading} />}
             {viewingReport && <TestReportModal result={viewingReport} onClose={() => setViewingReport(null)} onUpdateWeaknesses={onUpdateWeaknesses} student={student} onSaveDeck={handleSaveDeck} />}
             {isMoveModalOpen && <MoveTasksModal onClose={() => setIsMoveModalOpen(false)} onConfirm={handleMoveSelected} selectedCount={selectedTaskIds.length} />}
-            {isMusicLibraryOpen && <MusicLibraryModal onClose={() => toggleLibrary()} />}
+            {isLibraryOpen && <MusicLibraryModal onClose={() => toggleLibrary()} />}
             {deepLinkData && (
                 <DeepLinkConfirmationModal
                     data={deepLinkData}

@@ -361,9 +361,9 @@ const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) => {
                 </button>
               </div>
             </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
       </div>
       {isAiKeyModalOpen && (
           <AIGenerateAnswerKeyModal
