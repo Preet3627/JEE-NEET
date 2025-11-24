@@ -1,6 +1,6 @@
 
 # Universal Data Documentation for AI Agents (JEE Scheduler Pro)
-# Version: 14.1.0 (Maths Library Update)
+# Version: 14.3.0 (Expanded Schema with Exams & Gradients)
 
 ## 1. Core Concept: The Internal Knowledge Base
 The AI now operates with a comprehensive, built-in library for **Physics**, **Chemistry**, and **Mathematics**. All academic content generation (tips, flashcards, MCQs, explanations) **must be sourced from this internal knowledge base**. This ensures accuracy and consistency.
@@ -64,6 +64,17 @@ Your entire output must be a single JSON object with these top-level keys. Provi
 | `category`| string| **For `HOMEWORK`**. `Level-1`, `Level-2`, `PYQ`, etc. |
 | `q_ranges`| string | **For `HOMEWORK`**. E.g., `"1-15; 20-25"`. |
 | `answers`| string | **For `HOMEWORK`**. Stringified JSON, e.g., `"{\"1\":\"A\", \"2\":\"C\"}"`. |
+| `externalLink` | string | Optional URL for online class/resource (e.g. Zoom link). |
+| `gradient` | string | Optional Tailwind colors for card background, e.g., `"from-blue-500 to-cyan-500"`. |
+
+### `exams` Object Schema
+| Key | Type | Description |
+|---|---|---|
+| `title` | string | Exam name (e.g. "Mock Test 5"). |
+| `subject` | string | `"PHYSICS"`, `"CHEMISTRY"`, `"MATHS"` or `"FULL"`. |
+| `date` | string | `YYYY-MM-DD` format. |
+| `time` | string | `HH:MM` format. |
+| `syllabus` | string | Topics covered in the exam. |
 
 ### `flashcard_deck` Object Schema
 | Key | Type | Description |

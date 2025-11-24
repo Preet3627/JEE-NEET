@@ -223,7 +223,7 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
             <div className="border-t border-gray-700/50"></div>
             
             <div>
-                <h3 className="text-base font-bold text-gray-300 mb-2">Integrations</h3>
+                <h3 className="text-base font-bold text-gray-300 mb-2">Integrations & Sync</h3>
                 <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 space-y-4">
                     <div className="flex justify-between items-center">
                          <span className="text-sm text-gray-300">Google Account</span>
@@ -232,6 +232,16 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                             <button type="button" onClick={onGoogleSignIn} className="text-xs text-cyan-400 border border-cyan-500/50 px-2 py-1 rounded hover:bg-cyan-500/20">Connect</button>
                          }
                     </div>
+                    
+                    <div className="flex items-center justify-between">
+                        <label className="text-sm text-gray-300">Auto-Sync to Google Calendar</label>
+                        <input type="checkbox" checked={calendarSync} onChange={e => setCalendarSync(e.target.checked)} className="w-4 h-4 rounded text-cyan-600 bg-gray-700 border-gray-600 focus:ring-cyan-500" />
+                    </div>
+                    
+                    <button type="button" onClick={onExportToIcs} className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-gray-800 hover:bg-gray-700 text-white border border-gray-600">
+                        <Icon name="calendar" className="w-4 h-4" /> Export Calendar (.ics)
+                    </button>
+
                     <input type="password" value={geminiApiKey} onChange={(e) => setGeminiApiKey(e.target.value)} className={inputClass} placeholder="Gemini API Key" />
                 </div>
             </div>

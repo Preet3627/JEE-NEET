@@ -5,6 +5,7 @@ import Icon from './Icon';
 interface DeepLinkConfirmationModalProps {
   data: {
     schedules?: any[];
+    schedule?: any[]; // Handle singular case from AI sometimes
     exams?: any[];
     results?: any[];
     weaknesses?: string[];
@@ -29,8 +30,11 @@ const DeepLinkConfirmationModal: React.FC<DeepLinkConfirmationModalProps> = ({ d
   const animationClasses = isExiting ? 'modal-exit' : 'modal-enter';
   const contentAnimationClasses = isExiting ? 'modal-content-exit' : 'modal-content-enter';
 
+  // Safely calculate counts, handling potential variations in AI output structure
+  const scheduleCount = (data.schedules?.length || 0) + (Array.isArray(data.schedule) ? data.schedule.length : 0);
+  
   const counts = {
-    schedules: data.schedules?.length || 0,
+    schedules: scheduleCount,
     exams: data.exams?.length || 0,
     results: data.results?.length || 0,
     weaknesses: data.weaknesses?.length || 0

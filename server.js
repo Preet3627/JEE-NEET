@@ -735,198 +735,168 @@ const commonAIHandler = async (req, res, promptBuilder) => {
         });
 
         let text = response.text;
-        if (!text) throw new Error("AI returned empty response.");
-
+        if (!text) throw new Error("AI returned empty response");
+        
+        // Sanitize code blocks for frontend parsing if strictly JSON expected but not forced
         if (jsonResponse) {
-            text = text.replace(/```json\n?|\n?```/g, '').trim();
-            res.json(JSON.parse(text));
-        } else {
-            res.json({ response: text });
+            text = text.replace(/```json/g, '').replace(/```/g, '').trim();
         }
-    } catch (e) {
-        console.error("AI Handler Error:", e);
-        res.status(500).json({ error: e.message });
+
+        res.json({ response: text });
+
+    } catch (error) {
+        console.error("AI Error:", error);
+        res.status(500).json({ error: "AI Processing Failed" });
     }
 };
 
-apiRouter.post('/ai/parse-text', authMiddleware, async (req, res) => {
-    commonAIHandler(req, res, ({ text, domain }, kb) => ({
-        systemInstruction: `You are a helpful AI study assistant. Base URL: ${domain || 'https://jee.ponsrischool.in'}.
-        Parse text into STRICT JSON. 
-        Supports: 'schedules' (array), 'custom_widget', 'practice_test', 'flashcard_deck'.
-        Use Markdown for titles/details (Subscript: H_2O, Superscript: x^2).
-        ${kb}`,
-        userPrompt: text,
-        jsonResponse: true
-    }));
-});
-
+// AI Endpoints
 apiRouter.post('/ai/daily-insight', authMiddleware, async (req, res) => {
-    commonAIHandler(req, res, ({ weaknesses, syllabus }, kb) => ({
-        systemInstruction: `Generate a motivational quote and a tip based on weaknesses: ${weaknesses.join(', ')}. ${kb}`,
-        userPrompt: "Give me today's insight.",
+    commonAIHandler(req, res, (body, kb) => ({
+        systemInstruction: `You are an exam coach. Use this knowledge base: ${kb}. Return valid JSON: { "quote": "string", "insight": "string" }.`,
+        userPrompt: `Weaknesses: ${body.weaknesses.join(', ')}. Syllabus: ${body.syllabus || 'General'}. Give a short motivational quote and a specific academic tip.`,
         jsonResponse: true
     }));
 });
 
 apiRouter.post('/ai/chat', authMiddleware, async (req, res) => {
-    const { history, prompt, imageBase64 } = req.body;
+    // Special handler for chat history
     const { apiKey, config } = await getApiKeyAndConfigForUser(req.userId);
-    if (!apiKey) return res.status(500).json({ error: "AI service not configured" });
+    if (!apiKey) return res.status(500).json({ error: "AI not configured" });
 
     try {
         const ai = new GoogleGenAI({ apiKey });
         const model = 'gemini-2.5-flash';
-        const systemInstruction = `You are a helpful AI assistant. Use standard markdown. Format math like H_2O, x^2. ${getKnowledgeBaseForUser(config)}`;
+        const kb = getKnowledgeBaseForUser(config);
         
-        const chatHistory = history.map(h => ({
-            role: h.role === 'model' ? 'model' : 'user',
-            parts: h.parts.map(p => ({ text: p.text || '' }))
-        }));
+        const systemInstruction = `You are a tutor. Use the Internal Knowledge Base: ${kb}. If asked to create a schedule or exam, generate a DEEP LINK URL: ${req.body.domain}/?action=new_schedule&data={JSON} or /?action=view_exams. Support keys: 'exams', 'externalLink', 'gradient' in JSON for deep links.`;
+        
+        // Filter out error messages from history
+        const validHistory = req.body.history.filter(h => !h.parts[0].text.startsWith('Error:'));
+        
+        // Add current user prompt
+        const currentParts = [{ text: req.body.prompt }];
+        if (req.body.imageBase64) {
+            currentParts.push({ inlineData: { mimeType: 'image/jpeg', data: req.body.imageBase64 } });
+        }
+        
+        // We reconstruct the chat session somewhat manually as we are stateless here
+        // But Gemini API `generateContent` is stateless unless using `startChat`. 
+        // For simplicity with history provided, we'll just send the full history as contents.
+        const contents = [
+            ...validHistory, 
+            { role: 'user', parts: currentParts }
+        ];
 
-        const chat = ai.chats.create({ model, config: { systemInstruction }, history: chatHistory });
-        const parts = [{ text: prompt }];
-        if (imageBase64) parts.push({ inlineData: { mimeType: 'image/jpeg', data: imageBase64 } });
+        const response = await ai.models.generateContent({
+            model,
+            contents,
+            config: { systemInstruction }
+        });
 
-        const result = await chat.sendMessage({ message: parts });
-        res.json({ role: 'model', parts: [{ text: result.text }] });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.json({ role: 'model', parts: [{ text: response.text }] });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
 });
 
 apiRouter.post('/ai/analyze-mistake', authMiddleware, async (req, res) => {
-    commonAIHandler(req, res, ({ prompt, imageBase64 }, kb) => ({
-        systemInstruction: `Analyze mistake. Return JSON: { "mistake_topic": "Topic Name", "explanation": "Detailed explanation in markdown with formulas like H_2O, x^2" }. ${kb}`,
-        userPrompt: prompt,
-        imageBase64,
+    commonAIHandler(req, res, (body, kb) => ({
+        systemInstruction: `You are a tutor. Use the KB: ${kb}. Return JSON: { "mistake_topic": "string", "explanation": "markdown string" }.`,
+        userPrompt: `Analyze this mistake: ${body.prompt}`,
+        imageBase64: body.imageBase64,
         jsonResponse: true
     }));
 });
 
 apiRouter.post('/ai/solve-doubt', authMiddleware, async (req, res) => {
-    commonAIHandler(req, res, ({ prompt, imageBase64 }, kb) => ({
-        systemInstruction: `Solve doubt using KB. Return markdown. Use H_2O, x^2 style. ${kb}`,
-        userPrompt: prompt,
-        imageBase64,
-        jsonResponse: false
+    commonAIHandler(req, res, (body, kb) => ({
+        systemInstruction: `You are a expert tutor. Use the KB: ${kb}. Solve the doubt clearly with step-by-step explanations. Use LaTeX for math.`,
+        userPrompt: body.prompt,
+        imageBase64: body.imageBase64
     }));
 });
 
-apiRouter.post('/ai/generate-flashcards', authMiddleware, async (req, res) => {
-    commonAIHandler(req, res, ({ topic }, kb) => ({
-        systemInstruction: `Generate 5-10 flashcards for '${topic}'. Return JSON: { "flashcards": [{ "front": "...", "back": "..." }] }. Use internal KB. Format formulas clearly. ${kb}`,
-        userPrompt: "Generate cards.",
-        jsonResponse: true
-    }));
-});
-
-apiRouter.post('/ai/generate-practice-test', authMiddleware, async (req, res) => {
-    commonAIHandler(req, res, ({ topic, numQuestions, difficulty }, kb) => ({
-        systemInstruction: `Generate practice test on '${topic}'. ${numQuestions} Qs, ${difficulty}. Return JSON: { "questions": [{ "number": 1, "text": "...", "options": ["A) ..","B).."], "type": "MCQ" }], "answers": { "1": "A" } }. Use rich text formatting. ${kb}`,
-        userPrompt: "Generate test.",
+apiRouter.post('/ai/parse-text', authMiddleware, async (req, res) => {
+    commonAIHandler(req, res, (body) => ({
+        systemInstruction: `Extract study data into JSON. 
+        Schema: {
+            "schedules": [{ 
+                "title": "string", 
+                "detail": "string", 
+                "type": "ACTION" | "HOMEWORK", 
+                "subject": "PHYSICS"|"CHEMISTRY"|"MATHS", 
+                "day": "MONDAY", 
+                "time": "HH:MM", 
+                "q_ranges": "string", 
+                "gradient": "string (e.g. 'from-red-500 to-orange-500')",
+                "externalLink": "string (url)"
+            }],
+            "exams": [{ "title": "string", "subject": "string", "date": "YYYY-MM-DD", "time": "HH:MM", "syllabus": "string" }],
+            "metrics": [],
+            "flashcard_deck": { "name": "", "subject": "", "cards": [{ "front": "", "back": "" }] },
+            "practice_test": { "questions": [{ "number": 1, "text": "", "options": [], "type": "MCQ" }], "answers": {} },
+            "custom_widget": { "title": "string", "content": "markdown" }
+        }`,
+        userPrompt: `Extract data from: ${body.text}`,
         jsonResponse: true
     }));
 });
 
 apiRouter.post('/ai/correct-json', authMiddleware, async (req, res) => {
-    commonAIHandler(req, res, ({ brokenJson }, kb) => ({
-        systemInstruction: "Fix malformed JSON. Return valid JSON.",
-        userPrompt: brokenJson,
+    commonAIHandler(req, res, (body) => ({
+        systemInstruction: "Fix the malformed JSON string. Return only the valid JSON.",
+        userPrompt: body.brokenJson,
         jsonResponse: true
     }));
 });
 
-// --- WebDAV ---
-apiRouter.get('/music/browse', authMiddleware, async (req, res) => {
-    if (!musicWebdavClient) return res.json([]);
-    try {
-        const contents = await musicWebdavClient.getDirectoryContents(req.query.path || '/');
-        res.json(contents.map(item => ({
-            name: item.basename, type: item.type === 'directory' ? 'folder' : 'file',
-            path: item.filename, size: item.size
-        })));
-    } catch (e) { res.status(500).json({ error: e.message }); }
+apiRouter.post('/ai/analyze-test-results', authMiddleware, async (req, res) => {
+    commonAIHandler(req, res, (body, kb) => ({
+        systemInstruction: `Analyze test results. Return JSON: { "score": number, "totalMarks": number, "subjectTimings": {}, "chapterScores": {}, "aiSuggestions": "markdown", "incorrectQuestionNumbers": [] }. KB: ${kb}`,
+        userPrompt: `Syllabus: ${body.syllabus}. User Answers: ${JSON.stringify(body.userAnswers)}. Timings: ${JSON.stringify(body.timings)}. Image attached is Answer Key.`,
+        imageBase64: body.imageBase64,
+        jsonResponse: true
+    }));
 });
 
-apiRouter.get('/music/content', async (req, res) => {
-    const { token, path } = req.query;
-    if (!token || !path) return res.status(400).send('Bad Request');
-    try { jwt.verify(token, JWT_SECRET); } catch { return res.status(401).send('Unauthorized'); }
-    
-    if (!musicWebdavClient) return res.status(404).send('Not configured');
-    try {
-        const stream = musicWebdavClient.createReadStream(path);
-        // IMPORTANT: Allow CORS for audio visualization
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        stream.pipe(res);
-    } catch (e) { res.status(500).send(); }
+apiRouter.post('/ai/analyze-specific-mistake', authMiddleware, async (req, res) => {
+    commonAIHandler(req, res, (body, kb) => ({
+        systemInstruction: `Analyze specific mistake. Return JSON: { "topic": "string", "explanation": "markdown" }. KB: ${kb}`,
+        userPrompt: `Student Context: ${body.prompt}. Question Image Attached.`,
+        imageBase64: body.imageBase64,
+        jsonResponse: true
+    }));
 });
 
-apiRouter.get('/music/album-art', async (req, res) => {
-    const { token, path } = req.query;
-    if (!token || !path) return res.status(400).send('Bad Request');
-    try { jwt.verify(token, JWT_SECRET); } catch { return res.status(401).send('Unauthorized'); }
-
-    if (!musicWebdavClient) return res.status(404).send('Not configured');
-    try {
-        // Fetch small chunk for metadata
-        const stream = musicWebdavClient.createReadStream(path, { range: { start: 0, end: 3145727 } });
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        stream.pipe(res);
-    } catch (e) { res.status(500).send(); }
+apiRouter.post('/ai/generate-flashcards', authMiddleware, async (req, res) => {
+    commonAIHandler(req, res, (body, kb) => ({
+        systemInstruction: `Generate flashcards. Return JSON: { "flashcards": [{ "front": "string", "back": "string" }] }. KB: ${kb}`,
+        userPrompt: `Topic: ${body.topic}. Syllabus Context: ${body.syllabus}`,
+        jsonResponse: true
+    }));
 });
 
-// --- Study Material (WebDAV) ---
-apiRouter.get('/study-material/browse', authMiddleware, async (req, res) => {
-    if (!webdavClient) return res.status(404).json({ error: "Study material storage not configured." });
-    try {
-        const contents = await webdavClient.getDirectoryContents(req.query.path || '/');
-        res.json(contents.map(item => ({
-            name: item.basename, type: item.type === 'directory' ? 'folder' : 'file',
-            path: item.filename, size: item.size, modified: item.lastmod
-        })));
-    } catch (e) { res.status(500).json({ error: e.message }); }
+apiRouter.post('/ai/generate-answer-key', authMiddleware, async (req, res) => {
+    commonAIHandler(req, res, (body) => ({
+        systemInstruction: `Generate answer key. Return JSON: { "answerKey": { "1": "A", "2": "B" ... } }.`,
+        userPrompt: `Test Name: ${body.prompt}`,
+        jsonResponse: true
+    }));
 });
 
-apiRouter.get('/study-material/content', async (req, res) => {
-    const { path } = req.query;
-    const token = req.headers['authorization']?.split(' ')[1] || req.query.token;
-    
-    if (!token || !path) return res.status(400).send('Bad Request');
-    try { jwt.verify(token, JWT_SECRET); } catch { return res.status(401).send('Unauthorized'); }
-
-    if (!webdavClient) return res.status(404).send('Not configured');
-    try {
-        const stream = webdavClient.createReadStream(path);
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        stream.pipe(res);
-    } catch (e) { res.status(500).send(); }
+apiRouter.post('/ai/generate-practice-test', authMiddleware, async (req, res) => {
+    commonAIHandler(req, res, (body, kb) => ({
+        systemInstruction: `Generate practice test. Return JSON: { "questions": [{ "number": 1, "text": "string", "options": ["A", "B", "C", "D"], "type": "MCQ" }], "answers": { "1": "A" } }. KB: ${kb}`,
+        userPrompt: `Topic: ${body.topic}. Count: ${body.numQuestions}. Difficulty: ${body.difficulty}.`,
+        jsonResponse: true
+    }));
 });
 
-apiRouter.post('/study-material/details', authMiddleware, async (req, res) => {
-    if (!webdavClient) return res.status(404).json({ error: "Not configured" });
-    try {
-        const paths = req.body.paths;
-        const results = [];
-        for(const p of paths) {
-            try {
-                const stat = await webdavClient.stat(p);
-                results.push({
-                    name: stat.basename, type: stat.type === 'directory' ? 'folder' : 'file',
-                    path: stat.filename, size: stat.size, modified: stat.lastmod
-                });
-            } catch(e) {}
-        }
-        res.json(results);
-    } catch (e) { res.status(500).json({ error: e.message }); }
+// --- START SERVER ---
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-    const PORT = process.env.PORT || 3001;
-    app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
-    });
-}
 
 export default app;
