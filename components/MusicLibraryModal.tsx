@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../api/apiService';
 import Icon from './Icon';
@@ -42,17 +43,6 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
         }
     };
     
-    const handleDropUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if(file) {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                setDjDropSettings({...djDropSettings, customDropUrl: ev.target?.result as string});
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
     const handleAddToPlaylist = (e: React.MouseEvent, track: Track) => {
         e.stopPropagation();
         const playlistName = prompt("Enter playlist name to add to (or create new):");
@@ -86,23 +76,16 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
 
     const filteredTracks = tracks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const genres = tracks.reduce((acc, track) => {
-        const g = track.genre || 'Unclassified';
-        if (!acc[g]) acc[g] = [];
-        acc[g].push(track);
-        return acc;
-    }, {} as Record<string, Track[]>);
-
     return (
-        <div className="fixed inset-0 bg-black/95 z-[60] flex items-center justify-center p-0 md:p-4 backdrop-blur-xl" onClick={onClose}>
-            <div className="w-full h-full md:max-w-6xl md:h-[90vh] bg-[#111] md:rounded-2xl shadow-2xl flex flex-col overflow-hidden border md:border-white/10" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black z-[60] flex flex-col md:p-4">
+            <div className="w-full h-full md:max-w-6xl md:mx-auto bg-[#111] md:rounded-2xl shadow-2xl flex flex-col overflow-hidden border-none md:border md:border-white/10">
                 
-                <header className="p-4 md:p-6 bg-[#000] border-b border-white/5 flex flex-col gap-4">
+                <header className="p-4 md:p-6 bg-[#000] border-b border-white/5 flex flex-col gap-4 sticky top-0 z-10">
                     <div className="flex justify-between items-center">
                         <h2 className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 flex items-center gap-3">
                             <Icon name="music" className="text-white" /> LIBRARY
                         </h2>
-                        <button onClick={onClose} className="md:hidden p-2 rounded-full bg-white/10 text-white"><Icon name="arrow-left" className="w-5 h-5"/></button>
+                        <button onClick={onClose} className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20"><Icon name="arrow-left" className="w-6 h-6"/></button>
                     </div>
 
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -111,11 +94,11 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
                             <button onClick={() => setView('playlists')} className={`flex-1 md:flex-initial text-center md:px-4 py-1.5 rounded-md text-sm font-bold transition-colors ${view === 'playlists' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:text-white'}`}>Playlists</button>
                             <button onClick={() => setView('genres')} className={`flex-1 md:flex-initial text-center md:px-4 py-1.5 rounded-md text-sm font-bold transition-colors ${view === 'genres' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:text-white'}`}>Genres</button>
                         </div>
-                        <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search tracks..." className="bg-[#222] border border-white/10 rounded-full px-5 py-2 text-sm text-white w-full md:w-64 focus:border-cyan-500 outline-none transition-colors" />
+                        <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search tracks..." className="bg-[#222] border border-white/10 rounded-full px-5 py-3 text-base text-white w-full md:w-64 focus:border-cyan-500 outline-none transition-colors" />
                     </div>
                 </header>
 
-                <div className="flex-grow overflow-y-auto p-2 md:p-4 custom-scrollbar bg-[#050505]">
+                <div className="flex-grow overflow-y-auto p-2 md:p-4 custom-scrollbar bg-[#050505] pb-24 md:pb-4">
                     {view === 'tracks' && (
                         <div className="space-y-2">
                              {filteredTracks.map(track => {
@@ -141,7 +124,7 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
                                                 </>
                                             )}
                                         </div>
-                                        <div className="flex items-center gap-2 md:gap-4 opacity-0 md:opacity-60 group-hover:opacity-100 transition-opacity">
+                                        <div className="flex items-center gap-2 md:gap-4">
                                             <button onClick={(e) => handleAddToPlaylist(e, track)} className="p-2 text-gray-400 hover:text-yellow-400 bg-[#222] rounded-full hover:bg-[#333] transition-colors" title="Add to Playlist"><Icon name="plus" className="w-4 h-4" /></button>
                                             <button onClick={(e) => handleEditClick(e, track)} className="p-2 text-gray-400 hover:text-white bg-[#222] rounded-full hover:bg-[#333] transition-colors"><Icon name="edit" className="w-4 h-4" /></button>
                                         </div>
@@ -150,7 +133,6 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
                             })}
                         </div>
                     )}
-                    {/* Other views (playlists, genres) would be here */}
                 </div>
             </div>
         </div>

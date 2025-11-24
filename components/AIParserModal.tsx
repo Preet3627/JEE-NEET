@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import Icon from './Icon';
 import { api } from '../api/apiService';
@@ -46,7 +47,8 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
         return true;
     }
 
-    if (result.schedules?.length || result.exams?.length || result.metrics?.length) {
+    // Handle both singular 'schedule' and plural 'schedules'
+    if ((result.schedules && result.schedules.length > 0) || (result.schedule && Array.isArray(result.schedule)) || result.exams?.length || result.metrics?.length) {
         onDataReady(result);
         return true;
     }
@@ -64,7 +66,7 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
 
     const text = inputText.trim();
 
-    // Attempt 1: Parse as valid JSON (works offline)
+    // Attempt 1: Parse as valid JSON directly (works offline and is fastest)
     try {
       const jsonData = JSON.parse(text);
       if (processResult(jsonData)) {
@@ -73,21 +75,23 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
       }
     } catch (e) { /* Not valid JSON, proceed to AI parsing. */ }
 
-    // Attempt 2: If it looks like broken JSON, try to correct it
+    // Attempt 2: If it looks like broken JSON, try to correct it via AI
     if (text.startsWith('{') || text.startsWith('[')) {
       try {
-        const { correctedJson } = await api.correctJson(text);
-        const fixedJson = JSON.parse(correctedJson);
-        if (processResult(fixedJson)) {
-            setIsLoading(false);
-            return;
+        const correctionResult = await api.correctJson(text);
+        if (correctionResult && correctionResult.correctedJson) {
+            const correctedData = JSON.parse(correctionResult.correctedJson);
+            if (processResult(correctedData)) {
+                setIsLoading(false);
+                return;
+            }
         }
       } catch (correctionError) {
         console.warn("AI JSON correction failed, falling back to text parser:", correctionError);
       }
     }
     
-    // Attempt 3: Fallback to parsing as unstructured text
+    // Attempt 3: Fallback to parsing as unstructured text via AI
     try {
       const result = await api.parseText(text, window.location.origin);
       if (!processResult(result)) {
@@ -128,7 +132,10 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
 
         <div className="p-6">
             <div className="flex justify-between items-center mb-4">
-                <p className="text-sm text-gray-400">Paste unstructured text (e.g., "Maths exam on Friday") or raw JSON.</p>
+                <div>
+                    {theme !== 'liquid-glass' && <h2 className="text-2xl font-bold text-white mb-2">AI Data Import</h2>}
+                    <p className="text-sm text-gray-400">Paste unstructured text or raw JSON to import data.</p>
+                </div>
                 <button onClick={onOpenGuide} className="text-xs font-semibold text-cyan-400 hover:underline flex-shrink-0 flex items-center gap-1">
                     <Icon name="book-open" className="w-3 h-3" /> Guide
                 </button>

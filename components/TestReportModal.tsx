@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ResultData, StudentData, FlashcardDeck } from '../types';
 import TestAnalysisReport from './TestAnalysisReport';
@@ -24,7 +25,6 @@ const TestReportModal: React.FC<TestReportModalProps> = ({ result, onClose, stud
   const handleSaveFlashcards = () => {
     if (!result.analysis?.suggestedFlashcards) return;
     
-    // FIX: Added the missing 'isLocked' property to conform to the FlashcardDeck type.
     const newDeck: FlashcardDeck = {
         id: `deck_mistakes_${result.ID}`,
         name: `Mistakes from ${new Date(result.DATE).toLocaleDateString()}`,

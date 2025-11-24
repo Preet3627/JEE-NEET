@@ -1,8 +1,6 @@
 
-
 import React, { useRef, useEffect } from 'react';
 import { useMusicPlayer } from '../../context/MusicPlayerContext';
-import Icon from '../Icon';
 
 const MusicVisualizerWidget: React.FC = () => {
     const { analyser, isPlaying } = useMusicPlayer();
@@ -21,12 +19,12 @@ const MusicVisualizerWidget: React.FC = () => {
         const canvasCtx = canvas.getContext('2d');
         if (!canvasCtx) return;
 
-        analyser.fftSize = 256;
+        // Reduce resolution for performance, but keep visual fidelity ok
+        analyser.fftSize = 256; 
         const bufferLength = analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
 
         const draw = () => {
-            animationFrameId.current = requestAnimationFrame(draw);
             analyser.getByteFrequencyData(dataArray);
 
             canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
@@ -38,15 +36,22 @@ const MusicVisualizerWidget: React.FC = () => {
             for (let i = 0; i < bufferLength; i++) {
                 barHeight = dataArray[i] / 2;
                 
-                const r = barHeight + (25 * (i/bufferLength));
-                const g = 250 * (i/bufferLength);
+                // Simplified color calculation to reduce lag
+                // A simple gradient based on height or index is faster than string interpolation per frame per bar
+                // But for now we stick to rgb but pre-calculate common values if possible.
+                // Here we just do it inline but optimized.
+                
+                const r = barHeight + 50;
+                const g = 250 - i * 2;
                 const b = 50;
                 
-                canvasCtx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                canvasCtx.fillStyle = `rgb(${r},${g},${b})`;
                 canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
 
                 x += barWidth + 1;
             }
+            
+            animationFrameId.current = requestAnimationFrame(draw);
         };
 
         draw();

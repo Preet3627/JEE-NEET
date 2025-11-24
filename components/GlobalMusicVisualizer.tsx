@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect } from 'react';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
 
@@ -14,6 +15,7 @@ const GlobalMusicVisualizer: React.FC = () => {
                 const ctx = canvas.getContext('2d');
                 ctx?.clearRect(0, 0, canvas.width, canvas.height);
             }
+            if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
             return;
         }
 
@@ -25,7 +27,6 @@ const GlobalMusicVisualizer: React.FC = () => {
         const dataArray = new Uint8Array(bufferLength);
 
         const draw = () => {
-            animationFrameId.current = requestAnimationFrame(draw);
             analyser.getByteFrequencyData(dataArray);
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -37,12 +38,13 @@ const GlobalMusicVisualizer: React.FC = () => {
                 const barWidth = (canvas.width / barsToDraw);
                 let x = 0;
 
+                ctx.beginPath();
                 for (let i = 0; i < barsToDraw; i++) {
                     const value = dataArray[i];
-                    // FIX: Increased divider from 250 to 255 and added power to make response more dynamic/less topped out
                     const percent = Math.min(1, Math.pow(value / 255, 1.5)); 
                     const barHeight = Math.max(2, percent * canvas.height * 0.9);
-                    
+                    const y = (canvas.height - barHeight) / 2;
+
                     let fillStyle = '#fff';
                     if (visualizerSettings.colorMode === 'rgb') {
                         const hue = (hueOffsetRef.current + (i * 5)) % 360;
@@ -52,18 +54,14 @@ const GlobalMusicVisualizer: React.FC = () => {
                     } else {
                          fillStyle = `rgba(255, 255, 255, ${0.3 + percent})`;
                     }
-
-                    ctx.fillStyle = fillStyle;
-                    const y = (canvas.height - barHeight) / 2;
                     
-                    if (typeof ctx.roundRect === 'function') {
-                        ctx.roundRect(x, y, barWidth - 1, barHeight, 2);
-                    } else {
-                        ctx.rect(x, y, barWidth - 1, barHeight);
-                    }
-                    ctx.fill();
+                    ctx.fillStyle = fillStyle;
+                    // Optimize: use rect instead of roundRect for better performance on some devices
+                    ctx.fillRect(x, y, barWidth - 1, barHeight);
+                    
                     x += barWidth;
                 }
+                ctx.fill();
             } else if (visualizerSettings.preset === 'wave') {
                  ctx.lineWidth = 2;
                  ctx.strokeStyle = visualizerSettings.colorMode === 'rgb' ? `hsl(${hueOffsetRef.current}, 100%, 50%)` : '#06b6d4';
@@ -80,6 +78,8 @@ const GlobalMusicVisualizer: React.FC = () => {
                  ctx.lineTo(canvas.width, canvas.height / 2);
                  ctx.stroke();
             }
+            
+            animationFrameId.current = requestAnimationFrame(draw);
         };
 
         draw();
@@ -91,7 +91,7 @@ const GlobalMusicVisualizer: React.FC = () => {
         };
     }, [analyser, isPlaying, visualizerSettings]);
 
-    if (!isPlaying) return null;
+    if (!isPlaying || notchSettings.enabled === false) return null;
 
     const positionStyles: React.CSSProperties = {
         position: 'fixed',

@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState } from 'react';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
 import Icon from './Icon';
@@ -21,8 +20,15 @@ const FullScreenMusicPlayer: React.FC = () => {
     } = useMusicPlayer();
     
     const [bgGradient, setBgGradient] = useState('from-gray-900 to-black');
+    const [localTime, setLocalTime] = useState(currentTime);
+    const [isDragging, setIsDragging] = useState(false);
 
-    // Simple effect to change gradient based on track title hash
+    useEffect(() => {
+        if(!isDragging) {
+            setLocalTime(currentTime);
+        }
+    }, [currentTime, isDragging]);
+
     useEffect(() => {
         if(!currentTrack) return;
         const colors = [
@@ -33,7 +39,6 @@ const FullScreenMusicPlayer: React.FC = () => {
             'from-indigo-950 to-black',
             'from-purple-950 to-black',
         ];
-        // Deterministic random color based on title length
         const colorIndex = currentTrack.title.length % colors.length;
         setBgGradient(colors[colorIndex]);
     }, [currentTrack]);
@@ -44,6 +49,15 @@ const FullScreenMusicPlayer: React.FC = () => {
         return isNaN(m) ? '0:00' : `${m}:${s}`;
     };
 
+    const handleSeekStart = () => setIsDragging(true);
+    const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setLocalTime(parseFloat(e.target.value));
+    };
+    const handleSeekEnd = () => {
+        seek(localTime);
+        setIsDragging(false);
+    };
+
     if (!currentTrack) return null;
 
     return (
@@ -51,8 +65,8 @@ const FullScreenMusicPlayer: React.FC = () => {
             
             {/* Close Button */}
             <div className="absolute top-6 left-6 z-20">
-                <button onClick={toggleFullScreenPlayer} className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-all hover:rotate-90">
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                <button onClick={toggleFullScreenPlayer} className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-all">
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                 </button>
             </div>
 
@@ -61,7 +75,7 @@ const FullScreenMusicPlayer: React.FC = () => {
                 <div className="absolute inset-0 opacity-30 pointer-events-none bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.1),transparent_60%)]"></div>
 
                 {/* Moving Art Animation */}
-                <div className={`relative w-72 h-72 md:w-96 md:h-96 rounded-2xl shadow-2xl transition-transform duration-[800ms] cubic-bezier(0.34, 1.56, 0.64, 1) ${isPlaying ? 'scale-100' : 'scale-90 opacity-80'}`}>
+                <div className={`relative w-64 h-64 md:w-96 md:h-96 rounded-2xl shadow-2xl transition-transform duration-[800ms] cubic-bezier(0.34, 1.56, 0.64, 1) ${isPlaying ? 'scale-100' : 'scale-90 opacity-80'}`}>
                     <img 
                         src={currentTrack.coverArtUrl || 'https://via.placeholder.com/400'} 
                         alt="Album Art" 
@@ -84,12 +98,16 @@ const FullScreenMusicPlayer: React.FC = () => {
                             type="range"
                             min="0"
                             max={duration || 0}
-                            value={currentTime}
-                            onChange={(e) => seek(parseFloat(e.target.value))}
+                            value={localTime}
+                            onMouseDown={handleSeekStart}
+                            onTouchStart={handleSeekStart}
+                            onChange={handleSeekChange}
+                            onMouseUp={handleSeekEnd}
+                            onTouchEnd={handleSeekEnd}
                             className="w-full h-1.5 bg-white/20 rounded-full appearance-none cursor-pointer accent-white hover:h-2 transition-all"
                         />
                         <div className="flex justify-between text-xs font-bold text-gray-400 font-mono tracking-widest">
-                            <span>{formatTime(currentTime)}</span>
+                            <span>{formatTime(localTime)}</span>
                             <span>{formatTime(duration)}</span>
                         </div>
                     </div>

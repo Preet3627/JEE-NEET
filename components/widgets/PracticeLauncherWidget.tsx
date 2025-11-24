@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
 import Icon from '../Icon';
@@ -11,27 +12,27 @@ const PracticeLauncherWidget: React.FC<PracticeLauncherWidgetProps> = ({ onLaunc
   const mistakesCount = currentUser?.RESULTS.reduce((acc, r) => acc + (r.MISTAKES?.length || 0) - (r.FIXED_MISTAKES?.length || 0), 0) || 0;
 
   return (
-    <div className="bg-gradient-to-br from-purple-900/50 to-indigo-900/50 border border-[var(--glass-border)] rounded-xl shadow-lg p-6 backdrop-blur-sm h-full flex flex-col justify-between relative overflow-hidden group">
+    <div className="bg-gradient-to-br from-purple-900/50 to-indigo-900/50 border border-[var(--glass-border)] rounded-xl shadow-lg p-6 backdrop-blur-sm h-full min-h-[10rem] flex flex-col justify-between relative overflow-hidden group">
         <div className="absolute inset-0 bg-[url('https://media.istockphoto.com/id/1323933351/vector/hexagon-abstract-background-with-blue-and-purple-gradient-color-for-hi-tech-technology.jpg?s=612x612&w=0&k=20&c=K1aH1n1-Pj-S2o2aVyaW6vD0lVq-O9j7z2hfls2l-8I=')] bg-cover opacity-10 group-hover:opacity-20 transition-opacity duration-500"></div>
 
         <div className="relative z-10">
-            <h2 className="text-2xl font-bold text-white tracking-wider flex items-center gap-3">
-                <Icon name="stopwatch" className="w-6 h-6 text-purple-400" />
-                Practice Center
+            <h2 className="text-xl font-bold text-white tracking-wider flex items-center gap-2">
+                <Icon name="stopwatch" className="w-5 h-5 text-purple-400" />
+                Practice
             </h2>
-            <p className="text-sm text-gray-400 mt-2">Generate a custom quiz or start a full mock test.</p>
+            <p className="text-xs text-gray-400 mt-1">Quick start a custom quiz.</p>
         </div>
         
-        <div className="relative z-10 mt-4 flex flex-col sm:flex-row gap-4">
+        <div className="relative z-10 mt-4 flex flex-col gap-2">
              {mistakesCount > 0 && (
-                <button onClick={onLaunch} className="flex-1 flex flex-col items-center justify-center p-4 bg-red-900/40 border border-red-500/30 rounded-lg text-center hover:bg-red-900/60 transition-colors">
-                    <p className="font-black text-4xl text-white drop-shadow-lg">{mistakesCount}</p>
-                    <p className="text-xs font-bold text-red-300 uppercase tracking-wider">Mistakes to Fix</p>
+                <button onClick={onLaunch} className="flex-1 flex items-center justify-between p-2 bg-red-900/40 border border-red-500/30 rounded-lg hover:bg-red-900/60 transition-colors">
+                    <span className="text-xs font-bold text-red-300 uppercase">Fix Mistakes</span>
+                    <span className="font-black text-lg text-white">{mistakesCount}</span>
                 </button>
              )}
-            <button onClick={onLaunch} className="flex-1 p-4 bg-purple-600/50 border border-purple-500/30 rounded-lg text-center hover:bg-purple-600/70 transition-colors flex items-center justify-center gap-3">
-                <Icon name="play" className="w-8 h-8 text-white"/>
-                <span className="text-xl font-bold text-white">Launch</span>
+            <button onClick={onLaunch} className="flex-1 p-3 bg-purple-600/80 border border-purple-500/30 rounded-lg text-center hover:bg-purple-600 transition-colors flex items-center justify-center gap-2 shadow-lg">
+                <Icon name="play" className="w-5 h-5 text-white"/>
+                <span className="text-sm font-bold text-white">Start Session</span>
             </button>
         </div>
     </div>

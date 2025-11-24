@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useContext, ReactNode, useRef, useCallback, useEffect } from 'react';
 import { api } from '../api/apiService';
 import { Track, NotchSettings, VisualizerSettings, DjDropSettings, LocalPlaylist } from '../types';
@@ -54,7 +55,7 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const [currentTime, setCurrentTime] = useState(0);
     const [isAutoMixEnabled, setIsAutoMixEnabled] = useState(true);
 
-    const [notchSettings, setNotchSettings] = useState<NotchSettings>({ position: 'top', size: 'medium', width: 30 });
+    const [notchSettings, setNotchSettings] = useState<NotchSettings>({ position: 'top', size: 'medium', width: 30, enabled: true });
     const [visualizerSettings, setVisualizerSettings] = useState<VisualizerSettings>({ preset: 'bars', colorMode: 'rgb' });
     const [djDropSettings, setDjDropSettings] = useState<DjDropSettings>({ enabled: true, autoTrigger: true });
     
@@ -63,8 +64,8 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const audioElementRef = useRef<HTMLAudioElement | null>(null);
     const djDropAudioRef = useRef<HTMLAudioElement | null>(null);
     const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
-    const isFirstPlayRef = useRef(true);
     const currentObjectUrlRef = useRef<string | null>(null);
+    const currentTrackIdRef = useRef<string | null>(null);
 
     // Load settings from config on mount/update
     useEffect(() => {
@@ -146,6 +147,19 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
         }
     };
 
+    const updateMediaMetadata = (track: Track) => {
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: track.title,
+                artist: track.artist,
+                album: track.album,
+                artwork: [
+                    { src: track.coverArtUrl || DEFAULT_ART, sizes: '512x512', type: 'image/png' }
+                ]
+            });
+        }
+    };
+
     const fetchAlbumArt = async (track: Track): Promise<string> => {
         try {
              const response = await fetch(`/api/music/album-art?path=${encodeURIComponent(track.path || '')}&token=${localStorage.getItem('token')}`);
@@ -178,7 +192,6 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
         }
 
         if (audioElementRef.current) {
-            isFirstPlayRef.current = false;
             setTracklist(newTracklist);
 
             let coverArtUrl = DEFAULT_ART;
@@ -200,12 +213,17 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
                  streamUrl = api.getMusicContentUrl(track.id);
                  // Async fetch art, update state later if needed, but start playing immediately
                  fetchAlbumArt(track).then(url => {
-                     if(currentTrack?.id === track.id) setCurrentTrack(prev => prev ? {...prev, coverArtUrl: url} : null);
+                     if (currentTrackIdRef.current === track.id) {
+                         const updatedTrack = { ...track, coverArtUrl: url };
+                         setCurrentTrack(updatedTrack);
+                         updateMediaMetadata(updatedTrack);
+                     }
                  });
             }
 
             const trackWithArt = { ...track, coverArtUrl };
             setCurrentTrack(trackWithArt);
+            currentTrackIdRef.current = track.id;
             
             audioElementRef.current.src = streamUrl;
             audioElementRef.current.crossOrigin = "anonymous";
@@ -229,37 +247,43 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
                 } else if (gainNode && audioContext) {
                     gainNode.gain.setValueAtTime(1, audioContext.currentTime);
                 }
+                updateMediaMetadata(trackWithArt);
             }).catch(e => console.error("Playback error:", e));
         }
-    }, [audioContext, analyser, gainNode, initializeAudioContext, isAutoMixEnabled, isPlaying, djDropSettings, currentTrack]);
+    }, [audioContext, analyser, gainNode, initializeAudioContext, isAutoMixEnabled, isPlaying, djDropSettings]);
     
     const updateTrackMetadata = (id: string, newTitle: string, newArtist: string) => {
         setTracklist(prev => prev.map(t => t.id === id ? { ...t, title: newTitle, artist: newArtist } : t));
-        if (currentTrack?.id === id) setCurrentTrack({ ...currentTrack, title: newTitle, artist: newArtist });
+        if (currentTrack?.id === id) {
+            const updated = { ...currentTrack, title: newTitle, artist: newArtist };
+            setCurrentTrack(updated);
+            updateMediaMetadata(updated);
+        }
     };
 
-    const play = () => { 
+    const play = useCallback(() => { 
         initializeAudioContext();
         audioElementRef.current?.play(); 
         setIsPlaying(true); 
-    };
+        if(currentTrack) updateMediaMetadata(currentTrack);
+    }, [currentTrack, initializeAudioContext]);
     
-    const pause = () => { 
+    const pause = useCallback(() => { 
         audioElementRef.current?.pause(); 
         setIsPlaying(false); 
-    };
+    }, []);
     
-    const seek = (time: number) => { if(audioElementRef.current) audioElementRef.current.currentTime = time; };
+    const seek = useCallback((time: number) => { if(audioElementRef.current) audioElementRef.current.currentTime = time; }, []);
     const toggleFullScreenPlayer = () => setIsFullScreenPlayerOpen(prev => !prev);
     const toggleAutoMix = () => setIsAutoMixEnabled(prev => !prev);
 
-    const navigateTrack = (direction: 'next' | 'prev') => {
+    const navigateTrack = useCallback((direction: 'next' | 'prev') => {
         if (!currentTrack || tracklist.length === 0) return;
         const currentIndex = tracklist.findIndex(t => t.id === currentTrack.id);
         if (currentIndex === -1) return;
         let newIndex = direction === 'next' ? (currentIndex + 1) % tracklist.length : (currentIndex - 1 + tracklist.length) % tracklist.length;
         playTrack(tracklist[newIndex], tracklist);
-    };
+    }, [currentTrack, tracklist, playTrack]);
     
     useEffect(() => {
         if (!audioElementRef.current) {
@@ -275,7 +299,20 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
             drop.crossOrigin = "anonymous";
             djDropAudioRef.current = drop;
         }
-    }, [tracklist, currentTrack]);
+    }, [navigateTrack]);
+
+    // Setup Media Session Handlers separately
+    useEffect(() => {
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.setActionHandler('play', () => play());
+            navigator.mediaSession.setActionHandler('pause', () => pause());
+            navigator.mediaSession.setActionHandler('previoustrack', () => navigateTrack('prev'));
+            navigator.mediaSession.setActionHandler('nexttrack', () => navigateTrack('next'));
+            navigator.mediaSession.setActionHandler('seekto', (details) => {
+                if (details.seekTime) seek(details.seekTime);
+            });
+        }
+    }, [play, pause, navigateTrack, seek]);
 
     const value = { 
         audioElement: audioElementRef.current, analyser, isPlaying, currentTrack, isFullScreenPlayerOpen, 
