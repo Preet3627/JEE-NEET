@@ -364,7 +364,6 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
           )}
         </div>
       </div>
-      </div>
       {isAiKeyModalOpen && (
           <AIGenerateAnswerKeyModal
               onClose={() => setIsAiKeyModalOpen(false)}
@@ -388,3 +387,5 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
     </>
   );
 };
+
+export default CustomPracticeModal;

@@ -690,7 +690,7 @@ apiRouter.post('/ai/analyze-mistake', authMiddleware, (req, res) => simpleAiTask
 apiRouter.post('/ai/solve-doubt', authMiddleware, (req, res) => simpleAiTask(req, res, "\n\nSolve this doubt with step-by-step markdown explanation."));
 apiRouter.post('/ai/correct-json', authMiddleware, (req, res) => {
     const { brokenJson } = req.body;
-    simpleAiTask({ body: { prompt: `Fix this broken JSON and return ONLY the valid JSON string: ${brokenJson}` } } as any, res, "");
+    simpleAiTask({ body: { prompt: `Fix this broken JSON and return ONLY the valid JSON string: ${brokenJson}` } }, res, "");
 });
 
 // Start Server
