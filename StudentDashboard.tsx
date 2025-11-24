@@ -253,7 +253,17 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     const onUpdateResult = async (result: ResultData) => { await api.updateResult(result); };
     const onDeleteResult = async (resultId: string) => { await api.deleteResult(resultId); };
     const handleDeleteDeck = (deckId: string) => { /* ... */ };
-    const handleSaveCard = (deckId: string, card: Flashcard) => { /* ... */ };
+    const handleSaveCard = (deckId: string, card: Flashcard) => { 
+        // For quick add via widget, deckId might be auto-selected or user needs to choose
+        // This logic handles saving to a specific deck
+        const decks = student.CONFIG.flashcardDecks || [];
+        const targetDeckIndex = decks.findIndex(d => d.id === deckId);
+        if (targetDeckIndex >= 0) {
+            const newDecks = [...decks];
+            newDecks[targetDeckIndex] = { ...newDecks[targetDeckIndex], cards: [...newDecks[targetDeckIndex].cards, card] };
+            onUpdateConfig({ flashcardDecks: newDecks });
+        }
+    };
     const handleDeleteCard = (deckId: string, cardId: string) => { /* ... */ };
     const handleStartReviewSession = (deckId: string) => { const deck = student.CONFIG.flashcardDecks?.find(d => d.id === deckId); if (deck) setReviewingDeck(deck); };
     const handleSearchAction = (action: string, data?: any) => {
@@ -306,7 +316,22 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             'practice': <PracticeLauncherWidget onLaunch={() => setIsPracticeModalOpen(true)} />,
             'subjectAllocation': <SubjectAllocationWidget items={student.SCHEDULE_ITEMS} />,
             'scoreTrend': <ScoreTrendWidget results={student.RESULTS} />,
-            'flashcards': <InteractiveFlashcardWidget student={student} onUpdateConfig={onUpdateConfig} />,
+            'flashcards': <InteractiveFlashcardWidget 
+                student={student} 
+                onUpdateConfig={onUpdateConfig} 
+                onReviewDeck={handleStartReviewSession}
+                onAddCard={() => {
+                    // Open card modal with first available deck
+                    const deck = (student.CONFIG.flashcardDecks && student.CONFIG.flashcardDecks.length > 0) ? student.CONFIG.flashcardDecks[0] : null;
+                    if(deck) {
+                        setViewingDeck(deck);
+                        setEditingCard(null);
+                        setIsCreateCardModalOpen(true);
+                    } else {
+                        alert("Please create a deck first.");
+                    }
+                }}
+            />,
             'readingHours': <ReadingHoursWidget student={student} />,
             'todaysAgenda': <TodaysAgendaWidget items={student.SCHEDULE_ITEMS} onStar={handleStarTask} />,
             'upcomingExams': <UpcomingExamsWidget exams={student.EXAMS} />,

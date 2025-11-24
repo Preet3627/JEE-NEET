@@ -1,3 +1,4 @@
+
 export const knowledgeBase = {
     PHYSICS: `
       **Newton's Laws of Motion:**
@@ -15,10 +16,12 @@ export const knowledgeBase = {
       - Torque (τ) = r * F * sin(θ)
       - Moment of Inertia (I) for a solid sphere is 2/5 * MR^2.
       - Angular momentum (L) = I * ω
+      - Parallel Axis Theorem: I = I_cm + Md^2
 
       **Optics:**
       - Snell's Law: n_1 * sin(θ_1) = n_2 * sin(θ_2)
       - Lens Maker's Formula: 1/f = (n-1) * (1/R_1 - 1/R_2)
+      - Mirror Formula: 1/f = 1/v + 1/u
     `,
     CHEMISTRY: `
       **Mole Concept:**
@@ -29,6 +32,7 @@ export const knowledgeBase = {
       - **Ionic Bonds:** Formed by the transfer of electrons between a metal and a non-metal. Example: NaCl.
       - **Covalent Bonds:** Formed by the sharing of electrons. Example: Methane (CH_4).
       - **Hybridization:** The concept of mixing atomic orbitals to form new hybrid orbitals. sp^3 hybridization in methane results in a tetrahedral geometry.
+      - **VSEPR Theory:** Predicts geometry based on electron pair repulsion.
 
       **Thermodynamics:**
       - First Law: ΔU = q + w (Change in internal energy = heat + work).
@@ -38,22 +42,40 @@ export const knowledgeBase = {
       **Organic Chemistry:**
       - **Nomenclature:** IUPAC rules for naming organic compounds. E.g., CH_3CH_2OH is Ethanol.
       - **Isomerism:** Compounds with the same molecular formula (e.g., C_4H_{10}) but different structures (butane and isobutane).
+      - **Reaction Mechanisms:** SN1 (unimolecular, carbocation intermediate) vs SN2 (bimolecular, concerted, inversion of configuration).
     `,
     MATHS: `
       **Calculus:**
-      - **Differentiation:** The derivative of x^n is n*x^{n-1}. The derivative of sin(x) is cos(x).
-      - **Integration:** The integral of x^n dx is (x^{n+1})/(n+1) + C.
-      - **Fundamental Theorem of Calculus:** Connects differentiation and integration.
+      - **Differentiation:** 
+        - d/dx(x^n) = n*x^{n-1}
+        - d/dx(sin x) = cos x, d/dx(cos x) = -sin x
+        - Chain Rule: d/dx[f(g(x))] = f'(g(x)) * g'(x)
+      - **Integration:** 
+        - ∫x^n dx = (x^{n+1})/(n+1) + C (n ≠ -1)
+        - ∫(1/x) dx = ln|x| + C
+        - Integration by Parts: ∫u dv = uv - ∫v du
+      - **Definite Integrals:** Area under curve from a to b.
 
       **Trigonometry:**
-      - **Pythagorean Identity:** sin^2(x) + cos^2(x) = 1.
-      - **Sum and Difference Formulas:** sin(A+B) = sin(A)cos(B) + cos(A)sin(B).
-      - The general solution for sin(x) = 0 is x = nπ.
+      - **Identities:** sin^2(x) + cos^2(x) = 1, 1 + tan^2(x) = sec^2(x)
+      - **Double Angle:** sin(2A) = 2sinAcosA, cos(2A) = cos^2A - sin^2A
+      - **Sum/Diff:** sin(A+B) = sinAcosB + cosAsinB
+      - **General Solutions:** If sin x = sin α, then x = nπ + (-1)^n α.
 
       **Algebra:**
-      - **Quadratic Formula:** For ax^2 + bx + c = 0, the solutions are x = [-b ± sqrt(b^2 - 4ac)] / (2a).
-      - **Logarithms:** The rule for changing base is log_b(a) = log_c(a) / log_c(b). The natural logarithm, log_e(x), is often written as ln(x).
-      - **Binomial Theorem:** (x+y)^n = Σ [nCr * x^{n-r} * y^r] for r from 0 to n.
+      - **Quadratic Formula:** For ax^2 + bx + c = 0, x = [-b ± sqrt(b^2 - 4ac)] / (2a).
+      - **Sequence & Series:** AP sum S_n = n/2 [2a + (n-1)d]; GP sum S_n = a(r^n - 1)/(r-1).
+      - **Binomial Theorem:** (x+y)^n = Σ [nCr * x^{n-r} * y^r]
+      - **Complex Numbers:** z = a + ib, modulus |z| = sqrt(a^2 + b^2). Euler's form: e^{iθ} = cos θ + i sin θ.
+
+      **Coordinate Geometry:**
+      - **Straight Line:** y = mx + c (slope-intercept), ax + by + c = 0.
+      - **Circle:** (x-h)^2 + (y-k)^2 = r^2.
+      - **Conic Sections:** Parabola (y^2 = 4ax), Ellipse (x^2/a^2 + y^2/b^2 = 1), Hyperbola (x^2/a^2 - y^2/b^2 = 1).
+      
+      **Vectors & 3D:**
+      - **Dot Product:** A · B = |A||B|cosθ.
+      - **Cross Product:** A × B = |A||B|sinθ n_cap.
     `,
     BIOLOGY: `
       **Cell Biology:**

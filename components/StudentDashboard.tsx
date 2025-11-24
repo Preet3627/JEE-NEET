@@ -365,6 +365,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             'flashcards': <InteractiveFlashcardWidget 
                 student={student} 
                 onUpdateConfig={onUpdateConfig} 
+                onReviewDeck={handleStartReviewSession}
                 onAddCard={() => {
                     // Open card modal with first available deck
                     const deck = (student.CONFIG.flashcardDecks && student.CONFIG.flashcardDecks.length > 0) ? student.CONFIG.flashcardDecks[0] : null;
