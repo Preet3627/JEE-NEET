@@ -16,18 +16,20 @@ const MusicVisualizerWidget: React.FC = () => {
             return;
         }
 
-        const canvasCtx = canvas.getContext('2d');
+        const canvasCtx = canvas.getContext('2d', { alpha: false }); // Optimized context
         if (!canvasCtx) return;
 
-        // Reduce resolution for performance, but keep visual fidelity ok
-        analyser.fftSize = 256; 
+        analyser.fftSize = 128; // Lower resolution for performance
         const bufferLength = analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
 
         const draw = () => {
+            if (!isPlaying) return; // Stop drawing if paused
+
             analyser.getByteFrequencyData(dataArray);
 
-            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+            canvasCtx.fillStyle = '#000000'; // Clear with solid color instead of clearRect for alpha false optimization
+            canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
             
             const barWidth = (canvas.width / bufferLength) * 2.5;
             let barHeight;
@@ -36,13 +38,10 @@ const MusicVisualizerWidget: React.FC = () => {
             for (let i = 0; i < bufferLength; i++) {
                 barHeight = dataArray[i] / 2;
                 
-                // Simplified color calculation to reduce lag
-                // A simple gradient based on height or index is faster than string interpolation per frame per bar
-                // But for now we stick to rgb but pre-calculate common values if possible.
-                // Here we just do it inline but optimized.
-                
+                // Optimized static colors for performance
+                // Use simpler gradient or solid color based on index
                 const r = barHeight + 50;
-                const g = 250 - i * 2;
+                const g = 250 - i * 4;
                 const b = 50;
                 
                 canvasCtx.fillStyle = `rgb(${r},${g},${b})`;
@@ -67,7 +66,7 @@ const MusicVisualizerWidget: React.FC = () => {
         return null;
     }
     
-    return <canvas ref={canvasRef} width="300" height="40" className="w-full h-10" />;
+    return <canvas ref={canvasRef} width="300" height="40" className="w-full h-10 rounded-lg" />;
 };
 
 export default MusicVisualizerWidget;

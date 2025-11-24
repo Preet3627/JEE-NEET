@@ -12,7 +12,7 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
     const [tracks, setTracks] = useState<Track[]>([]);
     const [view, setView] = useState<'tracks' | 'playlists' | 'genres'>('tracks');
     const [searchQuery, setSearchQuery] = useState('');
-    const { playTrack, currentTrack, isPlaying, pause, updateTrackMetadata, djDropSettings, setDjDropSettings, playDjDrop, playlists, createPlaylist, addToPlaylist } = useMusicPlayer();
+    const { playTrack, currentTrack, isPlaying, pause, updateTrackMetadata, djDropSettings, setDjDropSettings, playDjDrop, playlists, createPlaylist, addToPlaylist, addToQueue, playNextInQueue } = useMusicPlayer();
     const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState({ title: '', artist: '' });
     const dropInputRef = useRef<HTMLInputElement>(null);
@@ -61,6 +61,16 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
         }
     };
 
+    const handlePlayNext = (e: React.MouseEvent, track: Track) => {
+        e.stopPropagation();
+        playNextInQueue(track);
+    };
+
+    const handleAddToQueue = (e: React.MouseEvent, track: Track) => {
+        e.stopPropagation();
+        addToQueue(track);
+    };
+
     const getGradient = (id: string) => {
         const colors = [
             'from-[#ff0055] to-[#ff00aa]', 
@@ -77,7 +87,7 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
     const filteredTracks = tracks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
     return (
-        <div className="fixed inset-0 bg-black z-[60] flex flex-col md:p-4">
+        <div className="fixed inset-0 bg-black z-[60] flex flex-col pt-safe-top pb-safe-bottom">
             <div className="w-full h-full md:max-w-6xl md:mx-auto bg-[#111] md:rounded-2xl shadow-2xl flex flex-col overflow-hidden border-none md:border md:border-white/10">
                 
                 <header className="p-4 md:p-6 bg-[#000] border-b border-white/5 flex flex-col gap-4 sticky top-0 z-10">
@@ -124,7 +134,9 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
                                                 </>
                                             )}
                                         </div>
-                                        <div className="flex items-center gap-2 md:gap-4">
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={(e) => handlePlayNext(e, track)} className="p-2 text-gray-400 hover:text-green-400 bg-[#222] rounded-full hover:bg-[#333] transition-colors" title="Play Next"><Icon name="forward" className="w-4 h-4" /></button>
+                                            <button onClick={(e) => handleAddToQueue(e, track)} className="p-2 text-gray-400 hover:text-cyan-400 bg-[#222] rounded-full hover:bg-[#333] transition-colors" title="Add to Queue"><Icon name="schedule" className="w-4 h-4" /></button>
                                             <button onClick={(e) => handleAddToPlaylist(e, track)} className="p-2 text-gray-400 hover:text-yellow-400 bg-[#222] rounded-full hover:bg-[#333] transition-colors" title="Add to Playlist"><Icon name="plus" className="w-4 h-4" /></button>
                                             <button onClick={(e) => handleEditClick(e, track)} className="p-2 text-gray-400 hover:text-white bg-[#222] rounded-full hover:bg-[#333] transition-colors"><Icon name="edit" className="w-4 h-4" /></button>
                                         </div>

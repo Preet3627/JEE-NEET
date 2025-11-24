@@ -6,7 +6,7 @@ import Icon from './Icon';
 const FullScreenMusicPlayer: React.FC = () => {
     const { 
         currentTrack, isPlaying, play, pause, nextTrack, prevTrack, toggleFullScreenPlayer,
-        seek, duration, currentTime, isAutoMixEnabled, toggleAutoMix, queue, removeFromQueue
+        seek, duration, currentTime, isAutoMixEnabled, toggleAutoMix, queue, removeFromQueue, toggleLibrary
     } = useMusicPlayer();
     
     const [bgGradient, setBgGradient] = useState('from-gray-900 to-black');
@@ -47,6 +47,9 @@ const FullScreenMusicPlayer: React.FC = () => {
             <div className="absolute top-6 left-6 z-20 flex gap-4">
                 <button onClick={toggleFullScreenPlayer} className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-all">
                     <Icon name="arrow-left" className="w-6 h-6" />
+                </button>
+                <button onClick={toggleLibrary} className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-all" title="Music Library">
+                    <Icon name="music" className="w-6 h-6" />
                 </button>
             </div>
             

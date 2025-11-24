@@ -56,6 +56,7 @@ import ClockWidget from './widgets/ClockWidget';
 import CustomWidget from './widgets/CustomWidget';
 import PracticeLauncherWidget from './widgets/PracticeLauncherWidget';
 import UniversalSearch from './UniversalSearch';
+import { useMusicPlayer } from '../context/MusicPlayerContext';
 
 interface StudentDashboardProps {
     student: StudentData;
@@ -86,6 +87,7 @@ interface StudentDashboardProps {
 const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     const { student, onSaveTask, onSaveBatchTasks, onDeleteTask, onToggleMistakeFixed, onUpdateConfig, onLogStudySession, onUpdateWeaknesses, onLogResult, onAddExam, onUpdateExam, onDeleteExam, onExportToIcs, onBatchImport, googleAuthStatus, onGoogleSignIn, onGoogleSignOut, onBackupToDrive, onRestoreFromDrive, allDoubts, onPostDoubt, onPostSolution, deepLinkAction } = props;
     const { refreshUser } = useAuth();
+    const { isLibraryOpen, toggleLibrary } = useMusicPlayer();
     const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
     const [scheduleView, setScheduleView] = useState<'upcoming' | 'past'>('upcoming');
     
@@ -145,7 +147,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
 
     // Study Material State
     const [viewingFile, setViewingFile] = useState<StudyMaterialItem | null>(null);
-    const [isMusicLibraryOpen, setIsMusicLibraryOpen] = useState(false);
     
     // Dashboard Layout State
     const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidgetItem[]>([]);
@@ -318,7 +319,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             'countdown': <CountdownWidget items={student.SCHEDULE_ITEMS} />,
             'dailyInsight': <DailyInsightWidget weaknesses={student.CONFIG.WEAK} exams={student.EXAMS} />,
             'quote': <MotivationalQuoteWidget quote="The expert in anything was once a beginner." />,
-            'music': <MusicPlayerWidget onOpenLibrary={() => setIsMusicLibraryOpen(true)} />,
+            'music': <MusicPlayerWidget onOpenLibrary={toggleLibrary} />,
             'practice': <PracticeLauncherWidget onLaunch={() => setIsPracticeModalOpen(true)} />,
             'subjectAllocation': <SubjectAllocationWidget items={student.SCHEDULE_ITEMS} />,
             'scoreTrend': <ScoreTrendWidget results={student.RESULTS} />,
@@ -573,7 +574,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             {isAiChatOpen && <AIChatPopup history={aiChatHistory} onSendMessage={handleAiChatMessage} onClose={() => setIsAiChatOpen(false)} isLoading={isAiChatLoading} />}
             {viewingReport && <TestReportModal result={viewingReport} onClose={() => setViewingReport(null)} onUpdateWeaknesses={onUpdateWeaknesses} student={student} onSaveDeck={handleSaveDeck} />}
             {isMoveModalOpen && <MoveTasksModal onClose={() => setIsMoveModalOpen(false)} onConfirm={handleMoveSelected} selectedCount={selectedTaskIds.length} />}
-            {isMusicLibraryOpen && <MusicLibraryModal onClose={() => setIsMusicLibraryOpen(false)} />}
+            {isMusicLibraryOpen && <MusicLibraryModal onClose={() => toggleLibrary()} />}
             {deepLinkData && (
                 <DeepLinkConfirmationModal
                     data={deepLinkData}

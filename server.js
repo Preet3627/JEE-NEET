@@ -877,6 +877,51 @@ apiRouter.get('/music/album-art', async (req, res) => {
     } catch (e) { res.status(500).send(); }
 });
 
+// --- Study Material (WebDAV) ---
+apiRouter.get('/study-material/browse', authMiddleware, async (req, res) => {
+    if (!webdavClient) return res.status(404).json({ error: "Study material storage not configured." });
+    try {
+        const contents = await webdavClient.getDirectoryContents(req.query.path || '/');
+        res.json(contents.map(item => ({
+            name: item.basename, type: item.type === 'directory' ? 'folder' : 'file',
+            path: item.filename, size: item.size, modified: item.lastmod
+        })));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.get('/study-material/content', async (req, res) => {
+    const { path } = req.query;
+    const token = req.headers['authorization']?.split(' ')[1] || req.query.token;
+    
+    if (!token || !path) return res.status(400).send('Bad Request');
+    try { jwt.verify(token, JWT_SECRET); } catch { return res.status(401).send('Unauthorized'); }
+
+    if (!webdavClient) return res.status(404).send('Not configured');
+    try {
+        const stream = webdavClient.createReadStream(path);
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        stream.pipe(res);
+    } catch (e) { res.status(500).send(); }
+});
+
+apiRouter.post('/study-material/details', authMiddleware, async (req, res) => {
+    if (!webdavClient) return res.status(404).json({ error: "Not configured" });
+    try {
+        const paths = req.body.paths;
+        const results = [];
+        for(const p of paths) {
+            try {
+                const stat = await webdavClient.stat(p);
+                results.push({
+                    name: stat.basename, type: stat.type === 'directory' ? 'folder' : 'file',
+                    path: stat.filename, size: stat.size, modified: stat.lastmod
+                });
+            } catch(e) {}
+        }
+        res.json(results);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const PORT = process.env.PORT || 3001;
     app.listen(PORT, () => {

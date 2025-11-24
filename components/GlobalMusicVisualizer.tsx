@@ -34,8 +34,8 @@ const GlobalMusicVisualizer: React.FC = () => {
             
             // Draw a simplified waveform or bars centered
             const barCount = 5;
-            const spacing = 3;
-            const totalBarWidth = (canvas.width - (barCount - 1) * spacing) / barCount;
+            const spacing = 4; // Increased spacing for smaller bars
+            const totalBarWidth = 4; // Fixed small width
             const center = canvas.width / 2;
             
             // Colors based on settings
@@ -53,7 +53,7 @@ const GlobalMusicVisualizer: React.FC = () => {
             for (let i = 0; i < 3; i++) {
                 // Get bass/mid values
                 const value = dataArray[i * 2]; 
-                const height = Math.max(4, (value / 255) * canvas.height);
+                const height = Math.max(3, (value / 255) * canvas.height * 0.8); // Smaller max height
                 const y = (canvas.height - height) / 2;
                 
                 // Center bar

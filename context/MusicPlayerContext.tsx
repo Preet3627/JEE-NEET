@@ -11,12 +11,14 @@ interface MusicPlayerContextType {
     isPlaying: boolean;
     currentTrack: Track | null;
     isFullScreenPlayerOpen: boolean;
+    isLibraryOpen: boolean;
     playTrack: (track: Track, tracklist: Track[]) => void;
     play: () => void;
     pause: () => void;
     nextTrack: () => void;
     prevTrack: () => void;
     toggleFullScreenPlayer: () => void;
+    toggleLibrary: () => void;
     seek: (time: number) => void;
     duration: number;
     currentTime: number;
@@ -34,6 +36,7 @@ interface MusicPlayerContextType {
     createPlaylist: (name: string) => void;
     addToPlaylist: (playlistId: string, track: Track) => void;
     queue: Track[];
+    playNextInQueue: (track: Track) => void;
     addToQueue: (track: Track) => void;
     removeFromQueue: (index: number) => void;
     clearQueue: () => void;
@@ -56,6 +59,7 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const [tracklist, setTracklist] = useState<Track[]>([]);
     const [queue, setQueue] = useState<Track[]>([]); // Queue System
     const [isFullScreenPlayerOpen, setIsFullScreenPlayerOpen] = useState(false);
+    const [isLibraryOpen, setIsLibraryOpen] = useState(false);
     const [duration, setDuration] = useState(0);
     const [currentTime, setCurrentTime] = useState(0);
     const [isAutoMixEnabled, setIsAutoMixEnabled] = useState(true);
@@ -98,9 +102,12 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     };
 
     const addToQueue = (track: Track) => setQueue(prev => [...prev, track]);
+    const playNextInQueue = (track: Track) => setQueue(prev => [track, ...prev]);
     const removeFromQueue = (index: number) => setQueue(prev => prev.filter((_, i) => i !== index));
     const clearQueue = () => setQueue([]);
     
+    const toggleLibrary = () => setIsLibraryOpen(prev => !prev);
+
     const initializeAudioContext = useCallback(() => {
         if (!audioContext) {
             const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -142,19 +149,21 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
             }
 
             const now = audioContext.currentTime;
+            // Fast ducking
             gainNode.gain.cancelScheduledValues(now);
             gainNode.gain.setValueAtTime(gainNode.gain.value, now);
-            gainNode.gain.linearRampToValueAtTime(0.3, now + 0.2);
+            gainNode.gain.exponentialRampToValueAtTime(0.1, now + 0.1);
             
             djDropAudioRef.current.play().then(() => {
                  setTimeout(() => {
                      if (gainNode && audioContext) {
                         const restoreTime = audioContext.currentTime;
                         gainNode.gain.cancelScheduledValues(restoreTime);
-                        gainNode.gain.setValueAtTime(0.3, restoreTime);
-                        gainNode.gain.linearRampToValueAtTime(1, restoreTime + 0.5);
+                        gainNode.gain.setValueAtTime(0.1, restoreTime);
+                        // Smooth restore
+                        gainNode.gain.linearRampToValueAtTime(1.0, restoreTime + 1.0);
                      }
-                 }, 1500);
+                 }, 1800); // Approx duration of drop
             }).catch(e => console.error("DJ drop play error", e));
         }
     };
@@ -169,6 +178,23 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
                     { src: track.coverArtUrl || DEFAULT_ART, sizes: '512x512', type: 'image/png' }
                 ]
             });
+            updateMediaPosition();
+        }
+    };
+
+    const updateMediaPosition = () => {
+        if ('mediaSession' in navigator && audioElementRef.current) {
+            if (!isNaN(audioElementRef.current.duration) && !isNaN(audioElementRef.current.currentTime)) {
+                try {
+                    navigator.mediaSession.setPositionState({
+                        duration: audioElementRef.current.duration,
+                        playbackRate: audioElementRef.current.playbackRate,
+                        position: audioElementRef.current.currentTime,
+                    });
+                } catch (e) { 
+                    // Ignore errors if metadata not fully loaded or infinite duration
+                }
+            }
         }
     };
 
@@ -284,7 +310,13 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
         setIsPlaying(false); 
     }, []);
     
-    const seek = useCallback((time: number) => { if(audioElementRef.current) audioElementRef.current.currentTime = time; }, []);
+    const seek = useCallback((time: number) => { 
+        if(audioElementRef.current) {
+            audioElementRef.current.currentTime = time; 
+            updateMediaPosition();
+        }
+    }, []);
+    
     const toggleFullScreenPlayer = () => setIsFullScreenPlayerOpen(prev => !prev);
     const toggleAutoMix = () => setIsAutoMixEnabled(prev => !prev);
 
@@ -311,7 +343,10 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
             audioElementRef.current = audio;
             audio.addEventListener('ended', () => navigateTrack('next')); 
             audio.addEventListener('timeupdate', () => setCurrentTime(audio.currentTime));
-            audio.addEventListener('loadedmetadata', () => setDuration(audio.duration));
+            audio.addEventListener('loadedmetadata', () => {
+                setDuration(audio.duration);
+                updateMediaPosition();
+            });
         }
         if (!djDropAudioRef.current) {
             const drop = new Audio(DJ_DROP_URL);
@@ -333,12 +368,12 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     }, [play, pause, navigateTrack, seek]);
 
     const value = { 
-        audioElement: audioElementRef.current, analyser, isPlaying, currentTrack, isFullScreenPlayerOpen, 
+        audioElement: audioElementRef.current, analyser, isPlaying, currentTrack, isFullScreenPlayerOpen, isLibraryOpen,
         playTrack, play, pause, nextTrack: () => navigateTrack('next'), prevTrack: () => navigateTrack('prev'), 
-        toggleFullScreenPlayer, seek, duration, currentTime, playDjDrop, isAutoMixEnabled, toggleAutoMix, 
+        toggleFullScreenPlayer, toggleLibrary, seek, duration, currentTime, playDjDrop, isAutoMixEnabled, toggleAutoMix, 
         updateTrackMetadata, notchSettings, visualizerSettings, djDropSettings, playlists, createPlaylist, addToPlaylist,
         setNotchSettings: handleSetNotchSettings, setVisualizerSettings: handleSetVisualizerSettings, setDjDropSettings: handleSetDjDropSettings,
-        queue, addToQueue, removeFromQueue, clearQueue
+        queue, addToQueue, playNextInQueue, removeFromQueue, clearQueue
     };
 
     return <MusicPlayerContext.Provider value={value}>{children}</MusicPlayerContext.Provider>;

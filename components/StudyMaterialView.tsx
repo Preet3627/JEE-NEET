@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { StudyMaterialItem, StudentData, Config } from '../types';
 import { api } from '../api/apiService';
@@ -71,6 +70,12 @@ const StudyMaterialView: React.FC<StudyMaterialViewProps> = ({ student, onUpdate
     const newPath = '/' + pathSegments.slice(0, index + 1).join('/');
     setPath(newPath);
   };
+  
+  const goBack = () => {
+      if (path === '/') return;
+      const parentPath = path.substring(0, path.lastIndexOf('/')) || '/';
+      setPath(parentPath);
+  };
 
   const handlePinToggle = (item: StudyMaterialItem) => {
     const currentPins = student.CONFIG.pinnedMaterials || [];
@@ -130,6 +135,11 @@ const StudyMaterialView: React.FC<StudyMaterialViewProps> = ({ student, onUpdate
       )}
       
       <div className="flex items-center gap-2 text-sm text-gray-400 mb-4 bg-gray-900/50 p-2 rounded-md overflow-x-auto">
+        {path !== '/' && (
+            <button onClick={goBack} className="p-1 hover:text-white flex-shrink-0 mr-2 border-r border-gray-700 pr-2">
+                <Icon name="arrow-left" className="w-4 h-4" />
+            </button>
+        )}
         <button onClick={() => setPath('/')} className="hover:text-white flex-shrink-0">Home</button>
         {breadcrumbs.map((segment, index) => (
           <React.Fragment key={index}>

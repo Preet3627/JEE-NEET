@@ -78,13 +78,11 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
     // Attempt 2: If it looks like broken JSON, try to correct it via AI
     if (text.startsWith('{') || text.startsWith('[')) {
       try {
-        const correctionResult = await api.correctJson(text);
-        if (correctionResult && correctionResult.correctedJson) {
-            const correctedData = JSON.parse(correctionResult.correctedJson);
-            if (processResult(correctedData)) {
-                setIsLoading(false);
-                return;
-            }
+        // The API returns the corrected object directly via json response
+        const correctedData = await api.correctJson(text);
+        if (processResult(correctedData)) {
+            setIsLoading(false);
+            return;
         }
       } catch (correctionError) {
         console.warn("AI JSON correction failed, falling back to text parser:", correctionError);

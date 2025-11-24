@@ -41,13 +41,14 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
   const [examType, setExamType] = useState(settings.examType || 'JEE');
   const [theme, setTheme] = useState(settings.theme || 'default');
   
+  const [notchEnabled, setNotchEnabled] = useState(currentNotch.enabled !== false);
   const [notchPos, setNotchPos] = useState<NotchSettings['position']>(currentNotch.position);
   const [notchSize, setNotchSize] = useState<NotchSettings['size']>(currentNotch.size);
   const [notchWidth, setNotchWidth] = useState<number>(currentNotch.width);
   const [visPreset, setVisPreset] = useState<VisualizerSettings['preset']>(currentVis.preset);
   const [visColor, setVisColor] = useState<VisualizerSettings['colorMode']>(currentVis.colorMode);
 
-  const WIDGET_KEYS = ['countdown', 'dailyInsight', 'quote', 'music', 'subjectAllocation', 'scoreTrend', 'flashcards', 'readingHours', 'todaysAgenda', 'upcomingExams', 'homework', 'visualizer', 'weather', 'clock'];
+  const WIDGET_KEYS = ['countdown', 'dailyInsight', 'quote', 'music', 'subjectAllocation', 'scoreTrend', 'flashcards', 'readingHours', 'todaysAgenda', 'upcomingExams', 'homework', 'visualizer', 'weather', 'clock', 'practice'];
   const LAYOUT_PRESETS: Record<'default' | 'focus' | 'compact', string[]> = {
     default: WIDGET_KEYS,
     focus: ['countdown', 'dailyInsight', 'todaysAgenda', 'upcomingExams', 'scoreTrend', 'homework'],
@@ -79,7 +80,7 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    setNotchSettings({ position: notchPos, size: notchSize, width: notchWidth });
+    setNotchSettings({ position: notchPos, size: notchSize, width: notchWidth, enabled: notchEnabled });
     setVisualizerSettings({ preset: visPreset, colorMode: visColor });
 
     const settingsToSave: Partial<Config['settings'] & { geminiApiKey?: string; isCalendarSyncEnabled?: boolean }> = { 
@@ -97,7 +98,7 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
         musicPlayerWidgetLayout: musicPlayerLayout as 'minimal' | 'expanded',
         dashboardBackgroundImage: bgImage,
         dashboardTransparency: transparency,
-        notchSettings: { position: notchPos, size: notchSize, width: notchWidth },
+        notchSettings: { position: notchPos, size: notchSize, width: notchWidth, enabled: notchEnabled },
         visualizerSettings: { preset: visPreset, colorMode: visColor }
     };
 
@@ -132,27 +133,35 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
             <div>
                 <h3 className="text-base font-bold text-gray-300">Music Player & Visuals</h3>
                 <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-xs font-bold text-gray-400">Notch Position</label>
-                            <select value={notchPos} onChange={e => setNotchPos(e.target.value as any)} className={inputClass + " py-1 text-xs"}>
-                                <option value="top">Top</option>
-                                <option value="bottom">Bottom</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-400">Size Constraint</label>
-                            <select value={notchSize} onChange={e => setNotchSize(e.target.value as any)} className={inputClass + " py-1 text-xs"}>
-                                <option value="small">Small (Phone)</option>
-                                <option value="medium">Medium</option>
-                                <option value="large">Large (Tablet)</option>
-                            </select>
-                        </div>
+                    <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-gray-400">Enable Notch Visualizer</label>
+                        <input type="checkbox" checked={notchEnabled} onChange={e => setNotchEnabled(e.target.checked)} className="w-4 h-4 rounded text-cyan-600 bg-gray-700 border-gray-600 focus:ring-cyan-500" />
                     </div>
-                    <div>
-                         <label className="text-xs font-bold text-gray-400 flex justify-between">Notch Width <span>{notchWidth}%</span></label>
-                         <input type="range" min="20" max="90" value={notchWidth} onChange={e => setNotchWidth(Number(e.target.value))} className="w-full h-1 bg-gray-700 rounded-lg accent-cyan-500" />
-                    </div>
+                    {notchEnabled && (
+                        <>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-400">Notch Position</label>
+                                    <select value={notchPos} onChange={e => setNotchPos(e.target.value as any)} className={inputClass + " py-1 text-xs"}>
+                                        <option value="top">Top</option>
+                                        <option value="bottom">Bottom</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-400">Size Constraint</label>
+                                    <select value={notchSize} onChange={e => setNotchSize(e.target.value as any)} className={inputClass + " py-1 text-xs"}>
+                                        <option value="small">Small (Phone)</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="large">Large (Tablet)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-gray-400 flex justify-between">Notch Width <span>{notchWidth}%</span></label>
+                                <input type="range" min="20" max="90" value={notchWidth} onChange={e => setNotchWidth(Number(e.target.value))} className="w-full h-1 bg-gray-700 rounded-lg accent-cyan-500" />
+                            </div>
+                        </>
+                    )}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="text-xs font-bold text-gray-400">Visualizer Style</label>
