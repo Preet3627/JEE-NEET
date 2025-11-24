@@ -1,12 +1,13 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import McqTimer from './McqTimer';
 import Icon from './Icon';
-import { getQuestionNumbersFromRanges } from '../utils/qRangesParser';
-import { HomeworkData, ResultData, StudentData, ScheduleItem, PracticeQuestion } from '../types';
-import AIGenerateAnswerKeyModal from './AIGenerateAnswerKeyModal';
-import AIParserModal from './AIParserModal';
-import { api } from '../api/apiService';
-import { useAuth } from '../context/AuthContext';
+import { getQuestionNumbersFromRanges } from './utils/qRangesParser';
+import { HomeworkData, ResultData, StudentData, ScheduleItem, PracticeQuestion } from './types';
+import AIGenerateAnswerKeyModal from './components/AIGenerateAnswerKeyModal';
+import AIParserModal from './components/AIParserModal';
+import { api } from './api/apiService';
+import { useAuth } from './context/AuthContext';
 
 interface CustomPracticeModalProps {
   onClose: () => void;
