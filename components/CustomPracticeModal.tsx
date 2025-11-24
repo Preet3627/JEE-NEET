@@ -51,7 +51,7 @@ const parseAnswers = (text: string): Record<string, string> => {
 };
 
 
-export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) => {
+const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) => {
   const { onClose, onSessionComplete, initialTask, aiPracticeTest, aiInitialTopic, defaultPerQuestionTime, onLogResult, student, onUpdateWeaknesses, onSaveTask, animationOrigin } = props;
   const { currentUser } = useAuth();
   const theme = currentUser?.CONFIG.settings.theme;
@@ -364,6 +364,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
           )}
         </div>
       </div>
+      </div>
       {isAiKeyModalOpen && (
           <AIGenerateAnswerKeyModal
               onClose={() => setIsAiKeyModalOpen(false)}
@@ -380,8 +381,8 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
           <AIParserModal
             onClose={() => setIsAiParserOpen(false)}
             onDataReady={handleDataFromParser}
-            onPracticeTestReady={() => {}} 
-            onOpenGuide={() => {}} 
+            onPracticeTestReady={() => {}} // This will be handled by the StudentDashboard
+            onOpenGuide={() => {}} // This will be handled by the StudentDashboard
           />
       )}
     </>
