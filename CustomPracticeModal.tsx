@@ -51,7 +51,7 @@ const parseAnswers = (text: string): Record<string, string> => {
 };
 
 
-const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) => {
+export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) => {
   const { onClose, onSessionComplete, initialTask, aiPracticeTest, aiInitialTopic, defaultPerQuestionTime, onLogResult, student, onUpdateWeaknesses, onSaveTask, animationOrigin } = props;
   const { currentUser } = useAuth();
   const theme = currentUser?.CONFIG.settings.theme;
