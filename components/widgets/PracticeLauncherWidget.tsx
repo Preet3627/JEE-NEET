@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
 import Icon from '../Icon';
@@ -13,7 +12,8 @@ const PracticeLauncherWidget: React.FC<PracticeLauncherWidgetProps> = ({ onLaunc
 
   return (
     <div className="bg-gradient-to-br from-purple-900/50 to-indigo-900/50 border border-[var(--glass-border)] rounded-xl shadow-lg p-6 backdrop-blur-sm h-full min-h-[10rem] flex flex-col justify-between relative overflow-hidden group">
-        <div className="absolute inset-0 bg-[url('https://media.istockphoto.com/id/1323933351/vector/hexagon-abstract-background-with-blue-and-purple-gradient-color-for-hi-tech-technology.jpg?s=612x612&w=0&k=20&c=K1aH1n1-Pj-S2o2aVyaW6vD0lVq-O9j7z2hfls2l-8I=')] bg-cover opacity-10 group-hover:opacity-20 transition-opacity duration-500"></div>
+        {/* Replaced hardcoded image URL with CSS gradient for reliability */}
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-blue-500/10 opacity-70 group-hover:opacity-90 transition-opacity duration-500"></div>
 
         <div className="relative z-10">
             <h2 className="text-xl font-bold text-white tracking-wider flex items-center gap-2">
