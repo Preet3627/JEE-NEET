@@ -2,6 +2,7 @@
   "name": "JEE Scheduler Pro",
   "description": "An AI-powered, multilingual weekly scheduler for JEE aspirants, featuring a clean, futuristic UI to optimize study sessions based on performance metrics.",
   "requestFramePermissions": [
-    "microphone"
+    "microphone",
+    "camera"
   ]
 }

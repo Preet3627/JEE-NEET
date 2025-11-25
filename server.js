@@ -58,27 +58,24 @@ const parseAIResponse = (text) => {
         console.warn("Initial JSON parse failed, attempting auto-fix for backslashes...", e.message);
         
         // 3. Fix common LaTeX/Path backslash issues
-        // Look for backslashes that are NOT followed by valid JSON escape characters (", \, /, b, f, n, r, t, u)
-        // and double them (e.g., \Delta -> \\Delta)
+        // Replace all single backslashes that are NOT part of a valid JSON escape sequence.
+        // This regex ensures we don't double already-escaped characters.
+        const fixedBackslashes = cleaned.replace(/\\(?!["\\/bfnrtu]|u[0-9a-fA-F]{4})/g, '\\\\');
         try {
-            const fixed = cleaned.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
-            return JSON.parse(fixed);
+            return JSON.parse(fixedBackslashes);
         } catch (e2) {
-            console.error("Auto-fix failed. Trying to extract object/array.");
+            console.error("Auto-fix failed. Trying to extract object/array.", e2.message);
             
             // 4. Try to extract the first JSON object or array if there's surrounding text
-            const match = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+            const match = fixedBackslashes.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
             if (match) {
                 try {
-                    const extracted = match[0];
-                    // Apply the backslash fix to the extracted part as well
-                    const fixedExtracted = extracted.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
-                    return JSON.parse(fixedExtracted);
+                    return JSON.parse(match[0]);
                 } catch (e3) {
-                    throw new Error(`Failed to parse AI response after all attempts: ${e.message}`);
+                    throw new Error(`Failed to parse AI response after all attempts: ${e.message} | ${e2.message} | ${e3.message}`);
                 }
             }
-            throw new Error(`Failed to parse AI response: ${e.message}`);
+            throw new Error(`Failed to parse AI response: ${e.message} | ${e2.message}`);
         }
     }
 };
@@ -1240,7 +1237,7 @@ apiRouter.post('/admin/students/:sid/clear-data', adminMiddleware, async (req, r
 
 // Helper function for simple text generation using new SDK pattern
 const simpleAiTask = async (req, res, promptSuffix, modelName = 'gemini-2.5-flash') => {
-    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable. API Key might be missing or invalid." });
     try {
         const { prompt, imageBase64 } = req.body;
         
@@ -1256,20 +1253,17 @@ const simpleAiTask = async (req, res, promptSuffix, modelName = 'gemini-2.5-flas
             contents: { parts: contents }
         });
         
-        // simpleAiTask is typically used for outputs meant to be rendered as Markdown or simple JSON strings.
-        // We'll return the raw text here, and the frontend can decide to parse it as JSON if it matches expectations
-        // (e.g., for analyze-mistake which expects JSON but might return markdown for error cases).
         res.json({ response: response.text }); 
 
     } catch (e) {
         console.error("AI Simple Task Error:", e);
-        res.status(500).json({ error: "An AI error occurred." });
+        res.status(500).json({ error: e.message });
     }
 };
 
 apiRouter.post('/ai/parse-text', authMiddleware, async (req, res) => {
     const { text, domain } = req.body;
-    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable. API Key might be missing or invalid." });
 
     try {
         const prompt = `
@@ -1322,7 +1316,7 @@ apiRouter.post('/ai/parse-text', authMiddleware, async (req, res) => {
 
 apiRouter.post('/ai/chat', authMiddleware, async (req, res) => {
     const { history, prompt, imageBase64, domain } = req.body;
-    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable. API Key might be missing or invalid." });
 
     try {
         // Convert history to Gemini format (user/model)
@@ -1376,7 +1370,7 @@ apiRouter.post('/ai/chat', authMiddleware, async (req, res) => {
 
 apiRouter.post('/ai/daily-insight', authMiddleware, async (req, res) => {
     const { weaknesses, syllabus } = req.body;
-    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable. API Key might be missing or invalid." });
     
     try {
         const prompt = `
@@ -1400,7 +1394,7 @@ apiRouter.post('/ai/daily-insight', authMiddleware, async (req, res) => {
 
 apiRouter.post('/ai/analyze-test-results', authMiddleware, async (req, res) => {
     const { imageBase64, userAnswers, timings, syllabus } = req.body;
-    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable. API Key might be missing or invalid." });
 
     try {
         const prompt = `
@@ -1444,7 +1438,7 @@ apiRouter.post('/ai/analyze-test-results', authMiddleware, async (req, res) => {
 
 apiRouter.post('/ai/generate-flashcards', authMiddleware, async (req, res) => {
     const { topic, syllabus } = req.body;
-    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable. API Key might be missing or invalid." });
     
     try {
         const prompt = `Create 10 flashcards for "${topic}". Context: ${syllabus || ''}. Return JSON: { "flashcards": [{"front": "...", "back": "..."}] }`;
@@ -1463,7 +1457,7 @@ apiRouter.post('/ai/generate-flashcards', authMiddleware, async (req, res) => {
 
 apiRouter.post('/ai/generate-answer-key', authMiddleware, async (req, res) => {
     const { prompt } = req.body;
-    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable. API Key might be missing or invalid." });
     
     try {
         const fullPrompt = `Generate the official answer key for: ${prompt}. If unknown, generate a realistic practice key. Return JSON: { "answerKey": {"1": "A", "2": "B", ...} }`;
@@ -1482,7 +1476,7 @@ apiRouter.post('/ai/generate-answer-key', authMiddleware, async (req, res) => {
 
 apiRouter.post('/ai/generate-practice-test', authMiddleware, async (req, res) => {
     const { topic, numQuestions, difficulty } = req.body;
-    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable. API Key might be missing or invalid." });
     
     try {
         const prompt = `
@@ -1510,7 +1504,7 @@ apiRouter.post('/ai/generate-practice-test', authMiddleware, async (req, res) =>
 
 apiRouter.post('/ai/analyze-specific-mistake', authMiddleware, async (req, res) => {
     const { prompt, imageBase64 } = req.body;
-    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable. API Key might be missing or invalid." });
     
     try {
         const fullPrompt = `Analyze this specific mistake. User thought: "${prompt}". Return JSON: { "topic": "Main Topic", "explanation": "Detailed explanation of why it is wrong and the correct concept." }`;
@@ -1544,7 +1538,7 @@ apiRouter.post('/ai/solve-doubt', authMiddleware, (req, res) =>
 
 apiRouter.post('/ai/correct-json', authMiddleware, (req, res) => {
     const { brokenJson } = req.body;
-    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable. API Key might be missing or invalid." });
     
     const prompt = `Fix this broken JSON and return ONLY the valid JSON string: ${brokenJson}`;
     
