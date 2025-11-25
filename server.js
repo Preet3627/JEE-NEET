@@ -183,6 +183,7 @@ if (isConfigured) {
         googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
         
         if(process.env.API_KEY) {
+            // Initialize GoogleGenAI with apiKey
             genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
         }
         
@@ -240,13 +241,10 @@ const adminMiddleware = (req, res, next) => {
 };
 
 // --- HELPER: Find Row ID by Inner JSON ID ---
-// Since data is encrypted blobs, we have to fetch all and find the matching ID to update/delete
-// This is an inefficiency accepted for the sake of the encrypted blob architecture requested.
 const findRowIdByInnerId = async (tableName, userId, innerId) => {
     const [rows] = await pool.query(`SELECT id, data FROM ${tableName} WHERE user_id = ?`, [userId]);
     for (const row of rows) {
         const item = decrypt(row.data);
-        // Check if item has an ID property that matches
         if (item && item.ID === innerId) {
             return row.id;
         }
@@ -459,16 +457,10 @@ apiRouter.post('/register', async (req, res) => {
 
 // --- USER DATA CRUD ---
 
-// Schedule Items
 apiRouter.post('/schedule-items', authMiddleware, async (req, res) => {
     const { task } = req.body;
     if (!task) return res.status(400).json({ error: "No task data" });
     try {
-        // If ID exists, it might be an update, but simpler to just insert new version for now or handle updates.
-        // Actually, apiService uses saveTask for both create and update.
-        // For update, we should try to find and update, or delete and re-insert.
-        // Re-inserting with same ID is tricky with auto-inc PK.
-        // Let's check if it exists by inner ID.
         const existingRowId = await findRowIdByInnerId('schedule_items', req.userId, task.ID);
         
         if (existingRowId) {
@@ -488,7 +480,6 @@ apiRouter.post('/schedule-items/batch', authMiddleware, async (req, res) => {
         const connection = await pool.getConnection();
         await connection.beginTransaction();
         for (const task of tasks) {
-             // Simply insert for batch import usually means new items
              await connection.query("INSERT INTO schedule_items (user_id, data) VALUES (?, ?)", [req.userId, encrypt(task)]);
         }
         await connection.commit();
@@ -522,14 +513,12 @@ apiRouter.post('/config', authMiddleware, async (req, res) => {
             currentConfig = typeof decrypted === 'string' ? JSON.parse(decrypted) : decrypted;
         }
         
-        // Deep merge for settings
         const newConfig = {
             ...currentConfig,
             ...updates,
             settings: { ...currentConfig.settings, ...(updates.settings || {}) }
         };
         
-        // Insert or Update
         if (rows.length > 0) {
             await pool.query("UPDATE user_configs SET config = ? WHERE user_id = ?", [encrypt(newConfig), req.userId]);
         } else {
@@ -539,24 +528,20 @@ apiRouter.post('/config', authMiddleware, async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Full Sync (Used by many frontend actions)
+// Full Sync
 apiRouter.post('/user-data/full-sync', authMiddleware, async (req, res) => {
     const { userData } = req.body;
     if (!userData) return res.status(400).json({ error: "No data" });
     
-    // This is a heavy operation, usually we'd want delta updates.
-    // But to support the current frontend logic:
     try {
         const connection = await pool.getConnection();
         await connection.beginTransaction();
 
-        // Update Config
         if (userData.CONFIG) {
              await connection.query("DELETE FROM user_configs WHERE user_id = ?", [req.userId]);
              await connection.query("INSERT INTO user_configs (user_id, config) VALUES (?, ?)", [req.userId, encrypt(userData.CONFIG)]);
         }
 
-        // Helper to sync table
         const syncTable = async (tableName, items) => {
             await connection.query(`DELETE FROM ${tableName} WHERE user_id = ?`, [req.userId]);
             for (const item of items) {
@@ -578,7 +563,6 @@ apiRouter.post('/user-data/full-sync', authMiddleware, async (req, res) => {
 // Results CRUD
 apiRouter.put('/results', authMiddleware, async (req, res) => {
     const { result } = req.body;
-    // Similar logic to schedule items, find by ID and update or insert
     try {
         const rowId = await findRowIdByInnerId('results', req.userId, result.ID);
         if (rowId) {
@@ -693,9 +677,7 @@ apiRouter.put('/admin/doubts/:doubtId/status', adminMiddleware, async (req, res)
 apiRouter.get('/messages/:sid', authMiddleware, async (req, res) => {
     const { sid } = req.params;
     try {
-        // Allow admin to see any, student to see own
         if (req.userRole !== 'admin' && req.userSid !== sid) return res.status(403).json({error: "Unauthorized"});
-        
         const [msgs] = await pool.query(
             "SELECT * FROM messages WHERE sender_sid = ? OR recipient_sid = ? ORDER BY created_at ASC",
             [sid, sid]
@@ -711,7 +693,6 @@ apiRouter.post('/messages', authMiddleware, async (req, res) => {
             "INSERT INTO messages (sender_sid, recipient_sid, content) VALUES (?, ?, ?)",
             [req.userSid, recipient_sid, content]
         );
-        // Return the message just created
         const [rows] = await pool.query("SELECT * FROM messages WHERE sender_sid = ? AND recipient_sid = ? ORDER BY id DESC LIMIT 1", [req.userSid, recipient_sid]);
         res.json(rows[0]);
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -737,8 +718,6 @@ apiRouter.get('/music/browse', authMiddleware, async (req, res) => {
 apiRouter.get('/music/content', async (req, res) => {
     const { path, token } = req.query;
     if (!musicWebdavClient) return res.status(503).send("Service unavailable");
-    
-    // Verify token manually since this is a direct link/src often
     try {
         jwt.verify(token, JWT_SECRET);
         const stream = musicWebdavClient.createReadStream(path);
@@ -748,12 +727,9 @@ apiRouter.get('/music/content', async (req, res) => {
 
 apiRouter.get('/music/album-art', async (req, res) => {
     const { path, token } = req.query;
-    // Just proxy the music file again, the frontend parser will extract art
     if (!musicWebdavClient) return res.status(503).send("Service unavailable");
     try {
         jwt.verify(token, JWT_SECRET);
-        // We need the file to extract metadata.
-        // Optimization: In real app, cache extracted art. Here, re-stream file.
         const stream = musicWebdavClient.createReadStream(path);
         stream.pipe(res);
     } catch (e) { res.status(401).send("Unauthorized"); }
@@ -806,7 +782,6 @@ apiRouter.post('/study-material/details', authMiddleware, async (req, res) => {
 
 
 // --- ADMIN ROUTES (Broadcast, etc) ---
-// ... (Already in original file, keeping consistent) ...
 apiRouter.get('/admin/students', adminMiddleware, async (req, res) => {
     if (!pool) return res.status(503);
     try {
@@ -917,22 +892,27 @@ apiRouter.post('/admin/students/:sid/clear-data', adminMiddleware, async (req, r
 
 // --- AI ROUTES (GENAI) ---
 
-// Helper for AI requests
+// Helper function for simple text generation using new SDK pattern
 const simpleAiTask = async (req, res, promptSuffix) => {
     if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
     try {
         const { prompt, imageBase64 } = req.body;
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         
-        let parts = [prompt + (promptSuffix || "")];
+        let contents = [];
         if (imageBase64) {
-            parts.push({ inlineData: { data: imageBase64, mimeType: "image/jpeg" } });
+            contents.push({ inlineData: { data: imageBase64, mimeType: "image/jpeg" } });
         }
+        // Append suffix if present
+        contents.push({ text: prompt + (promptSuffix || "") });
+
+        const response = await genAI.models.generateContent({
+            model: 'gemini-1.5-flash',
+            contents: { parts: contents }
+        });
         
-        const result = await model.generateContent(parts);
-        const response = await result.response;
-        res.json({ response: response.text() });
+        res.json({ response: response.text });
     } catch (e) {
+        console.error(e);
         res.status(500).json({ error: e.message });
     }
 };
@@ -942,7 +922,6 @@ apiRouter.post('/ai/parse-text', authMiddleware, async (req, res) => {
     if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
 
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const prompt = `
         Analyze the following text and extract study schedule items, exams, metrics, or flashcards.
         Return strictly valid JSON format.
@@ -976,9 +955,12 @@ apiRouter.post('/ai/parse-text', authMiddleware, async (req, res) => {
         If no valid data is found, return empty arrays.
         `;
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        let textResponse = response.text();
+        const response = await genAI.models.generateContent({
+            model: 'gemini-2.0-flash',
+            contents: { parts: [{ text: prompt }] }
+        });
+
+        let textResponse = response.text;
         textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
         
         res.json(JSON.parse(textResponse));
@@ -993,50 +975,43 @@ apiRouter.post('/ai/chat', authMiddleware, async (req, res) => {
     if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
 
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        
-        // Convert history to Gemini format
+        // Convert history to Gemini format (user/model)
         const chatHistory = history.map(msg => ({
             role: msg.role,
             parts: msg.parts
         }));
 
-        const chat = model.startChat({
+        // Handle image by appending to current prompt (multimodal turn)
+        const currentParts = [];
+        if (imageBase64) {
+            currentParts.push({ inlineData: { data: imageBase64, mimeType: "image/jpeg" } });
+        }
+        
+        // System instructions for deep linking
+        const systemPrompt = `
+        You are an academic assistant for JEE/NEET. 
+        Use the internal knowledge base.
+        If the user asks to create a schedule or add a task, respond with a Deep Link URL in this format:
+        ${domain}/?action=new_schedule&data={"title":"...","day":"...","subject":"...","gradient":"from-purple-500 to-indigo-500"}
+        If the user asks for a search, use:
+        ${domain}/?action=search&data={"query":"..."}
+        If the user asks to import an exam:
+        ${domain}/?action=import_exam&data={"exams":[{"title":"...","date":"..."}]}
+        `;
+        
+        currentParts.push({ text: `${systemPrompt}\nUser: ${prompt}` });
+
+        // Use chat interface for history context
+        const chat = genAI.chats.create({
+            model: 'gemini-1.5-flash',
             history: chatHistory,
             generationConfig: {
                 maxOutputTokens: 500,
             },
         });
 
-        let result;
-        if (imageBase64) {
-             // For multimodal chat, we can't use history easily with the current SDK in one go if history has images
-             const imagePart = {
-                inlineData: {
-                    data: imageBase64,
-                    mimeType: "image/jpeg"
-                }
-            };
-            result = await model.generateContent([prompt, imagePart]);
-        } else {
-            // Instruct AI to generate Deep Links for actions
-            const systemPrompt = `
-            You are an academic assistant for JEE/NEET. 
-            Use the internal knowledge base.
-            If the user asks to create a schedule or add a task, respond with a Deep Link URL in this format:
-            ${domain}/?action=new_schedule&data={"title":"...","day":"...","subject":"...","gradient":"from-purple-500 to-indigo-500"}
-            If the user asks for a search, use:
-            ${domain}/?action=search&data={"query":"..."}
-            If the user asks to import an exam:
-            ${domain}/?action=import_exam&data={"exams":[{"title":"...","date":"..."}]}
-            `;
-            
-            const msgWithSystem = `${systemPrompt}\nUser: ${prompt}`;
-            result = await chat.sendMessage(msgWithSystem);
-        }
-
-        const response = await result.response;
-        res.json({ role: 'model', parts: [{ text: response.text() }] });
+        const response = await chat.sendMessage(currentParts);
+        res.json({ role: 'model', parts: [{ text: response.text }] });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -1047,7 +1022,6 @@ apiRouter.post('/ai/daily-insight', authMiddleware, async (req, res) => {
     if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
     
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `
         Generate a short, motivational study tip or insight for a JEE student.
         User weaknesses: ${weaknesses.join(', ')}.
@@ -1055,8 +1029,12 @@ apiRouter.post('/ai/daily-insight', authMiddleware, async (req, res) => {
         Return JSON: { "quote": "Motivational quote...", "insight": "Specific study tip..." }
         `;
         
-        const result = await model.generateContent(prompt);
-        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        const response = await genAI.models.generateContent({
+            model: 'gemini-1.5-flash',
+            contents: { parts: [{ text: prompt }] }
+        });
+        
+        const text = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
         res.json(JSON.parse(text));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1066,7 +1044,6 @@ apiRouter.post('/ai/analyze-test-results', authMiddleware, async (req, res) => {
     if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
 
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
         const prompt = `
         Analyze this test answer key image.
         User Answers: ${JSON.stringify(userAnswers)}
@@ -1089,9 +1066,17 @@ apiRouter.post('/ai/analyze-test-results', authMiddleware, async (req, res) => {
         }
         `;
         
-        const imagePart = { inlineData: { data: imageBase64, mimeType: "image/jpeg" } };
-        const result = await model.generateContent([prompt, imagePart]);
-        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        const response = await genAI.models.generateContent({
+            model: 'gemini-1.5-pro',
+            contents: {
+                parts: [
+                    { inlineData: { data: imageBase64, mimeType: "image/jpeg" } },
+                    { text: prompt }
+                ]
+            }
+        });
+
+        const text = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
         res.json(JSON.parse(text));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1101,10 +1086,14 @@ apiRouter.post('/ai/generate-flashcards', authMiddleware, async (req, res) => {
     if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
     
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `Create 10 flashcards for "${topic}". Context: ${syllabus || ''}. Return JSON: { "flashcards": [{"front": "...", "back": "..."}] }`;
-        const result = await model.generateContent(prompt);
-        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        
+        const response = await genAI.models.generateContent({
+            model: 'gemini-1.5-flash',
+            contents: { parts: [{ text: prompt }] }
+        });
+
+        const text = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
         res.json(JSON.parse(text));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1114,10 +1103,14 @@ apiRouter.post('/ai/generate-answer-key', authMiddleware, async (req, res) => {
     if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
     
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const fullPrompt = `Generate the official answer key for: ${prompt}. If unknown, generate a realistic practice key. Return JSON: { "answerKey": {"1": "A", "2": "B", ...} }`;
-        const result = await model.generateContent(fullPrompt);
-        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        
+        const response = await genAI.models.generateContent({
+            model: 'gemini-1.5-flash',
+            contents: { parts: [{ text: fullPrompt }] }
+        });
+
+        const text = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
         res.json(JSON.parse(text));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1127,7 +1120,6 @@ apiRouter.post('/ai/generate-practice-test', authMiddleware, async (req, res) =>
     if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
     
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
         const prompt = `
         Generate a ${difficulty} practice test on "${topic}" with ${numQuestions} questions.
         Return JSON:
@@ -1138,8 +1130,13 @@ apiRouter.post('/ai/generate-practice-test', authMiddleware, async (req, res) =>
             "answers": { "1": "A", "2": "C" ... }
         }
         `;
-        const result = await model.generateContent(prompt);
-        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        
+        const response = await genAI.models.generateContent({
+            model: 'gemini-1.5-pro',
+            contents: { parts: [{ text: prompt }] }
+        });
+
+        const text = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
         res.json(JSON.parse(text));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1149,23 +1146,56 @@ apiRouter.post('/ai/analyze-specific-mistake', authMiddleware, async (req, res) 
     if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
     
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const fullPrompt = `Analyze this specific mistake. User thought: "${prompt}". Return JSON: { "topic": "Main Topic", "explanation": "Detailed explanation of why it is wrong and the correct concept." }`;
         
-        const parts = [fullPrompt];
-        if (imageBase64) parts.push({ inlineData: { data: imageBase64, mimeType: "image/jpeg" } });
+        const parts = [];
+        if (imageBase64) {
+            parts.push({ inlineData: { data: imageBase64, mimeType: "image/jpeg" } });
+        }
+        parts.push({ text: fullPrompt });
         
-        const result = await model.generateContent(parts);
-        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        const response = await genAI.models.generateContent({
+            model: 'gemini-1.5-flash',
+            contents: { parts: parts }
+        });
+
+        const text = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
         res.json(JSON.parse(text));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-apiRouter.post('/ai/analyze-mistake', authMiddleware, (req, res) => simpleAiTask(req, res, "\n\nAnalyze this mistake. Return JSON: { \"mistake_topic\": \"Short Topic Name\", \"explanation\": \"Detailed markdown explanation\" }"));
-apiRouter.post('/ai/solve-doubt', authMiddleware, (req, res) => simpleAiTask(req, res, "\n\nSolve this doubt with step-by-step markdown explanation."));
+// Generic tasks using simpleAiTask helper
+apiRouter.post('/ai/analyze-mistake', authMiddleware, (req, res) => 
+    simpleAiTask(req, res, "\n\nAnalyze this mistake. Return JSON: { \"mistake_topic\": \"Short Topic Name\", \"explanation\": \"Detailed markdown explanation\" }")
+);
+
+apiRouter.post('/ai/solve-doubt', authMiddleware, (req, res) => 
+    simpleAiTask(req, res, "\n\nSolve this doubt with step-by-step markdown explanation.")
+);
+
 apiRouter.post('/ai/correct-json', authMiddleware, (req, res) => {
     const { brokenJson } = req.body;
-    simpleAiTask({ body: { prompt: `Fix this broken JSON and return ONLY the valid JSON string: ${brokenJson}` } }, res, "");
+    // We construct a new req object structure for the helper, or we can just call generateContent directly.
+    // Calling helper by mocking req body:
+    // simpleAiTask(req, res, "") <-- req already has body.brokenJson, but helper expects body.prompt.
+    
+    // Better implementation inline for clarity:
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    const prompt = `Fix this broken JSON and return ONLY the valid JSON string: ${brokenJson}`;
+    
+    genAI.models.generateContent({
+        model: 'gemini-1.5-flash',
+        contents: { parts: [{ text: prompt }] }
+    }).then(result => {
+        const text = result.text.replace(/```json/g, '').replace(/```/g, '').trim();
+        // The frontend expects { correctedJson: ... } or similar, 
+        // but `AIParserModal` actually expects the raw object if it calls API directly?
+        // Looking at frontend AIParserModal.tsx: const correctedData = JSON.parse(correctionResult.correctedJson);
+        // So we must return { correctedJson: string }
+        res.json({ correctedJson: text });
+    }).catch(e => {
+        res.status(500).json({ error: e.message });
+    });
 });
 
 // Start Server
