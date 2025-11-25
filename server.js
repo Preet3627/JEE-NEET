@@ -48,34 +48,45 @@ let genAI = null;
 
 // --- HELPER: Robust AI JSON Parser ---
 const parseAIResponse = (text) => {
-    // 1. Remove Markdown code blocks
-    let cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    
+    // 1. Remove Markdown code blocks, if any
+    let cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+
     try {
-        // 2. Try parsing standard JSON
-        return JSON.parse(cleaned);
-    } catch (e) {
-        console.warn("Initial JSON parse failed, attempting auto-fix for backslashes...", e.message);
+        // Attempt 1: Direct parse
+        return JSON.parse(cleanedText);
+    } catch (e1) {
+        console.warn("Attempt 1: Direct JSON parse failed.", e1.message);
         
-        // 3. Fix common LaTeX/Path backslash issues
-        // Replace all single backslashes that are NOT part of a valid JSON escape sequence.
-        // This regex ensures we don't double already-escaped characters.
-        const fixedBackslashes = cleaned.replace(/\\(?!["\\/bfnrtu]|u[0-9a-fA-F]{4})/g, '\\\\');
+        // Attempt 2: Fix common LaTeX/path backslash issues and other problematic characters
+        // This regex replaces any backslash that is NOT followed by a valid JSON escape sequence.
+        // It also handles common problematic unescaped characters like parentheses in LaTeX.
+        let correctedText = cleanedText.replace(/\\(?!["\\/bfnrtu]|u[0-9a-fA-F]{4})/g, '\\\\');
+        
+        // Further fix for specific LaTeX constructs that might still break JSON
+        // Example: `\(` or `\)` might be interpreted as start of escape sequence in JSON.
+        correctedText = correctedText.replace(/\\([()])/g, '\\\\$1'); // Escape ( and ) if preceded by a single backslash.
+        correctedText = correctedText.replace(/(?<!\\)"/g, '\\"'); // Escape unescaped quotes (common in titles)
+        correctedText = correctedText.replace(/\n/g, '\\n'); // Escape newlines within string values
+        
+        // Try parsing the corrected text
         try {
-            return JSON.parse(fixedBackslashes);
+            return JSON.parse(correctedText);
         } catch (e2) {
-            console.error("Auto-fix failed. Trying to extract object/array.", e2.message);
-            
-            // 4. Try to extract the first JSON object or array if there's surrounding text
-            const match = fixedBackslashes.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
-            if (match) {
+            console.warn("Attempt 2: Backslash and general escape correction failed.", e2.message);
+
+            // Attempt 3: Try to extract only the first JSON object or array from potentially messy text
+            const match = correctedText.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+            if (match && match[0]) {
                 try {
-                    return JSON.parse(match[0]);
+                    // Apply corrections again to the extracted match
+                    const extractedAndCorrected = match[0].replace(/\\(?!["\\/bfnrtu]|u[0-9a-fA-F]{4})/g, '\\\\');
+                    return JSON.parse(extractedAndCorrected);
                 } catch (e3) {
-                    throw new Error(`Failed to parse AI response after all attempts: ${e.message} | ${e2.message} | ${e3.message}`);
+                    console.error("Attempt 3: Extract & parse failed.", e3.message);
+                    throw new Error(`Failed to parse AI response after all attempts. Original error: ${e1.message}. Last attempt error: ${e3.message}`);
                 }
             }
-            throw new Error(`Failed to parse AI response: ${e.message} | ${e2.message}`);
+            throw new Error(`Failed to parse AI response: ${e1.message}. Last attempt error: ${e2.message}`);
         }
     }
 };
@@ -384,6 +395,9 @@ apiRouter.get('/status', async (req, res) => {
 });
 
 apiRouter.get('/dj-drop', async (req, res) => {
+    // Check for DB pool early as it's a critical resource
+    if (!pool) return res.status(503).send("Database not initialized for DJ Drop.");
+
     const djDropUrl = process.env.NEXTCLOUD_DJ_DROP_URL || 'https://nc.ponsrischool.in/index.php/s/em85Zdf2EYEkz3j/download';
     try {
         // Fetch as buffer to avoid Vercel's body parser limits if it's a large file
@@ -452,7 +466,7 @@ apiRouter.post('/auth/google', async (req, res) => {
 
 apiRouter.post('/login', async (req, res) => {
     const { sid, password } = req.body;
-    if (!pool) return res.status(500).json({ error: "Database error" });
+    if (!pool) return res.status(500).json({ error: "Database not initialized" });
 
     try {
         const [users] = await pool.query("SELECT * FROM users WHERE sid = ? OR email = ?", [sid, sid]);
@@ -525,7 +539,8 @@ apiRouter.post('/register', async (req, res) => {
 
 apiRouter.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
-    if (!pool || !mailer) return res.status(503).json({ error: "Service unavailable" });
+    if (!pool) return res.status(503).json({ error: "Database not initialized" });
+    if (!mailer) return res.status(503).json({ error: "Email service not configured" });
 
     try {
         const [users] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
@@ -1011,7 +1026,7 @@ apiRouter.post('/messages', authMiddleware, async (req, res) => {
 // --- MUSIC & FILES ROUTES (WebDAV) ---
 
 apiRouter.get('/music/browse', authMiddleware, async (req, res) => {
-    if (!musicWebdavClient) return res.status(503).json({ error: "Music WebDAV not configured" });
+    if (!musicWebdavClient) return res.status(503).json({ error: "Music WebDAV not configured. Check .env variables for NEXTCLOUD_MUSIC_SHARE_TOKEN/PASSWORD." });
     const path = req.query.path || '/';
     try {
         const files = await musicWebdavClient.getDirectoryContents(path);
@@ -1030,7 +1045,7 @@ apiRouter.get('/music/browse', authMiddleware, async (req, res) => {
 
 apiRouter.get('/music/content', async (req, res) => {
     const { path: filePath, token } = req.query; // Renamed 'path' to 'filePath' to avoid conflict
-    if (!musicWebdavClient) return res.status(503).send("Service unavailable");
+    if (!musicWebdavClient) return res.status(503).send("Music WebDAV not configured. Service unavailable.");
     try {
         jwt.verify(token, JWT_SECRET); // Verify the token that grants access to the music content
         const stream = musicWebdavClient.createReadStream(filePath);
@@ -1043,7 +1058,7 @@ apiRouter.get('/music/content', async (req, res) => {
 
 apiRouter.get('/music/album-art', async (req, res) => {
     const { path: filePath, token } = req.query; // Renamed 'path' to 'filePath'
-    if (!musicWebdavClient) return res.status(503).send("Service unavailable");
+    if (!musicWebdavClient) return res.status(503).send("Music WebDAV not configured. Service unavailable.");
     try {
         jwt.verify(token, JWT_SECRET); // Verify the token
         const stream = musicWebdavClient.createReadStream(filePath);
@@ -1055,7 +1070,7 @@ apiRouter.get('/music/album-art', async (req, res) => {
 });
 
 apiRouter.get('/study-material/browse', authMiddleware, async (req, res) => {
-    if (!webdavClient) return res.status(503).json({ error: "Study Material WebDAV not configured" });
+    if (!webdavClient) return res.status(503).json({ error: "Study Material WebDAV not configured. Check .env variables for NEXTCLOUD_SHARE_TOKEN/PASSWORD." });
     const path = req.query.path || '/';
     try {
         const files = await webdavClient.getDirectoryContents(path);
@@ -1073,7 +1088,7 @@ apiRouter.get('/study-material/browse', authMiddleware, async (req, res) => {
 });
 
 apiRouter.get('/study-material/content', authMiddleware, async (req, res) => {
-    if (!webdavClient) return res.status(503).send("Service unavailable");
+    if (!webdavClient) return res.status(503).send("Study Material WebDAV not configured. Service unavailable.");
     const path = req.query.path;
     try {
         const stream = webdavClient.createReadStream(path);
@@ -1085,7 +1100,7 @@ apiRouter.get('/study-material/content', authMiddleware, async (req, res) => {
 });
 
 apiRouter.post('/study-material/details', authMiddleware, async (req, res) => {
-    if (!webdavClient) return res.status(503).json({ error: "Study Material WebDAV not configured" });
+    if (!webdavClient) return res.status(503).json({ error: "Study Material WebDAV not configured." });
     const { paths } = req.body;
     if (!paths || !Array.isArray(paths)) return res.status(400).json({ error: "Invalid paths array" });
 
@@ -1257,6 +1272,10 @@ const simpleAiTask = async (req, res, promptSuffix, modelName = 'gemini-2.5-flas
 
     } catch (e) {
         console.error("AI Simple Task Error:", e);
+        // Check for specific GenAI service unavailable error
+        if (e.message && e.message.includes('503 Service Unavailable')) {
+            return res.status(503).json({ error: "AI Service is currently overloaded. Please try again later." });
+        }
         res.status(500).json({ error: e.message });
     }
 };
@@ -1310,6 +1329,9 @@ apiRouter.post('/ai/parse-text', authMiddleware, async (req, res) => {
         res.json(parsedData);
     } catch (e) {
         console.error("AI Parse Text Error", e);
+        if (e.message && e.message.includes('503 Service Unavailable')) {
+            return res.status(503).json({ error: "AI Service is currently overloaded. Please try again later." });
+        }
         res.status(500).json({ error: "Failed to parse text with AI" });
     }
 });
@@ -1364,6 +1386,9 @@ apiRouter.post('/ai/chat', authMiddleware, async (req, res) => {
         res.json({ role: 'model', parts: [{ text: response.text }] });
     } catch (e) {
         console.error("AI Chat Error:", e);
+        if (e.message && e.message.includes('503 Service Unavailable')) {
+            return res.status(503).json({ error: "AI Service is currently overloaded. Please try again later." });
+        }
         res.status(500).json({ error: e.message });
     }
 });
@@ -1374,9 +1399,9 @@ apiRouter.post('/ai/daily-insight', authMiddleware, async (req, res) => {
     
     try {
         const prompt = `
-        Generate a short, motivational study tip or insight for a JEE student.
+        Generate a short, motivational study tip or insight for a JEE/NEET student.
         User weaknesses: ${weaknesses.join(', ')}.
-        Upcoming exam syllabus: ${syllabus || 'General JEE Prep'}.
+        Upcoming exam syllabus: ${syllabus || 'General JEE/NEET Prep'}.
         Return JSON: { "quote": "Motivational quote...", "insight": "Specific study tip..." }
         `;
         
@@ -1388,6 +1413,9 @@ apiRouter.post('/ai/daily-insight', authMiddleware, async (req, res) => {
         res.json(parseAIResponse(response.text));
     } catch (e) { 
         console.error("AI Daily Insight Error:", e);
+        if (e.message && e.message.includes('503 Service Unavailable')) {
+            return res.status(503).json({ error: "AI Service is currently overloaded. Please try again later." });
+        }
         res.status(500).json({ error: e.message }); 
     }
 });
@@ -1432,6 +1460,9 @@ apiRouter.post('/ai/analyze-test-results', authMiddleware, async (req, res) => {
         res.json(parseAIResponse(response.text));
     } catch (e) { 
         console.error("AI Analyze Test Results Error:", e);
+        if (e.message && e.message.includes('503 Service Unavailable')) {
+            return res.status(503).json({ error: "AI Service is currently overloaded. Please try again later." });
+        }
         res.status(500).json({ error: e.message }); 
     }
 });
@@ -1451,6 +1482,9 @@ apiRouter.post('/ai/generate-flashcards', authMiddleware, async (req, res) => {
         res.json(parseAIResponse(response.text));
     } catch (e) { 
         console.error("AI Generate Flashcards Error:", e);
+        if (e.message && e.message.includes('503 Service Unavailable')) {
+            return res.status(503).json({ error: "AI Service is currently overloaded. Please try again later." });
+        }
         res.status(500).json({ error: e.message }); 
     }
 });
@@ -1470,6 +1504,9 @@ apiRouter.post('/ai/generate-answer-key', authMiddleware, async (req, res) => {
         res.json(parseAIResponse(response.text));
     } catch (e) { 
         console.error("AI Generate Answer Key Error:", e);
+        if (e.message && e.message.includes('503 Service Unavailable')) {
+            return res.status(503).json({ error: "AI Service is currently overloaded. Please try again later." });
+        }
         res.status(500).json({ error: e.message }); 
     }
 });
@@ -1498,6 +1535,9 @@ apiRouter.post('/ai/generate-practice-test', authMiddleware, async (req, res) =>
         res.json(parseAIResponse(response.text));
     } catch (e) { 
         console.error("AI Generate Practice Test Error:", e);
+        if (e.message && e.message.includes('503 Service Unavailable')) {
+            return res.status(503).json({ error: "AI Service is currently overloaded. Please try again later." });
+        }
         res.status(500).json({ error: e.message }); 
     }
 });
@@ -1523,6 +1563,9 @@ apiRouter.post('/ai/analyze-specific-mistake', authMiddleware, async (req, res) 
         res.json(parseAIResponse(response.text));
     } catch (e) { 
         console.error("AI Analyze Specific Mistake Error:", e);
+        if (e.message && e.message.includes('503 Service Unavailable')) {
+            return res.status(503).json({ error: "AI Service is currently overloaded. Please try again later." });
+        }
         res.status(500).json({ error: e.message }); 
     }
 });
@@ -1551,6 +1594,9 @@ apiRouter.post('/ai/correct-json', authMiddleware, (req, res) => {
         res.json({ correctedJson: parseAIResponse(text) });
     }).catch(e => {
         console.error("AI Correct JSON Error:", e);
+        if (e.message && e.message.includes('503 Service Unavailable')) {
+            return res.status(503).json({ error: "AI Service is currently overloaded. Please try again later." });
+        }
         res.status(500).json({ error: e.message });
     });
 });

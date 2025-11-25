@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import Icon from './Icon';
 import { api } from '../api/apiService';
@@ -25,36 +24,6 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
     setIsExiting(true);
     setTimeout(onClose, theme === 'liquid-glass' ? 500 : 300);
   };
-  
-  const processResult = (result: any): boolean => {
-    if (!result || typeof result !== 'object') {
-        return false;
-    }
-
-    const testData = result.practice_test || result.homework_assignment;
-    if (testData?.questions && Array.isArray(testData.questions)) {
-        onPracticeTestReady(testData);
-        return true;
-    }
-    
-    if (result.flashcard_deck?.cards && Array.isArray(result.flashcard_deck.cards)) {
-        onDataReady(result);
-        return true;
-    }
-    
-    if (result.custom_widget) {
-        onDataReady(result);
-        return true;
-    }
-
-    // Handle both singular 'schedule' and plural 'schedules'
-    if ((result.schedules && result.schedules.length > 0) || (result.schedule && Array.isArray(result.schedule)) || result.exams?.length || result.metrics?.length) {
-        onDataReady(result);
-        return true;
-    }
-
-    return false;
-  };
 
   const handleParse = async () => {
     if (!inputText.trim()) {
@@ -65,36 +34,63 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
     setError('');
 
     const text = inputText.trim();
+    
+    const handleResult = (result: any) => {
+        if (!result || typeof result !== 'object' || Object.keys(result).length === 0) {
+            setError("The AI couldn't find any actionable data in your text. Please check the Guide for formatting examples.");
+            return;
+        }
 
-    // Attempt 1: Parse as valid JSON directly (works offline and is fastest)
+        if (result.practice_test || result.homework_assignment) {
+            onPracticeTestReady(result.practice_test || result.homework_assignment);
+        } else if (result.flashcard_deck) {
+            onDataReady(result);
+        } else if (result.custom_widget) { // Handle custom widgets
+            onDataReady(result);
+        } else if ((result.schedules?.length > 0 || Array.isArray(result.schedule) && result.schedule.length > 0) || result.exams?.length || result.metrics?.length) {
+            onDataReady(result);
+        } else {
+            setError("The AI couldn't find any actionable data in your text. Please check the Guide for formatting examples.");
+            return; // Explicitly return false for no data found
+        }
+        return true; // Data found and handled
+    };
+
+    // Attempt 1: Parse as valid JSON (works offline)
     try {
       const jsonData = JSON.parse(text);
-      if (processResult(jsonData)) {
-        setIsLoading(false);
-        return;
+      if (jsonData && typeof jsonData === 'object') {
+        if (handleResult(jsonData)) {
+          setIsLoading(false);
+          return;
+        }
       }
-    } catch (e) { /* Not valid JSON, proceed to AI parsing. */ }
+    } catch (e) {
+      // Not valid JSON, proceed to AI parsing.
+    }
 
-    // Attempt 2: If it looks like broken JSON, try to correct it via AI
+    // Attempt 2: If it looks like broken JSON, try to correct it online
+    // Check for potential JSON structure even if it's broken
     if (text.startsWith('{') || text.startsWith('[')) {
       try {
-        // The API returns the corrected object directly via json response
-        const correctedData = await api.correctJson(text);
-        if (processResult(correctedData)) {
-            setIsLoading(false);
-            return;
+        const correctionResult = await api.correctJson(text);
+        // api.correctJson now returns { correctedJson: "..." }
+        const correctedData = JSON.parse(correctionResult.correctedJson); 
+        if (correctedData && Object.keys(correctedData).length > 0) {
+            if (handleResult(correctedData)) {
+                setIsLoading(false);
+                return;
+            }
         }
       } catch (correctionError) {
         console.warn("AI JSON correction failed, falling back to text parser:", correctionError);
       }
     }
     
-    // Attempt 3: Fallback to parsing as unstructured text via AI
+    // Attempt 3: Fallback to parsing as unstructured text online
     try {
       const result = await api.parseText(text, window.location.origin);
-      if (!processResult(result)) {
-         throw new Error("Could not extract any valid data. Please check the Guide for formatting examples.");
-      }
+      handleResult(result); // handleResult will set error if no data found
     } catch (parseError: any) {
       console.error("AI Parser error:", parseError);
       setError(parseError.error || 'Failed to parse data. The AI service may be unavailable or the format is unrecognized.');
@@ -116,43 +112,39 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
         className={`w-full max-w-2xl bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--modal-border-radius)] shadow-[var(--modal-shadow)] ${contentAnimationClasses} overflow-hidden flex flex-col`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className={`flex items-center px-4 py-3 border-b border-white/10 ${theme === 'liquid-glass' ? 'bg-black/20' : 'bg-transparent'}`}>
-             {theme === 'liquid-glass' && (
-                <div className="flex gap-2 mr-4">
-                    <button onClick={handleClose} className="w-3 h-3 rounded-full bg-[#ff5f56]"></button>
-                    <div className="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
-                    <div className="w-3 h-3 rounded-full bg-[#27c93f]"></div>
-                </div>
-             )}
-             <h2 className="text-sm font-semibold text-white tracking-wide flex-grow text-center">AI Data Import</h2>
-        </div>
-
+        {theme === 'liquid-glass' && (
+          <div className="flex-shrink-0 flex items-center p-3 border-b border-[var(--glass-border)]">
+            <div className="flex gap-2">
+              <button onClick={handleClose} className="w-3 h-3 rounded-full bg-red-500"></button>
+              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            </div>
+            <h2 className="text-sm font-semibold text-white text-center flex-grow -ml-12">AI Data Import</h2>
+          </div>
+        )}
         <div className="p-6">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center">
                 <div>
                     {theme !== 'liquid-glass' && <h2 className="text-2xl font-bold text-white mb-2">AI Data Import</h2>}
-                    <p className="text-sm text-gray-400">Paste unstructured text or raw JSON to import data.</p>
+                    <p className="text-sm text-gray-400 mb-4">Paste unstructured text or raw JSON to import data or start a practice test.</p>
                 </div>
-                <button onClick={onOpenGuide} className="text-xs font-semibold text-cyan-400 hover:underline flex-shrink-0 flex items-center gap-1">
-                    <Icon name="book-open" className="w-3 h-3" /> Guide
-                </button>
+                <button onClick={onOpenGuide} className="text-xs font-semibold text-cyan-400 hover:underline flex-shrink-0">View {examType} Guide</button>
             </div>
             
             <textarea
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 className="w-full h-48 bg-gray-900 border border-gray-600 rounded-md p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                placeholder="Paste here..."
+                placeholder="Paste text here, e.g., 'Wednesday at 7pm I have a physics deep dive...' OR paste pre-formatted JSON."
             />
 
-            {error && <p className="text-sm text-red-400 mt-2 text-center bg-red-900/20 p-2 rounded">{error}</p>}
+            {error && <p className="text-sm text-red-400 mt-2 text-center">{error}</p>}
 
             <div className="flex justify-end items-center gap-4 pt-4 mt-4 border-t border-gray-700/50">
-                <button type="button" onClick={handleClose} className="px-5 py-2 text-sm font-semibold rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600">Cancel</button>
-                <button onClick={handleParse} disabled={isLoading} className="flex items-center justify-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-cyan-500 to-purple-500 text-white hover:opacity-90 disabled:opacity-50">
-                    {isLoading ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Processing...</> : <><Icon name="upload" /> Parse & Import</>}
-                </button>
+            <button type="button" onClick={handleClose} className="px-5 py-2 text-sm font-semibold rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600">Cancel</button>
+            <button onClick={handleParse} disabled={isLoading} className="flex items-center justify-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-cyan-500 to-purple-500 text-white hover:opacity-90 disabled:opacity-50">
+                {isLoading ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Parsing...</> : <><Icon name="upload" /> Parse & Import</>}
+            </button>
             </div>
         </div>
       </div>
