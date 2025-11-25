@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import McqTimer from './McqTimer';
 import Icon from './Icon';
@@ -340,7 +341,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
                   </button>
                 </div>
 
-                {/* ---------------------- MANUAL TAB (FIXED FRAGMENT) ---------------------- */}
+                {/* MANUAL TAB */}
                 {activeTab === 'manual' && (
                   <>
                     <div className="mt-4">
@@ -396,8 +397,6 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
                     )}
                   </>
                 )}
-                {/* ---------------------- END FIXED MANUAL TAB ---------------------- */}
-
 
                 {activeTab === 'ai' && (
                   <div className="space-y-4">
