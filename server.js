@@ -239,6 +239,21 @@ const adminMiddleware = (req, res, next) => {
     });
 };
 
+// --- HELPER: Find Row ID by Inner JSON ID ---
+// Since data is encrypted blobs, we have to fetch all and find the matching ID to update/delete
+// This is an inefficiency accepted for the sake of the encrypted blob architecture requested.
+const findRowIdByInnerId = async (tableName, userId, innerId) => {
+    const [rows] = await pool.query(`SELECT id, data FROM ${tableName} WHERE user_id = ?`, [userId]);
+    for (const row of rows) {
+        const item = decrypt(row.data);
+        // Check if item has an ID property that matches
+        if (item && item.ID === innerId) {
+            return row.id;
+        }
+    }
+    return null;
+};
+
 // --- HELPER: Get Full User Data ---
 const getUserData = async (userId) => {
     if (!pool) return null;
@@ -442,7 +457,356 @@ apiRouter.post('/register', async (req, res) => {
     }
 });
 
-// --- ADMIN ROUTES ---
+// --- USER DATA CRUD ---
+
+// Schedule Items
+apiRouter.post('/schedule-items', authMiddleware, async (req, res) => {
+    const { task } = req.body;
+    if (!task) return res.status(400).json({ error: "No task data" });
+    try {
+        // If ID exists, it might be an update, but simpler to just insert new version for now or handle updates.
+        // Actually, apiService uses saveTask for both create and update.
+        // For update, we should try to find and update, or delete and re-insert.
+        // Re-inserting with same ID is tricky with auto-inc PK.
+        // Let's check if it exists by inner ID.
+        const existingRowId = await findRowIdByInnerId('schedule_items', req.userId, task.ID);
+        
+        if (existingRowId) {
+            await pool.query("UPDATE schedule_items SET data = ? WHERE id = ?", [encrypt(task), existingRowId]);
+        } else {
+            await pool.query("INSERT INTO schedule_items (user_id, data) VALUES (?, ?)", [req.userId, encrypt(task)]);
+        }
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.post('/schedule-items/batch', authMiddleware, async (req, res) => {
+    const { tasks } = req.body;
+    if (!tasks || !Array.isArray(tasks)) return res.status(400).json({ error: "Invalid tasks array" });
+    
+    try {
+        const connection = await pool.getConnection();
+        await connection.beginTransaction();
+        for (const task of tasks) {
+             // Simply insert for batch import usually means new items
+             await connection.query("INSERT INTO schedule_items (user_id, data) VALUES (?, ?)", [req.userId, encrypt(task)]);
+        }
+        await connection.commit();
+        connection.release();
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.delete('/schedule-items/:taskId', authMiddleware, async (req, res) => {
+    const { taskId } = req.params;
+    try {
+        const rowId = await findRowIdByInnerId('schedule_items', req.userId, taskId);
+        if (rowId) {
+            await pool.query("DELETE FROM schedule_items WHERE id = ?", [rowId]);
+            res.json({ success: true });
+        } else {
+            res.status(404).json({ error: "Task not found" });
+        }
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Config
+apiRouter.post('/config', authMiddleware, async (req, res) => {
+    const updates = req.body;
+    try {
+        const [rows] = await pool.query("SELECT config FROM user_configs WHERE user_id = ?", [req.userId]);
+        let currentConfig = {};
+        if (rows.length > 0) {
+            const raw = rows[0].config;
+            const decrypted = decrypt(raw);
+            currentConfig = typeof decrypted === 'string' ? JSON.parse(decrypted) : decrypted;
+        }
+        
+        // Deep merge for settings
+        const newConfig = {
+            ...currentConfig,
+            ...updates,
+            settings: { ...currentConfig.settings, ...(updates.settings || {}) }
+        };
+        
+        // Insert or Update
+        if (rows.length > 0) {
+            await pool.query("UPDATE user_configs SET config = ? WHERE user_id = ?", [encrypt(newConfig), req.userId]);
+        } else {
+            await pool.query("INSERT INTO user_configs (user_id, config) VALUES (?, ?)", [req.userId, encrypt(newConfig)]);
+        }
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Full Sync (Used by many frontend actions)
+apiRouter.post('/user-data/full-sync', authMiddleware, async (req, res) => {
+    const { userData } = req.body;
+    if (!userData) return res.status(400).json({ error: "No data" });
+    
+    // This is a heavy operation, usually we'd want delta updates.
+    // But to support the current frontend logic:
+    try {
+        const connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        // Update Config
+        if (userData.CONFIG) {
+             await connection.query("DELETE FROM user_configs WHERE user_id = ?", [req.userId]);
+             await connection.query("INSERT INTO user_configs (user_id, config) VALUES (?, ?)", [req.userId, encrypt(userData.CONFIG)]);
+        }
+
+        // Helper to sync table
+        const syncTable = async (tableName, items) => {
+            await connection.query(`DELETE FROM ${tableName} WHERE user_id = ?`, [req.userId]);
+            for (const item of items) {
+                await connection.query(`INSERT INTO ${tableName} (user_id, data) VALUES (?, ?)`, [req.userId, encrypt(item)]);
+            }
+        };
+
+        if (userData.SCHEDULE_ITEMS) await syncTable('schedule_items', userData.SCHEDULE_ITEMS);
+        if (userData.RESULTS) await syncTable('results', userData.RESULTS);
+        if (userData.EXAMS) await syncTable('exams', userData.EXAMS);
+        if (userData.STUDY_SESSIONS) await syncTable('study_sessions', userData.STUDY_SESSIONS);
+
+        await connection.commit();
+        connection.release();
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Results CRUD
+apiRouter.put('/results', authMiddleware, async (req, res) => {
+    const { result } = req.body;
+    // Similar logic to schedule items, find by ID and update or insert
+    try {
+        const rowId = await findRowIdByInnerId('results', req.userId, result.ID);
+        if (rowId) {
+            await pool.query("UPDATE results SET data = ? WHERE id = ?", [encrypt(result), rowId]);
+        } else {
+            await pool.query("INSERT INTO results (user_id, data) VALUES (?, ?)", [req.userId, encrypt(result)]);
+        }
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.delete('/results', authMiddleware, async (req, res) => {
+    const { resultId } = req.body;
+    try {
+        const rowId = await findRowIdByInnerId('results', req.userId, resultId);
+        if (rowId) {
+            await pool.query("DELETE FROM results WHERE id = ?", [rowId]);
+            res.json({ success: true });
+        } else {
+            res.status(404).json({ error: "Result not found" });
+        }
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Profile
+apiRouter.put('/profile', authMiddleware, async (req, res) => {
+    const { fullName, profilePhoto } = req.body;
+    try {
+        const updates = [];
+        const params = [];
+        if (fullName) { updates.push("full_name = ?"); params.push(fullName); }
+        if (profilePhoto) { updates.push("profile_photo = ?"); params.push(profilePhoto); }
+        
+        if (updates.length > 0) {
+            params.push(req.userId);
+            await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
+        }
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.post('/me/api-token', authMiddleware, async (req, res) => {
+    try {
+        const token = crypto.randomBytes(24).toString('hex');
+        await pool.query("UPDATE users SET api_token = ? WHERE id = ?", [token, req.userId]);
+        res.json({ token });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.delete('/me/api-token', authMiddleware, async (req, res) => {
+    try {
+        await pool.query("UPDATE users SET api_token = NULL WHERE id = ?", [req.userId]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- DOUBTS ROUTES ---
+apiRouter.get('/doubts/all', authMiddleware, async (req, res) => {
+    if (!pool) return res.status(503).json({ error: "DB offline" });
+    try {
+        const [doubts] = await pool.query("SELECT * FROM doubts WHERE status != 'deleted' ORDER BY created_at DESC");
+        const [solutions] = await pool.query("SELECT * FROM doubt_solutions ORDER BY created_at ASC");
+        
+        const result = doubts.map(d => ({
+            ...d,
+            solutions: solutions.filter(s => s.doubt_id === d.id)
+        }));
+        res.json(result);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.post('/doubts', authMiddleware, async (req, res) => {
+    const { question, question_image } = req.body;
+    const user = await getUserData(req.userId);
+    if(!user) return res.status(401).json({error: "User not found"});
+    
+    const doubtId = `D${Date.now()}`;
+    try {
+        await pool.query(
+            "INSERT INTO doubts (id, user_sid, question, question_image, created_at, author_name, author_photo, status) VALUES (?, ?, ?, ?, NOW(), ?, ?, 'active')",
+            [doubtId, user.sid, question, question_image, user.fullName, user.profilePhoto]
+        );
+        res.json({ success: true, id: doubtId });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.post('/doubts/:doubtId/solutions', authMiddleware, async (req, res) => {
+    const { doubtId } = req.params;
+    const { solution, solution_image } = req.body;
+    const user = await getUserData(req.userId);
+    
+    const solId = `SOL${Date.now()}`;
+    try {
+        await pool.query(
+            "INSERT INTO doubt_solutions (id, doubt_id, user_sid, solution, solution_image, created_at, solver_name, solver_photo) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)",
+            [solId, doubtId, user.sid, solution, solution_image, user.fullName, user.profilePhoto]
+        );
+        res.json({ success: true, id: solId });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.put('/admin/doubts/:doubtId/status', adminMiddleware, async (req, res) => {
+    const { doubtId } = req.params;
+    const { status } = req.body;
+    try {
+        await pool.query("UPDATE doubts SET status = ? WHERE id = ?", [status, doubtId]);
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- MESSAGING ROUTES ---
+apiRouter.get('/messages/:sid', authMiddleware, async (req, res) => {
+    const { sid } = req.params;
+    try {
+        // Allow admin to see any, student to see own
+        if (req.userRole !== 'admin' && req.userSid !== sid) return res.status(403).json({error: "Unauthorized"});
+        
+        const [msgs] = await pool.query(
+            "SELECT * FROM messages WHERE sender_sid = ? OR recipient_sid = ? ORDER BY created_at ASC",
+            [sid, sid]
+        );
+        res.json(msgs);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.post('/messages', authMiddleware, async (req, res) => {
+    const { recipient_sid, content } = req.body;
+    try {
+        await pool.query(
+            "INSERT INTO messages (sender_sid, recipient_sid, content) VALUES (?, ?, ?)",
+            [req.userSid, recipient_sid, content]
+        );
+        // Return the message just created
+        const [rows] = await pool.query("SELECT * FROM messages WHERE sender_sid = ? AND recipient_sid = ? ORDER BY id DESC LIMIT 1", [req.userSid, recipient_sid]);
+        res.json(rows[0]);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- MUSIC & FILES ROUTES (WebDAV) ---
+
+apiRouter.get('/music/browse', authMiddleware, async (req, res) => {
+    if (!musicWebdavClient) return res.status(503).json({ error: "Music WebDAV not configured" });
+    const path = req.query.path || '/';
+    try {
+        const files = await musicWebdavClient.getDirectoryContents(path);
+        res.json(files.map(f => ({
+            name: f.basename,
+            type: f.type === 'directory' ? 'folder' : 'file',
+            path: f.filename,
+            size: f.size,
+            modified: f.lastmod
+        })));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.get('/music/content', async (req, res) => {
+    const { path, token } = req.query;
+    if (!musicWebdavClient) return res.status(503).send("Service unavailable");
+    
+    // Verify token manually since this is a direct link/src often
+    try {
+        jwt.verify(token, JWT_SECRET);
+        const stream = musicWebdavClient.createReadStream(path);
+        stream.pipe(res);
+    } catch (e) { res.status(401).send("Unauthorized"); }
+});
+
+apiRouter.get('/music/album-art', async (req, res) => {
+    const { path, token } = req.query;
+    // Just proxy the music file again, the frontend parser will extract art
+    if (!musicWebdavClient) return res.status(503).send("Service unavailable");
+    try {
+        jwt.verify(token, JWT_SECRET);
+        // We need the file to extract metadata.
+        // Optimization: In real app, cache extracted art. Here, re-stream file.
+        const stream = musicWebdavClient.createReadStream(path);
+        stream.pipe(res);
+    } catch (e) { res.status(401).send("Unauthorized"); }
+});
+
+apiRouter.get('/study-material/browse', authMiddleware, async (req, res) => {
+    if (!webdavClient) return res.status(503).json({ error: "WebDAV not configured" });
+    const path = req.query.path || '/';
+    try {
+        const files = await webdavClient.getDirectoryContents(path);
+        res.json(files.map(f => ({
+            name: f.basename,
+            type: f.type === 'directory' ? 'folder' : 'file',
+            path: f.filename,
+            size: f.size,
+            modified: f.lastmod
+        })));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.get('/study-material/content', authMiddleware, async (req, res) => {
+    if (!webdavClient) return res.status(503).send("Service unavailable");
+    const path = req.query.path;
+    try {
+        const stream = webdavClient.createReadStream(path);
+        stream.pipe(res);
+    } catch (e) { res.status(500).send("Error fetching file"); }
+});
+
+apiRouter.post('/study-material/details', authMiddleware, async (req, res) => {
+    if (!webdavClient) return res.status(503).json({ error: "WebDAV not configured" });
+    const { paths } = req.body;
+    try {
+        const details = [];
+        for (const p of paths) {
+            try {
+                const stat = await webdavClient.stat(p);
+                details.push({
+                    name: stat.basename,
+                    type: stat.type === 'directory' ? 'folder' : 'file',
+                    path: stat.filename,
+                    size: stat.size,
+                    modified: stat.lastmod
+                });
+            } catch (e) { /* ignore missing */ }
+        }
+        res.json(details);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+
+// --- ADMIN ROUTES (Broadcast, etc) ---
+// ... (Already in original file, keeping consistent) ...
 apiRouter.get('/admin/students', adminMiddleware, async (req, res) => {
     if (!pool) return res.status(503);
     try {
@@ -485,11 +849,6 @@ apiRouter.post('/admin/broadcast-task', adminMiddleware, async (req, res) => {
 
     try {
         let query = "SELECT id FROM users WHERE role = 'student'";
-        const params = [];
-        
-        // Since examType is stored in JSON config, we have to filter in JS or efficient query
-        // For simplicity/robustness with encrypted configs, we will fetch all, filter in JS
-        // This assumes user base is manageable.
         
         const [users] = await pool.query(query);
         const targetUserIds = [];
@@ -557,6 +916,26 @@ apiRouter.post('/admin/students/:sid/clear-data', adminMiddleware, async (req, r
 });
 
 // --- AI ROUTES (GENAI) ---
+
+// Helper for AI requests
+const simpleAiTask = async (req, res, promptSuffix) => {
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    try {
+        const { prompt, imageBase64 } = req.body;
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        
+        let parts = [prompt + (promptSuffix || "")];
+        if (imageBase64) {
+            parts.push({ inlineData: { data: imageBase64, mimeType: "image/jpeg" } });
+        }
+        
+        const result = await model.generateContent(parts);
+        const response = await result.response;
+        res.json({ response: response.text() });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
 
 apiRouter.post('/ai/parse-text', authMiddleware, async (req, res) => {
     const { text, domain } = req.body;
@@ -632,7 +1011,6 @@ apiRouter.post('/ai/chat', authMiddleware, async (req, res) => {
         let result;
         if (imageBase64) {
              // For multimodal chat, we can't use history easily with the current SDK in one go if history has images
-             // Simplified: Just send prompt + image as a new generation if image exists
              const imagePart = {
                 inlineData: {
                     data: imageBase64,
@@ -653,7 +1031,6 @@ apiRouter.post('/ai/chat', authMiddleware, async (req, res) => {
             ${domain}/?action=import_exam&data={"exams":[{"title":"...","date":"..."}]}
             `;
             
-            // Prepend system prompt to the last user message for context (workaround for simple chat)
             const msgWithSystem = `${systemPrompt}\nUser: ${prompt}`;
             result = await chat.sendMessage(msgWithSystem);
         }
@@ -665,26 +1042,124 @@ apiRouter.post('/ai/chat', authMiddleware, async (req, res) => {
     }
 });
 
-// ... (Other AI routes implemented similarly using genAI)
-// For brevity, implementing a generic handler for simple text-based AI tasks
-const simpleAiTask = async (req, res, promptSuffix) => {
+apiRouter.post('/ai/daily-insight', authMiddleware, async (req, res) => {
+    const { weaknesses, syllabus } = req.body;
     if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    
     try {
-        const { prompt, imageBase64 } = req.body;
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `
+        Generate a short, motivational study tip or insight for a JEE student.
+        User weaknesses: ${weaknesses.join(', ')}.
+        Upcoming exam syllabus: ${syllabus || 'General JEE Prep'}.
+        Return JSON: { "quote": "Motivational quote...", "insight": "Specific study tip..." }
+        `;
         
-        let parts = [prompt + (promptSuffix || "")];
-        if (imageBase64) {
-            parts.push({ inlineData: { data: imageBase64, mimeType: "image/jpeg" } });
+        const result = await model.generateContent(prompt);
+        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        res.json(JSON.parse(text));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.post('/ai/analyze-test-results', authMiddleware, async (req, res) => {
+    const { imageBase64, userAnswers, timings, syllabus } = req.body;
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+        const prompt = `
+        Analyze this test answer key image.
+        User Answers: ${JSON.stringify(userAnswers)}
+        Timings (sec): ${JSON.stringify(timings)}
+        Syllabus: ${syllabus}
+        
+        Match the image key with user answers.
+        Calculate score (+4 correct, -1 incorrect).
+        Identify weak chapters based on incorrect answers and the syllabus.
+        
+        Return strictly valid JSON:
+        {
+            "score": 120,
+            "totalMarks": 300,
+            "incorrectQuestionNumbers": [2, 5, ...],
+            "subjectTimings": { "Physics": 3600, "Chemistry": 2400, "Maths": 4000 },
+            "chapterScores": { "Rotational Motion": {"correct": 1, "incorrect": 2, "accuracy": 33}, ... },
+            "aiSuggestions": "Markdown study advice based on weaknesses...",
+            "suggestedFlashcards": [ {"front": "Q...", "back": "A..."} ]
         }
+        `;
+        
+        const imagePart = { inlineData: { data: imageBase64, mimeType: "image/jpeg" } };
+        const result = await model.generateContent([prompt, imagePart]);
+        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        res.json(JSON.parse(text));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.post('/ai/generate-flashcards', authMiddleware, async (req, res) => {
+    const { topic, syllabus } = req.body;
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const prompt = `Create 10 flashcards for "${topic}". Context: ${syllabus || ''}. Return JSON: { "flashcards": [{"front": "...", "back": "..."}] }`;
+        const result = await model.generateContent(prompt);
+        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        res.json(JSON.parse(text));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.post('/ai/generate-answer-key', authMiddleware, async (req, res) => {
+    const { prompt } = req.body;
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const fullPrompt = `Generate the official answer key for: ${prompt}. If unknown, generate a realistic practice key. Return JSON: { "answerKey": {"1": "A", "2": "B", ...} }`;
+        const result = await model.generateContent(fullPrompt);
+        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        res.json(JSON.parse(text));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.post('/ai/generate-practice-test', authMiddleware, async (req, res) => {
+    const { topic, numQuestions, difficulty } = req.body;
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+        const prompt = `
+        Generate a ${difficulty} practice test on "${topic}" with ${numQuestions} questions.
+        Return JSON:
+        {
+            "questions": [
+                { "number": 1, "text": "Question text...", "options": ["A. ..", "B. ..", "C. ..", "D. .."], "type": "MCQ" }
+            ],
+            "answers": { "1": "A", "2": "C" ... }
+        }
+        `;
+        const result = await model.generateContent(prompt);
+        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        res.json(JSON.parse(text));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+apiRouter.post('/ai/analyze-specific-mistake', authMiddleware, async (req, res) => {
+    const { prompt, imageBase64 } = req.body;
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const fullPrompt = `Analyze this specific mistake. User thought: "${prompt}". Return JSON: { "topic": "Main Topic", "explanation": "Detailed explanation of why it is wrong and the correct concept." }`;
+        
+        const parts = [fullPrompt];
+        if (imageBase64) parts.push({ inlineData: { data: imageBase64, mimeType: "image/jpeg" } });
         
         const result = await model.generateContent(parts);
-        const response = await result.response;
-        res.json({ response: response.text() });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-};
+        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        res.json(JSON.parse(text));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 apiRouter.post('/ai/analyze-mistake', authMiddleware, (req, res) => simpleAiTask(req, res, "\n\nAnalyze this mistake. Return JSON: { \"mistake_topic\": \"Short Topic Name\", \"explanation\": \"Detailed markdown explanation\" }"));
 apiRouter.post('/ai/solve-doubt', authMiddleware, (req, res) => simpleAiTask(req, res, "\n\nSolve this doubt with step-by-step markdown explanation."));
