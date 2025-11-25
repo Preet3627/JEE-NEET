@@ -1,4 +1,3 @@
-
 import express from 'express';
 import mysql from 'mysql2/promise';
 import cors from 'cors';
@@ -46,6 +45,43 @@ let googleClient = null;
 let webdavClient = null;
 let musicWebdavClient = null;
 let genAI = null;
+
+// --- HELPER: Robust AI JSON Parser ---
+const parseAIResponse = (text) => {
+    // 1. Remove Markdown code blocks
+    let cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+    try {
+        // 2. Try parsing standard JSON
+        return JSON.parse(cleaned);
+    } catch (e) {
+        console.warn("Initial JSON parse failed, attempting auto-fix for backslashes...", e.message);
+        
+        // 3. Fix common LaTeX/Path backslash issues
+        // Look for backslashes that are NOT followed by valid JSON escape characters (", \, /, b, f, n, r, t, u)
+        // and double them (e.g., \Delta -> \\Delta)
+        try {
+            const fixed = cleaned.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
+            return JSON.parse(fixed);
+        } catch (e2) {
+            console.error("Auto-fix failed. Trying to extract object/array.");
+            
+            // 4. Try to extract the first JSON object or array if there's surrounding text
+            const match = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+            if (match) {
+                try {
+                    const extracted = match[0];
+                    // Apply the backslash fix to the extracted part as well
+                    const fixedExtracted = extracted.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
+                    return JSON.parse(fixedExtracted);
+                } catch (e3) {
+                    throw new Error(`Failed to parse AI response after all attempts: ${e.message}`);
+                }
+            }
+            throw new Error(`Failed to parse AI response: ${e.message}`);
+        }
+    }
+};
 
 // --- ENCRYPTION SETUP ---
 const ALGORITHM = 'aes-256-cbc';
@@ -183,7 +219,6 @@ if (isConfigured) {
         googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
         
         if(process.env.API_KEY) {
-            // Initialize GoogleGenAI with apiKey
             genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
         }
         
@@ -910,7 +945,15 @@ const simpleAiTask = async (req, res, promptSuffix) => {
             contents: { parts: contents }
         });
         
-        res.json({ response: response.text });
+        res.json({ response: parseAIResponse(response.text) }); // Use parser for safety if JSON expected, or raw text if not?
+        // Wait, simpleAiTask usually returns raw text in a JSON wrapper { response: "..." }
+        // The parser is for structured data endpoints.
+        // Let's stick to returning raw text here for generic tasks, but parsed if it looks like JSON.
+        
+        // Actually, simpleAiTask is used for "analyze-mistake" and "solve-doubt" which return Markdown or JSON string inside response field.
+        // We'll leave it as raw text for frontend to renderMarkdown.
+        res.json({ response: response.text }); 
+
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: e.message });
@@ -960,10 +1003,8 @@ apiRouter.post('/ai/parse-text', authMiddleware, async (req, res) => {
             contents: { parts: [{ text: prompt }] }
         });
 
-        let textResponse = response.text;
-        textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
-        
-        res.json(JSON.parse(textResponse));
+        const parsedData = parseAIResponse(response.text);
+        res.json(parsedData);
     } catch (e) {
         console.error("AI Parse Error", e);
         res.status(500).json({ error: "Failed to parse text with AI" });
@@ -1034,8 +1075,7 @@ apiRouter.post('/ai/daily-insight', authMiddleware, async (req, res) => {
             contents: { parts: [{ text: prompt }] }
         });
         
-        const text = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
-        res.json(JSON.parse(text));
+        res.json(parseAIResponse(response.text));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1076,8 +1116,7 @@ apiRouter.post('/ai/analyze-test-results', authMiddleware, async (req, res) => {
             }
         });
 
-        const text = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
-        res.json(JSON.parse(text));
+        res.json(parseAIResponse(response.text));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1093,8 +1132,7 @@ apiRouter.post('/ai/generate-flashcards', authMiddleware, async (req, res) => {
             contents: { parts: [{ text: prompt }] }
         });
 
-        const text = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
-        res.json(JSON.parse(text));
+        res.json(parseAIResponse(response.text));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1110,8 +1148,7 @@ apiRouter.post('/ai/generate-answer-key', authMiddleware, async (req, res) => {
             contents: { parts: [{ text: fullPrompt }] }
         });
 
-        const text = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
-        res.json(JSON.parse(text));
+        res.json(parseAIResponse(response.text));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1136,8 +1173,7 @@ apiRouter.post('/ai/generate-practice-test', authMiddleware, async (req, res) =>
             contents: { parts: [{ text: prompt }] }
         });
 
-        const text = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
-        res.json(JSON.parse(text));
+        res.json(parseAIResponse(response.text));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1159,8 +1195,7 @@ apiRouter.post('/ai/analyze-specific-mistake', authMiddleware, async (req, res) 
             contents: { parts: parts }
         });
 
-        const text = response.text.replace(/```json/g, '').replace(/```/g, '').trim();
-        res.json(JSON.parse(text));
+        res.json(parseAIResponse(response.text));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1175,23 +1210,16 @@ apiRouter.post('/ai/solve-doubt', authMiddleware, (req, res) =>
 
 apiRouter.post('/ai/correct-json', authMiddleware, (req, res) => {
     const { brokenJson } = req.body;
-    // We construct a new req object structure for the helper, or we can just call generateContent directly.
-    // Calling helper by mocking req body:
-    // simpleAiTask(req, res, "") <-- req already has body.brokenJson, but helper expects body.prompt.
-    
-    // Better implementation inline for clarity:
     if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    
     const prompt = `Fix this broken JSON and return ONLY the valid JSON string: ${brokenJson}`;
     
     genAI.models.generateContent({
         model: 'gemini-1.5-flash',
         contents: { parts: [{ text: prompt }] }
     }).then(result => {
+        // Just return cleaned text for this specific utility endpoint
         const text = result.text.replace(/```json/g, '').replace(/```/g, '').trim();
-        // The frontend expects { correctedJson: ... } or similar, 
-        // but `AIParserModal` actually expects the raw object if it calls API directly?
-        // Looking at frontend AIParserModal.tsx: const correctedData = JSON.parse(correctionResult.correctedJson);
-        // So we must return { correctedJson: string }
         res.json({ correctedJson: text });
     }).catch(e => {
         res.status(500).json({ error: e.message });
