@@ -1,5 +1,6 @@
 
 
+
 import { StudentData, ScheduleItem, Config, ResultData, ExamData, DoubtData } from '../types';
 
 const API_URL = '/api';
@@ -19,7 +20,11 @@ const handleResponse = async (res: Response) => {
         // Handle successful but empty responses (like 204 No Content)
         return responseText ? JSON.parse(responseText) : {};
     } catch {
-        throw new Error('Failed to parse server response.');
+        // If response is not JSON, but success (e.g., plain text success message)
+        // Return the raw text or a success object depending on expected behavior
+        // For now, let's assume successful responses are always JSON or empty
+        console.warn("Server returned non-JSON response for a successful call:", responseText);
+        return responseText; // Return raw text if not parsable as JSON
     }
 };
 
@@ -47,6 +52,10 @@ export const authFetch = async (url: string, options: RequestInit = {}) => {
              // Dispatch a global event for the AuthContext to handle logout
              window.dispatchEvent(new Event('auth-error'));
              throw new Error('Unauthorized');
+        }
+        // For blob response types, handle them directly here without parsing as JSON
+        if ((options as any).returnRawResponse) { // Custom option to signal raw response needed
+            return response;
         }
         return handleResponse(response);
     } catch (error) {
@@ -114,7 +123,7 @@ export const api = {
 
     // Study Material
     getStudyMaterial: (path: string) => authFetch(`/study-material/browse?path=${encodeURIComponent(path)}`),
-    getStudyMaterialContent: (path: string) => authFetch(`/study-material/content?path=${encodeURIComponent(path)}`, { responseType: 'blob' as any }), // Needs custom responseType
+    getStudyMaterialContent: (path: string) => authFetch(`/study-material/content?path=${encodeURIComponent(path)}`, { returnRawResponse: true }).then(res => res.blob()), // FIX: Handle blob response explicitly
     getStudyMaterialDetails: (paths: string[]) => authFetch('/study-material/details', { method: 'POST', body: JSON.stringify({ paths }) }),
     
     // Music

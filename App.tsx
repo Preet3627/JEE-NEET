@@ -64,12 +64,11 @@ const API_URL = '/api';
 interface ModalState {
     id: string; // Unique identifier for the modal component (e.g., 'SettingsModal')
     componentId: string; // Internal ID for history state
-    onCloseCallback: () => void; // The original setState(false) function for the modal component
 }
 
 const App: React.FC = () => {
     const { currentUser, userRole, isLoading, isDemoMode, enterDemoMode, logout, refreshUser } = useAuth();
-    const { isFullScreenPlayerOpen, currentTrack, toggleLibrary, isLibraryOpen } = useMusicPlayer();
+    const { isFullScreenPlayerOpen, currentTrack, isLibraryOpen, toggleLibrary } = useMusicPlayer();
     
     const [allStudents, setAllStudents] = useState<StudentData[]>([]);
     const [allDoubts, setAllDoubts] = useState<DoubtData[]>([]);// FIX: Added `DoubtData` type.
@@ -85,38 +84,28 @@ const App: React.FC = () => {
     // --- Modal Navigation State ---
     const modalStack = useRef<ModalState[]>([]);
     // This map stores the setState functions for each modal, allowing generic open/close
-    const modalSetStateMap = useRef<Map<string, React.Dispatch<React.SetStateAction<boolean>> | ((val: any) => void)>>(new Map()); // FIX: Updated type for `modalSetStateMap`
+    // FIX: Updated type for `modalSetStateMap`
+    const modalSetStateMap = useRef<Map<string, React.Dispatch<React.SetStateAction<boolean>> | ((val: any) => void)>>(new Map()); 
 
-    const openModal = useCallback((modalId: string, setStateTrue: React.Dispatch<React.SetStateAction<boolean>> | (() => void)) => {
-        // Prevent opening if already in stack, or if another modal with same ID is topmost
-        if (modalStack.current.some(m => m.id === modalId)) {
-            console.warn(`Attempted to open modal ${modalId} which is already in the stack.`);
-            // If it's already open, ensure it's at the top of the history
-            if (modalStack.current.length > 0 && modalStack.current[modalStack.current.length - 1].id === modalId) {
-                return;
-            }
+    const openModal = useCallback((modalId: string, setter: React.Dispatch<React.SetStateAction<boolean>> | ((val: any) => void), initialValue: any = true) => {
+        // Only push history state if this modal isn't already the topmost
+        if (modalStack.current.length > 0 && modalStack.current[modalStack.current.length - 1].id === modalId) {
+            return;
         }
 
         const historyStateId = `modal-${modalId}-${Date.now()}`;
-        // Push a new state to browser history, linking it to our modal
         window.history.pushState({ modalId: historyStateId, appModal: true }, '', window.location.pathname); 
 
-        // Store the original setState callback for this modal
-        modalSetStateMap.current.set(modalId, setStateTrue);
+        modalSetStateMap.current.set(modalId, setter); // Store the setter
 
-        const modalState: ModalState = {
-            id: modalId,
-            componentId: historyStateId,
-            onCloseCallback: setStateTrue,
-        };
-        modalStack.current.push(modalState);
+        modalStack.current.push({ id: modalId, componentId: historyStateId });
         
-        // Call the original setState to truly open the modal component
-        if (typeof setStateTrue === 'function') {
-            (setStateTrue as React.Dispatch<React.SetStateAction<boolean>>)(true);
+        // Call the original setter to truly open the modal component
+        if (typeof setter === 'function') {
+            (setter as React.Dispatch<React.SetStateAction<boolean>>)(initialValue);
         } else {
             // For special setters that don't take boolean, e.g., toggleLibrary() or setViewingDeck(deck)
-            (setStateTrue as () => void)();
+            (setter as (val: any) => void)(initialValue);
         }
     }, []);
 
@@ -124,19 +113,18 @@ const App: React.FC = () => {
         const index = modalStack.current.findIndex(m => m.id === modalId);
         if (index === -1) {
             console.warn(`Attempted to close modal ${modalId} not found in stack.`);
-            // If not in stack, just set its state to false if we can.
+            // If not in stack, just set its state to false/null if we can.
             const setStateFalse = modalSetStateMap.current.get(modalId);
-            if (setStateFalse) { // FIX: Check if setter exists
+            if (setStateFalse) { 
                 if (typeof setStateFalse === 'function') {
                     (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
                 } else {
-                    (setStateFalse as (val: any) => void)(null); // For object-based setters, pass null to clear
+                    (setStateFalse as (val: any) => void)(null); 
                 }
             }
             return;
         }
 
-        const modalToClose = modalStack.current[index];
         // Only trigger history.back() if this is the topmost modal
         if (index === modalStack.current.length - 1) {
             // This will trigger handlePopState
@@ -145,11 +133,11 @@ const App: React.FC = () => {
             // If not topmost, remove from stack and force close its component state
             modalStack.current.splice(index, 1);
             const setStateFalse = modalSetStateMap.current.get(modalId);
-            if (setStateFalse) { // FIX: Check if setter exists
+            if (setStateFalse) { 
                 if (typeof setStateFalse === 'function') {
                     (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
                 } else {
-                    (setStateFalse as (val: any) => void)(null); // For object-based setters, pass null to clear
+                    (setStateFalse as (val: any) => void)(null); 
                 }
             }
             console.warn(`Modal ${modalId} closed out of order, removed from stack. Current stack size: ${modalStack.current.length}`);
@@ -160,20 +148,20 @@ const App: React.FC = () => {
     // --- Global popstate listener for browser back button and modal `onClose` callbacks ---
     useEffect(() => {
         const handlePopState = (event: PopStateEvent) => {
-            // Check if the state we are popping is one created by our modal system
             if (event.state && event.state.appModal) {
+                // This is a state created by our modal system
                 const topmostModal = modalStack.current[modalStack.current.length - 1];
 
                 if (topmostModal && topmostModal.componentId === event.state.modalId) {
                     // This is a controlled back navigation for our topmost modal
                     modalStack.current.pop();
-                    // Call the original setState(false) to hide the component
+                    // Call the original setState(false/null) to hide the component
                     const setStateFalse = modalSetStateMap.current.get(topmostModal.id);
-                    if (setStateFalse) { // FIX: Check if setter exists
+                    if (setStateFalse) { 
                         if (typeof setStateFalse === 'function') {
-                            (setStateFalse as React.Dispatch<React.SetSetStateAction<boolean>>)(false);
+                            (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
                         } else {
-                            (setStateFalse as (val: any) => void)(null); // For object-based setters
+                            (setStateFalse as (val: any) => void)(null); 
                         }
                     }
                 } else {
@@ -190,7 +178,7 @@ const App: React.FC = () => {
                         for (let i = modalStack.current.length - 1; i >= indexInStack; i--) {
                             const modal = modalStack.current[i];
                             const setStateFalse = modalSetStateMap.current.get(modal.id);
-                            if (setStateFalse) { // FIX: Check if setter exists
+                            if (setStateFalse) { 
                                 if (typeof setStateFalse === 'function') {
                                     (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
                                 } else {
@@ -204,7 +192,7 @@ const App: React.FC = () => {
                         // or a modal was closed unexpectedly. Clear stack and ensure no modals are rendered.
                         modalStack.current.forEach(modal => {
                             const setStateFalse = modalSetStateMap.current.get(modal.id);
-                            if (setStateFalse) { // FIX: Check if setter exists
+                            if (setStateFalse) { 
                                 if (typeof setStateFalse === 'function') {
                                     (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
                                 } else {
@@ -222,13 +210,11 @@ const App: React.FC = () => {
                 const topmostModal = modalStack.current[modalStack.current.length - 1];
                 console.log(`Intercepting browser back for modal ${topmostModal.id}.`);
                 // Re-push the state to stay on page and effectively prevent default browser navigation
-                // This might cause an infinite loop if not handled carefully, ensuring the next `popstate`
-                // is properly consumed by `closeModal` or `handlePopState` logic.
                 window.history.pushState(event.state, '', window.location.pathname); 
                 
                 // Then, trigger the close of the topmost modal
                 const setStateFalse = modalSetStateMap.current.get(topmostModal.id);
-                if (setStateFalse) { // FIX: Check if setter exists
+                if (setStateFalse) { 
                     if (typeof setStateFalse === 'function') {
                         (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
                     } else {
@@ -280,8 +266,6 @@ const App: React.FC = () => {
                     setDeepLinkAction({ action, data });
                 } catch (e) {
                     try {
-                        // Attempt to correct malformed JSON
-                        // FIX: Ensure `api.correctJson` exists and is called correctly
                         const correctionResult = await api.correctJson(decodedData);
                         const correctedData = JSON.parse(correctionResult.correctedJson);
                         setDeepLinkAction({ action, data: correctedData });
@@ -687,7 +671,7 @@ const App: React.FC = () => {
     const [isAiChatOpen, setAiChatOpen] = useState(false);
     const [isAiDoubtSolverOpen, setAiDoubtSolverOpen] = useState(false);
     const [isCreateDeckModalOpen, setCreateDeckModalOpen] = useState(false);
-    const [isAiFlashcardModalOpen, setAiFlashcardModalOpen] = useState(false);
+    const [isAiFlashcardModalOpen, setAiFlashcardModalOpen] = useState(false); // FIX: Corrected variable name
     const [isCreateCardModalOpen, setCreateCardModalOpen] = useState(false);
     const [isMessagingModalOpen, setMessagingModalOpen] = useState(false); 
     const [isUniversalSearchOpen, setUniversalSearchOpen] = useState(false);
@@ -732,7 +716,7 @@ const App: React.FC = () => {
         ['MusicLibraryModal', toggleLibrary], 
         ['DeepLinkConfirmationModal', setDeepLinkAction], 
         ['CreateEditDeckModal', setCreateDeckModalOpen],
-        ['AIGenerateFlashcardsModal', setAiFlashcardModalOpen],
+        ['AIGenerateFlashcardsModal', setAiFlashcardModalOpen], 
         ['DeckViewModal', setViewingDeck], 
         ['CreateEditFlashcardModal', setCreateCardModalOpen],
         ['FlashcardReviewModal', setReviewingDeck], 
@@ -810,8 +794,8 @@ const App: React.FC = () => {
                                 onPostDoubt={onPostDoubt} 
                                 onPostSolution={onPostSolution} 
                                 deepLinkAction={deepLinkAction}
-                                openModal={openModal}
-                                closeModal={closeModal}
+                                openModal={openModal} {/* FIX: Pass openModal */}
+                                closeModal={closeModal} {/* FIX: Pass closeModal */}
                                 // Pass specific modal state setters and getters for granular control
                                 isCreateModalOpen={isCreateModalOpen} setIsCreateModalOpen={setIsCreateModalOpen}
                                 isAiParserModalOpen={isAiParserModalOpen} setisAiParserModalOpen={setisAiParserModalOpen}
@@ -844,14 +828,14 @@ const App: React.FC = () => {
                                 isAiChatLoading={false} setIsAiChatLoading={()=>{}} // Not directly used in studentDashboard
                                 isAiDoubtSolverOpen={isAiDoubtSolverOpen} setAiDoubtSolverOpen={setAiDoubtSolverOpen}
                                 isCreateDeckModalOpen={isCreateDeckModalOpen} setCreateDeckModalOpen={setCreateDeckModalOpen}
-                                isAiFlashcardModalOpen={isAiFlashcardModalOpen} setAiFlashcardModalOpen={setAiFlashcardModalOpen}
+                                isAiFlashcardModalOpen={isAiFlashcardModalOpen} setIsAiFlashcardModalOpen={setAiFlashcardModalOpen} {/* FIX: Corrected variable name */}
                                 editingDeck={editingDeck} setEditingDeck={setEditingDeck}
                                 viewingDeck={viewingDeck} setViewingDeck={setViewingDeck}
                                 isCreateCardModalOpen={isCreateCardModalOpen} setCreateCardModalOpen={setCreateCardModalOpen}
                                 editingCard={editingCard} setEditingCard={setEditingCard}
                                 reviewingDeck={reviewingDeck} setReviewingDeck={setReviewingDeck}
                                 viewingFile={viewingFile} setViewingFile={setViewingFile}
-                                isMusicLibraryOpen={isLibraryOpen} setIsMusicLibraryOpen={toggleLibrary}
+                                isMusicLibraryOpen={isLibraryOpen} setIsMusicLibraryOpen={toggleLibrary} {/* FIX: Use isLibraryOpen */}
                                 analyzingMistake={analyzingMistake} setAnalyzingMistake={setAnalyzingMistake}
                             />
                         )}
@@ -900,7 +884,7 @@ const App: React.FC = () => {
             {isLogResultModalOpen && currentUser && <LogResultModal onClose={() => {closeModal('LogResultModal'); setInitialScoreForModal(undefined); setInitialMistakesForModal(undefined);}} onSave={onLogResult} initialScore={initialScoreForModal} initialMistakes={initialMistakesForModal} />}
             {isEditResultModalOpen && currentUser && editingResult && <EditResultModal result={editingResult} onClose={() => { closeModal('EditResultModal'); setEditingResult(null); }} onSave={api.updateResult} />}
             {isExamModalOpen && currentUser && <CreateEditExamModal exam={editingExam} onClose={() => { closeModal('CreateEditExamModal'); setEditingExam(null); }} onSave={(exam) => editingExam ? onUpdateExam(exam) : onAddExam(exam)} />}
-            {isAiMistakeModalOpen && currentUser && <AIMistakeAnalysisModal onClose={() => closeModal('AIMistakeAnalysisModal')} onSaveWeakness={onUpdateWeaknesses} />}
+            {isAiMistakeModalOpen && currentUser && <AIMistakeAnalysisModal onClose={() => closeModal('AIMistakeAnalysisModal')} onSaveWeakness={(weakness) => onUpdateWeaknesses([...new Set([...(currentUser.CONFIG.WEAK || []), weakness])])} />} {/* FIX: Wrap onUpdateWeaknesses */}
             {isAiDoubtSolverOpen && currentUser && <AIDoubtSolverModal onClose={() => closeModal('AIDoubtSolverModal')} />}
             {isAiChatOpen && currentUser && <AIChatPopup history={[]} onSendMessage={() => {}} onClose={() => closeModal('AIChatPopup')} isLoading={false} />}
             {currentUser && viewingReport && <TestReportModal result={viewingReport} onClose={() => setViewingReport(null)} onUpdateWeaknesses={onUpdateWeaknesses} student={currentUser} onSaveDeck={() => {}} />}
@@ -910,7 +894,7 @@ const App: React.FC = () => {
 
             {/* Flashcard Modals */}
             {isCreateDeckModalOpen && currentUser && <CreateEditDeckModal deck={editingDeck} onClose={() => { closeModal('CreateEditDeckModal'); setEditingDeck(null); }} onSave={() => {}} />}
-            {isAiFlashcardModalOpen && currentUser && <AIGenerateFlashcardsModal student={currentUser} onClose={() => closeModal('AIGenerateFlashcard sModal')} onSaveDeck={() => {}} />}
+            {isAiFlashcardModalOpen && currentUser && <AIGenerateFlashcardsModal student={currentUser} onClose={() => closeModal('AIGenerateFlashcardsModal')} onSaveDeck={() => {}} />}
             {currentUser && viewingDeck && <DeckViewModal deck={viewingDeck} onClose={() => setViewingDeck(null)} onAddCard={() => openModal('CreateEditFlashcardModal', setCreateCardModalOpen)} onEditCard={() => {}} onDeleteCard={() => {}} onStartReview={() => {setReviewingDeck(viewingDeck); openModal('FlashcardReviewModal', setReviewingDeck);}} />}
             {isCreateCardModalOpen && currentUser && viewingDeck && <CreateEditFlashcardModal card={editingCard} deckId={viewingDeck.id} onClose={() => { closeModal('CreateEditFlashcardModal'); setEditingCard(null); }} onSave={() => {}} />}
             {currentUser && reviewingDeck && <FlashcardReviewModal deck={reviewingDeck} onClose={() => closeModal('FlashcardReviewModal')} />}

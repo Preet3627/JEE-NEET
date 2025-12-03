@@ -1,4 +1,5 @@
 
+
 import { StudentData, UiText, ScheduleItem } from '../types';
 
 // Mock uiTextData
@@ -658,7 +659,7 @@ export const studentDatabase: StudentData[] = [
       { date: '2024-05-20', duration: 3600, questions_solved: 20, questions_skipped: [5, 12] },
       { date: '2024-05-21', duration: 5400, questions_solved: 30, questions_skipped: [10] },
     ],
-    DOUBTS: []
+    // DOUBTS: [] // FIX: Removed DOUBTS as it's not part of StudentData
   },
   {
     id: 2,
@@ -685,6 +686,6 @@ export const studentDatabase: StudentData[] = [
     RESULTS: [],
     EXAMS: [],
     STUDY_SESSIONS: [],
-    DOUBTS: []
+    // DOUBTS: [] // FIX: Removed DOUBTS as it's not part of StudentData
   },
 ];
