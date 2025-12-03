@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Icon from './Icon';
 import { playNextSound, playStopSound, playMarkSound, vibrate } from '../utils/sounds';
@@ -236,8 +237,8 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
 
         if (correctAnswers) {
             const correctAnswer = correctAnswers[currentQuestionNumber.toString()];
-            // FIX: Ensure normalizeAnswer can handle string | string[] for both arguments
-            const isCorrect = normalizeAnswer(value) === normalizeAnswer(correctAnswer);
+            // FIX: Correctly compare string or string[] answers
+            const isCorrect = JSON.stringify(normalizeAnswer(value)) === JSON.stringify(normalizeAnswer(correctAnswer));
             setFeedback({
                 status: isCorrect ? 'correct' : 'incorrect',
                 correctAnswer: correctAnswer,
@@ -360,7 +361,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
             const answer = correctAnswers[currentQuestionNumber.toString()];
             if (Array.isArray(answer)) return 'MULTI_CHOICE';
             // Simple check: if answer contains only A-D, it's likely MCQ. Otherwise, NUM.
-            return ['A', 'B', 'C', 'D'].includes(answer.toUpperCase().trim()) ? 'MCQ' : 'NUM';
+            return ['A', 'B', 'C', 'D'].includes((answer as string).toUpperCase().trim()) ? 'MCQ' : 'NUM';
         }
         if (practiceMode === 'jeeMains') {
             return getQuestionInfo(currentQuestionIndex).type;
@@ -470,10 +471,10 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
 
         // Feedback logic for Multi-Choice
         if (isMultiChoice) {
-            const normalizedUserAnswers = Array.isArray(userAnswer) ? userAnswer.map(normalizeAnswer) : [];
+            const normalizedUserAnswers = Array.isArray(userAnswer) ? userAnswer.map(a => normalizeAnswer(a)) : [];
             const normalizedCorrectAnswers = Array.isArray(normalizedCorrectAnswer) ? normalizedCorrectAnswer : [];
 
-            const isCorrectOption = normalizedCorrectAnswers.includes(currentOption);
+            const isCorrectOption = normalizedCorrectAnswers.includes(currentOption as string);
             const wasUserSelected = normalizedUserAnswers.includes(currentOption);
 
             if (isCorrectOption) {

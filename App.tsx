@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from './context/AuthContext';
 import { StudentData, ScheduleItem, StudySession, Config, ResultData, ExamData, DoubtData, HomeworkData, PracticeQuestion, FlashcardDeck, Flashcard, StudyMaterialItem } from './types';
@@ -6,6 +7,7 @@ import { studentDatabase } from './data/mockData';
 import { api } from './api/apiService';
 
 import Header from './components/Header';
+// FIX: Changed to named import as StudentDashboard does not have a default export.
 import StudentDashboard from './components/StudentDashboard';
 import TeacherDashboard from './components/TeacherDashboard';
 import AuthScreen from './screens/AuthScreen';
@@ -757,30 +759,24 @@ const App: React.FC = () => {
     isAnswerKeyUploadModalOpen, setAnswerKeyUploadModalOpen, isProfileModalOpen, setIsProfileModalOpen,
     isSpecificMistakeAnalysisModalOpen, setIsSpecificMistakeAnalysisModalOpen,
   }), [
-    openModal, closeModal, isExamTypeSelectionModalOpen, setIsExamTypeSelectionModalOpen,
-    isCreateModalOpen, setIsCreateModalOpen, isAiParserModalOpen, setisAiParserModalOpen, isPracticeModalOpen, setIsPracticeModalOpen,
-    isSettingsModalOpen, setIsSettingsModalOpen, editingTask, setEditingTask,
-    viewingTask, setViewingTask, practiceTask, setPracticeTask, aiPracticeTest, setAiPracticeTest,
-    isEditWeaknessesModalOpen, setIsEditWeaknessesModalOpen, isLogResultModalOpen, setLogResultModalOpen,
-    initialScoreForModal, setInitialScoreForModal, initialMistakesForModal, setInitialMistakesForModal,
-    isEditResultModalOpen, setEditResultModalOpen, editingResult, setEditingResult,
-    isExamModalOpen, setIsExamModalOpen, editingExam, setEditingExam,
-    isAiMistakeModalOpen, setAiMistakeModalOpen, viewingReport, setViewingReport,
-    isAssistantGuideOpen, setAssistantGuideOpen, isAiGuideModalOpen, setAiGuideModalOpen,
-    isSearchOpen, setIsSearchOpen, searchInitialQuery, setSearchInitialQuery,
-    isSelectMode, setIsSelectMode, selectedTaskIds, setSelectedTaskIds,
-    isMoveModalOpen, setMoveModalOpen, isAiChatOpen, setAiChatOpen,
-    aiChatHistory, setAiChatHistory, showAiChatFab, setShowAiChatFab,
-    isAiChatLoading, setIsAiChatLoading, isAiDoubtSolverOpen, setIsAiDoubtSolverOpen, 
-    isCreateDeckModalOpen, setCreateDeckModalOpen, isAiFlashcardModalOpen, setAiFlashcardModalOpen,
-    editingDeck, setEditingDeck, viewingDeck, setViewingDeck,
-    isCreateCardModalOpen, setCreateCardModalOpen, editingCard, setEditingCard,
-    reviewingDeck, setReviewingDeck, viewingFile, setViewingFile,
-    isMusicLibraryOpen, setIsMusicLibraryOpen, analyzingMistake, setAnalyzingMistake,
-    handleMoveSelectedTasks, handleSaveDeck, handleDeleteCard, handleSaveCard, // Add handlers as dependencies
-    setDeepLinkAction, isMessagingModalOpen, setMessagingModalOpen, messagingStudent, setMessagingStudent,
-    isAnswerKeyUploadModalOpen, setAnswerKeyUploadModalOpen, isProfileModalOpen, setIsProfileModalOpen,
-    isSpecificMistakeAnalysisModalOpen, setIsSpecificMistakeAnalysisModalOpen
+    openModal, closeModal, isExamTypeSelectionModalOpen,
+    isCreateModalOpen, isAiParserModalOpen, isPracticeModalOpen,
+    isSettingsModalOpen, editingTask, viewingTask, practiceTask, aiPracticeTest,
+    isEditWeaknessesModalOpen, isLogResultModalOpen,
+    initialScoreForModal, initialMistakesForModal,
+    isEditResultModalOpen, editingResult, isExamModalOpen, editingExam,
+    isAiMistakeModalOpen, viewingReport,
+    isAssistantGuideOpen, isAiGuideModalOpen,
+    isSearchOpen, searchInitialQuery,
+    isSelectMode, selectedTaskIds, isMoveModalOpen, isAiChatOpen,
+    aiChatHistory, showAiChatFab, isAiChatLoading, isAiDoubtSolverOpen, 
+    isCreateDeckModalOpen, isAiFlashcardModalOpen,
+    editingDeck, viewingDeck, isCreateCardModalOpen, editingCard,
+    reviewingDeck, viewingFile, isMusicLibraryOpen, analyzingMistake,
+    handleMoveSelectedTasks, handleSaveDeck, handleDeleteCard, handleSaveCard,
+    setDeepLinkAction, isMessagingModalOpen, messagingStudent,
+    isAnswerKeyUploadModalOpen, isProfileModalOpen,
+    isSpecificMistakeAnalysisModalOpen
   ]);
 
   const renderMainContent = () => {
@@ -842,131 +838,4 @@ const App: React.FC = () => {
   return renderMainContent();
 };
 
-export default App;--- START OF FILE vite.config.ts ---
-
-
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import { VitePWA } from 'vite-plugin-pwa'
-import { nodePolyfills } from 'vite-plugin-node-polyfills'
-
-// https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [
-    react(),
-    nodePolyfills({
-      // Whether to polyfill specific globals.
-      globals: {
-        Buffer: true,
-        global: true,
-        process: true,
-      },
-      // Whether to polyfill `node:` protocol imports.
-      protocolImports: true,
-    }),
-    VitePWA({
-      registerType: 'autoUpdate',
-      injectRegister: 'auto',
-      strategies: 'injectManifest',
-      srcDir: '.',
-      filename: 'service-worker.js',
-      devOptions: {
-        enabled: true
-      },
-      manifest: false // We are using public/manifest.json
-    })
-  ],
-  server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-      }
-    }
-  },
-  build: {
-    outDir: 'dist',
-  }
-})--- START OF FILE tailwind.config.js ---
-
-/** @type {import('tailwindcss').Config} */
-export default {
-  content: [
-    "./index.html",
-    "./*.{js,ts,jsx,tsx}",
-    "./components/**/*.{js,ts,jsx,tsx}",
-    "./context/**/*.{js,ts,jsx,tsx}",
-    "./data/**/*.{js,ts,jsx,tsx}",
-    "./screens/**/*.{js,ts,jsx,tsx}",
-    "./utils/**/*.{js,ts,jsx,tsx}",
-  ],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-}--- START OF FILE postcss.config.js ---
-
-export default {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-}--- START OF FILE index.css ---
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;--- START OF FILE components/widgets/FlashcardWidget.tsx ---
---- START OF FILE components/ImageToTimetableModal.tsx ---
---- START OF FILE components/EditWeaknessesModal.tsx ---
-
-import React, { useState } from 'react';
-
-interface EditWeaknessesModalProps {
-  currentWeaknesses: string[];
-  onClose: () => void;
-  onSave: (weaknesses: string[]) => void;
-}
-
-const EditWeaknessesModal: React.FC<EditWeaknessesModalProps> = ({ currentWeaknesses, onClose, onSave }) => {
-  const [weaknessesText, setWeaknessesText] = useState(currentWeaknesses.join('\n'));
-  const [isExiting, setIsExiting] = useState(false);
-
-  const handleClose = () => {
-    setIsExiting(true);
-    setTimeout(onClose, 300);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const weaknessesArray = weaknessesText.split('\n').map(w => w.trim()).filter(Boolean);
-    onSave(weaknessesArray);
-    handleClose();
-  };
-
-  const animationClasses = isExiting ? 'modal-exit' : 'modal-enter';
-  const contentAnimationClasses = isExiting ? 'modal-content-exit' : 'modal-content-enter';
-
-  return (
-    <div className={`fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${animationClasses}`} onClick={handleClose}>
-      <div className={`w-full max-w-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl shadow-2xl p-6 ${contentAnimationClasses}`} onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-2xl font-bold text-white mb-2">Edit Priority Weaknesses</h2>
-        <p className="text-sm text-gray-400 mb-4">List your main areas for improvement, one per line. These will be prioritized in your schedule.</p>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <textarea
-            value={weaknessesText}
-            onChange={(e) => setWeaknessesText(e.target.value)}
-            className="w-full h-48 bg-gray-900 border border-gray-600 rounded-md p-3 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-            placeholder="e.g., Integration by Parts&#10;Wave Optics&#10;Mole Concept"
-          />
-          <div className="flex justify-end gap-4 pt-2">
-            <button type="button" onClick={handleClose} className="px-5 py-2 text-sm font-semibold rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600 transition-colors">Cancel</button>
-            <button type="submit" className="px-5 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-cyan-500 to-purple-500 text-white hover:opacity-90 transition-opacity">Save Weaknesses</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-export default EditWeaknessesModal;
+export default App;

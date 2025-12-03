@@ -53,7 +53,13 @@ const parseAnswers = (text: string): Record<string, string | string[]> => {
             if (parts.length === 2) {
                 const qNum = parts[0].trim();
                 const answer = parts[1].trim();
-                if (qNum && answer) answers[qNum] = answer;
+                if (qNum && answer) {
+                    if (answer.startsWith('[') && answer.endsWith(']')) {
+                        answers[qNum] = answer.slice(1, -1).split(',');
+                    } else {
+                        answers[qNum] = answer;
+                    }
+                }
             }
         });
     } else {
