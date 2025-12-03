@@ -202,6 +202,30 @@ export interface Config {
   }
 }
 
+// Added missing DoubtData and MessageData interfaces
+export interface DoubtSolutionData {
+  id: string;
+  doubt_id: string;
+  user_sid: string;
+  solution: string;
+  solution_image?: string;
+  created_at: string;
+  solver_name: string;
+  solver_photo?: string;
+}
+
+export interface DoubtData {
+  id: string;
+  user_sid: string;
+  question: string;
+  question_image?: string;
+  created_at: string;
+  author_name: string;
+  author_photo?: string;
+  status: 'active' | 'archived' | 'deleted';
+  solutions: DoubtSolutionData[]; // Solutions are part of a doubt
+}
+
 export interface StudentData {
   id: number;
   sid: string;
@@ -217,7 +241,7 @@ export interface StudentData {
   RESULTS: ResultData[];
   EXAMS: ExamData[];
   STUDY_SESSIONS: StudySession[];
-  DOUBTS: DoubtData[];
+  // DOUBTS: DoubtData[]; // Doubts are fetched globally for community, not stored per student directly
 }
 
 export interface MessageData {

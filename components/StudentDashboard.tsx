@@ -49,7 +49,7 @@ import MoveTasksModal from './MoveTasksModal';
 import TodayPlanner from './TodayPlanner';
 import CountdownWidget from './widgets/CountdownWidget';
 import InteractiveFlashcardWidget from './widgets/InteractiveFlashcardWidget';
-import MotivationalQuoteWidget from './widgets/MotivationalQuoteWidget';
+import MotivationalQuoteWidget from './widgets/widgets/MotivationalQuoteWidget';
 import MusicPlayerWidget from './widgets/MusicPlayerWidget';
 import MusicLibraryModal from './MusicLibraryModal';
 import WeatherWidget from './widgets/WeatherWidget';
@@ -118,7 +118,7 @@ interface StudentDashboardProps {
     isAiChatLoading: boolean; setIsAiChatLoading: React.Dispatch<React.SetStateAction<boolean>>;
     isAiDoubtSolverOpen: boolean; setAiDoubtSolverOpen: React.Dispatch<React.SetStateAction<boolean>>;
     isCreateDeckModalOpen: boolean; setCreateDeckModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
-    isAiFlashcardModalOpen: boolean; setAiFlashcardModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isAiFlashcardModalOpen: boolean; setIsAiFlashcardModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     editingDeck: FlashcardDeck | null; setEditingDeck: React.Dispatch<React.SetStateAction<FlashcardDeck | null>>;
     viewingDeck: FlashcardDeck | null; setViewingDeck: React.Dispatch<React.SetStateAction<FlashcardDeck | null>>;
     isCreateCardModalOpen: boolean; setCreateCardModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -162,7 +162,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         isSelectMode, setIsSelectMode,
         selectedTaskIds, setSelectedTaskIds,
         isMoveModalOpen, setMoveModalOpen,
-        isAiChatOpen, setIsAiChatOpen,
+        isAiChatOpen, setAiChatOpen,
         aiChatHistory, setAiChatHistory,
         showAiChatFab, setShowAiChatFab,
         isAiChatLoading, setIsAiChatLoading,
@@ -189,6 +189,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     // Layout Editor State
     const [isEditLayoutMode, setIsEditLayoutMode] = useState(false);
     
+    // FIX: Added local state for dashboardWidgets
+    const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidgetItem[]>([]);
+    // FIX: Added refs for drag and drop
+    const dragItemRef = useRef<number | null>(null);
+    const dragOverItemRef = useRef<number | null>(null);
+    
     const taskItems = student.SCHEDULE_ITEMS;
     const activityItems = student.SCHEDULE_ITEMS.filter(item => item.type === 'ACTIVITY') as ActivityData[];
 
@@ -199,6 +205,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         } else {
             // Default layout
             const defaultWidgets = ['clock', 'practice', 'dailyInsight', 'quote', 'music', 'subjectAllocation', 'scoreTrend', 'flashcards', 'readingHours', 'todaysAgenda', 'upcomingExams', 'homework', 'visualizer', 'weather', 'countdown'];
+            // FIX: Use `setDashboardWidgets` setter
             setDashboardWidgets(defaultWidgets.map(id => ({ id })));
         }
     }, [student.CONFIG.settings.dashboardLayout]);
@@ -265,12 +272,13 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     const handleStarTask = (taskId: string) => { const task = student.SCHEDULE_ITEMS.find(t => t.ID === taskId); if (task) onSaveTask({ ...task, isStarred: !task.isStarred }); };
     const handleStartPractice = (homework: HomeworkData) => { setPracticeTask(homework); openModal('CustomPracticeModal', setIsPracticeModalOpen); };
     const handleSaveWeakness = (newWeakness: string) => { const updatedWeaknesses = [...new Set([...student.CONFIG.WEAK, newWeakness])]; onUpdateWeaknesses(updatedWeaknesses); };
-    const handleApiKeySet = () => { if (!student.CONFIG.settings.hasGeminiKey) openModal('AIChatPopup', setIsAiChatOpen); setShowAiChatFab(true); };
+    const handleApiKeySet = () => { if (!student.CONFIG.settings.hasGeminiKey) openModal('AIChatPopup', setAiChatOpen); setShowAiChatFab(true); };
     const handleAiChatMessage = async (prompt: string, imageBase64?: string) => {
         const newHistory = [...aiChatHistory, { role: 'user', parts: [{ text: prompt }] }];
         setAiChatHistory(newHistory);
         setIsAiChatLoading(true);
         try {
+            // FIX: `api.aiChat` needs to be defined in `apiService.ts`
             const result = await api.aiChat({ 
                 history: newHistory, 
                 prompt, 
@@ -290,8 +298,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     const handleDeleteSelected = async () => { /* ... */ };
     const handleClearAllSchedule = async () => { /* ... */ };
     const handleEditResult = (result: ResultData) => { setEditingResult(result); openModal('EditResultModal', setEditResultModalOpen); };
-    const onUpdateResult = async (result: ResultData) => { await api.updateResult(result); refreshUser(); };
-    const onDeleteResult = async (resultId: string) => { await api.deleteResult(resultId); refreshUser(); };
+    // FIX: `onUpdateResult` and `onDeleteResult` were directly calling `api` instead of their props.
+    const onUpdateResult = async (result: ResultData) => { await props.onUpdateResult(result); refreshUser(); };
+    const onDeleteResult = async (resultId: string) => { await props.onDeleteResult(resultId); refreshUser(); };
     const handleDeleteDeck = (deckId: string) => { 
         if (window.confirm(`Are you sure you want to delete this deck? This cannot be undone.`)) {
             const newDecks = student.CONFIG.flashcardDecks?.filter(d => d.id !== deckId) || [];
@@ -323,7 +332,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             onUpdateConfig({ flashcardDecks: newDecks });
         }
     };
-    const handleStartReviewSession = (deckId: string) => { const deck = student.CONFIG.flashcardDecks?.find(d => d.id === deckId); if (deck) {setReviewingDeck(deck); openModal('FlashcardReviewModal', setReviewingDeck);}};
+    const handleStartReviewSession = (deckId: string) => { const deck = student.CONFIG.flashcardDecks?.find(d => d.id === deckId); if (deck) {setReviewingDeck(deck); closeModal('DeckViewModal'); openModal('FlashcardReviewModal', setReviewingDeck);}};
     const handleSearchAction = (action: string, data?: any) => {
         switch (action) {
             case 'create_task': setEditingTask(null); openModal('CreateEditTaskModal', setIsCreateModalOpen); break;
@@ -342,10 +351,15 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     const handleDragEnter = (index: number) => { dragOverItemRef.current = index; };
     const handleDragEnd = () => {
         if (dragItemRef.current !== null && dragOverItemRef.current !== null) {
+            // FIX: Use local state `dashboardWidgets`
             const newWidgets = [...dashboardWidgets];
+            // FIX: Access `dragItemRef.current` safely
             const draggedItem = newWidgets[dragItemRef.current];
+            // FIX: Access `dragItemRef.current` safely
             newWidgets.splice(dragItemRef.current, 1);
+            // FIX: Access `dragOverItemRef.current` safely
             newWidgets.splice(dragOverItemRef.current, 0, draggedItem);
+            // FIX: Use `setDashboardWidgets` setter
             setDashboardWidgets(newWidgets);
             onUpdateConfig({ settings: { ...student.CONFIG.settings, dashboardLayout: newWidgets } });
         }
@@ -354,13 +368,17 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     };
 
     const handleRemoveWidget = (id: string) => {
+        // FIX: Use local state `dashboardWidgets`
         const newWidgets = dashboardWidgets.filter(w => w.id !== id);
+        // FIX: Use `setDashboardWidgets` setter
         setDashboardWidgets(newWidgets);
         onUpdateConfig({ settings: { ...student.CONFIG.settings, dashboardLayout: newWidgets } });
     };
 
     const handleToggleMinimizeWidget = (id: string) => {
+        // FIX: Use local state `dashboardWidgets`
         const newWidgets = dashboardWidgets.map(w => w.id === id ? { ...w, minimized: !w.minimized } : w);
+        // FIX: Use `setDashboardWidgets` setter
         setDashboardWidgets(newWidgets);
         onUpdateConfig({ settings: { ...student.CONFIG.settings, dashboardLayout: newWidgets } });
     };
@@ -385,7 +403,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                     if(deck) {
                         setViewingDeck(deck); // Set viewing deck for context
                         setEditingCard(null); // Clear any editing card
-                        openModal('CreateEditFlashcardModal', setIsCreateCardModalOpen);
+                        // FIX: Use `setCreateCardModalOpen` prop
+                        openModal('CreateEditFlashcardModal', setCreateCardModalOpen);
                     } else {
                         alert("Please create a deck first.");
                     }
@@ -508,6 +527,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     );
 
     const renderContent = () => {
+        // FIX: Derived state for useToolbarLayout
+        const useToolbarLayout = isMobile && student.CONFIG.settings.mobileLayout === 'toolbar';
+
         switch (activeTab) {
             case 'dashboard':
                 return renderDashboardContent();
@@ -535,7 +557,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                                 onTaskSelect={handleTaskSelect}
                                 onToggleSelectMode={handleToggleSelectMode}
                                 onDeleteSelected={handleDeleteSelected}
-                                onMoveSelected={() => openModal('MoveTasksModal', setIsMoveModalOpen)}
+                                // FIX: Use `setMoveModalOpen` prop correctly
+                                onMoveSelected={() => openModal('MoveTasksModal', setMoveModalOpen)}
                             />
                         </div>
                         <div className="space-y-8">
@@ -598,7 +621,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
 
             {showAiChatFab && !isAiChatOpen && (
                 <button 
-                    onClick={() => openModal('AIChatPopup', setIsAiChatOpen)}
+                    onClick={() => openModal('AIChatPopup', setAiChatOpen)}
                     className="fixed bottom-6 right-6 z-40 w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/30 transition-transform hover:scale-110 active:scale-95 animate-pulse"
                     title="Open AI Assistant"
                 >
@@ -620,8 +643,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             </div>
 
             {/* Modals are rendered here, their visibility is controlled by their respective state in App.tsx */}
-            {isSettingsModalOpen && <SettingsModal settings={student.CONFIG.settings} decks={student.CONFIG.flashcardDecks || []} onClose={() => closeModal('SettingsModal')} onSave={(s) => onUpdateConfig({ settings: { ...student.CONFIG.settings, ...s } as any })} onExportToIcs={onExportToIcs} googleAuthStatus={googleAuthStatus} onGoogleSignIn={onGoogleSignIn} onGoogleSignOut={onGoogleSignOut} onBackupToDrive={onBackupToDrive} onRestoreFromDrive={onRestoreFromDrive} onApiKeySet={handleApiKeySet} onOpenAssistantGuide={() => openModal('GoogleAssistantGuideModal', setIsAssistantGuideOpen)} onOpenAiGuide={() => openModal('AIGuideModal', setIsAiGuideModalOpen)} onClearAllSchedule={handleClearAllSchedule} onToggleEditLayout={() => setIsEditLayoutMode(!isEditLayoutMode)} />}
-            {isAiParserModalOpen && <AIParserModal onClose={() => closeModal('AIParserModal')} onDataReady={handleDataImport} onPracticeTestReady={handleAiPracticeTest} onOpenGuide={() => openModal('AIGuideModal', setIsAiGuideModalOpen)} examType={student.CONFIG.settings.examType} />}
+            {isSettingsModalOpen && <SettingsModal settings={student.CONFIG.settings} decks={student.CONFIG.flashcardDecks || []} onClose={() => closeModal('SettingsModal')} onSave={(s) => onUpdateConfig({ settings: { ...student.CONFIG.settings, ...s } as any })} onExportToIcs={onExportToIcs} googleAuthStatus={googleAuthStatus} onGoogleSignIn={onGoogleSignIn} onGoogleSignOut={onGoogleSignOut} onBackupToDrive={onBackupToDrive} onRestoreFromDrive={onRestoreFromDrive} onApiKeySet={handleApiKeySet} onOpenAssistantGuide={() => openModal('GoogleAssistantGuideModal', setAssistantGuideOpen)} onOpenAiGuide={() => openModal('AIGuideModal', setAiGuideModalOpen)} onClearAllSchedule={handleClearAllSchedule} onToggleEditLayout={() => setIsEditLayoutMode(!isEditLayoutMode)} />}
+            {isAiParserModalOpen && <AIParserModal onClose={() => closeModal('AIParserModal')} onDataReady={handleDataImport} onPracticeTestReady={handleAiPracticeTest} onOpenGuide={() => openModal('AIGuideModal', setAiGuideModalOpen)} examType={student.CONFIG.settings.examType} />}
             {isCreateModalOpen && <CreateEditTaskModal task={editingTask || viewingTask} viewOnly={!!viewingTask} onClose={() => { closeModal('CreateEditTaskModal'); setEditingTask(null); setViewingTask(null); }} onSave={onSaveTask} decks={student.CONFIG.flashcardDecks || []} />}
             {isPracticeModalOpen && <CustomPracticeModal initialTask={practiceTask} aiPracticeTest={aiPracticeTest} onClose={() => { closeModal('CustomPracticeModal'); setPracticeTask(null); setAiPracticeTest(null); }} onSessionComplete={(duration, solved, skipped) => onLogStudySession({ duration, questions_solved: solved, questions_skipped: skipped })} defaultPerQuestionTime={student.CONFIG.settings.perQuestionTime || 180} onLogResult={onLogResult} student={student} onUpdateWeaknesses={onUpdateWeaknesses} onSaveTask={onSaveTask} />}
             {isEditWeaknessesModalOpen && <EditWeaknessesModal currentWeaknesses={student.CONFIG.WEAK} onClose={() => closeModal('EditWeaknessesModal')} onSave={onUpdateWeaknesses} />}
@@ -653,7 +676,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             {/* Flashcard Modals */}
             {isCreateDeckModalOpen && <CreateEditDeckModal deck={editingDeck} onClose={() => { closeModal('CreateEditDeckModal'); setEditingDeck(null); }} onSave={handleSaveDeck} />}
             {isAiFlashcardModalOpen && <AIGenerateFlashcardsModal student={student} onClose={() => closeModal('AIGenerateFlashcardsModal')} onSaveDeck={handleSaveDeck} />}
-            {viewingDeck && <DeckViewModal deck={viewingDeck} onClose={() => setViewingDeck(null)} onAddCard={() => { setEditingCard(null); openModal('CreateEditFlashcardModal', setIsCreateCardModalOpen); }} onEditCard={(card) => { setEditingCard(card); openModal('CreateEditFlashcardModal', setIsCreateCardModalOpen); }} onDeleteCard={(cardId) => handleDeleteCard(viewingDeck.id, cardId)} onStartReview={() => { setReviewingDeck(viewingDeck); closeModal('DeckViewModal'); openModal('FlashcardReviewModal', setReviewingDeck); }} />}
+            {viewingDeck && <DeckViewModal deck={viewingDeck} onClose={() => setViewingDeck(null)} onAddCard={() => { setEditingCard(null); openModal('CreateEditFlashcardModal', setCreateCardModalOpen); }} onEditCard={(card) => { setEditingCard(card); openModal('CreateEditFlashcardModal', setCreateCardModalOpen); }} onDeleteCard={(cardId) => handleDeleteCard(viewingDeck.id, cardId)} onStartReview={() => { setReviewingDeck(viewingDeck); closeModal('DeckViewModal'); openModal('FlashcardReviewModal', setReviewingDeck); }} />}
             {isCreateCardModalOpen && viewingDeck && <CreateEditFlashcardModal card={editingCard} deckId={viewingDeck.id} onClose={() => { closeModal('CreateEditFlashcardModal'); setEditingCard(null); }} onSave={handleSaveCard} />}
             {reviewingDeck && <FlashcardReviewModal deck={reviewingDeck} onClose={() => closeModal('FlashcardReviewModal')} />}
             

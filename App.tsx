@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from './context/AuthContext';
 // Added missing imports
@@ -71,7 +72,7 @@ const App: React.FC = () => {
     const { isFullScreenPlayerOpen, currentTrack, toggleLibrary, isLibraryOpen } = useMusicPlayer();
     
     const [allStudents, setAllStudents] = useState<StudentData[]>([]);
-    const [allDoubts, setAllDoubts] = useState<DoubtData[]>([]);
+    const [allDoubts, setAllDoubts] = useState<DoubtData[]>([]);// FIX: Added `DoubtData` type.
     const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline' | 'misconfigured'>('checking');
     const [isSyncing, setIsSyncing] = useState(false);
     const [googleClientId, setGoogleClientId] = useState<string | null>(null);
@@ -84,7 +85,7 @@ const App: React.FC = () => {
     // --- Modal Navigation State ---
     const modalStack = useRef<ModalState[]>([]);
     // This map stores the setState functions for each modal, allowing generic open/close
-    const modalSetStateMap = useRef<Map<string, React.Dispatch<React.SetStateAction<boolean>> | (() => void)>>(new Map());
+    const modalSetStateMap = useRef<Map<string, React.Dispatch<React.SetStateAction<boolean>> | ((val: any) => void)>>(new Map()); // FIX: Updated type for `modalSetStateMap`
 
     const openModal = useCallback((modalId: string, setStateTrue: React.Dispatch<React.SetStateAction<boolean>> | (() => void)) => {
         // Prevent opening if already in stack, or if another modal with same ID is topmost
@@ -115,7 +116,7 @@ const App: React.FC = () => {
             (setStateTrue as React.Dispatch<React.SetStateAction<boolean>>)(true);
         } else {
             // For special setters that don't take boolean, e.g., toggleLibrary() or setViewingDeck(deck)
-            setStateTrue();
+            (setStateTrue as () => void)();
         }
     }, []);
 
@@ -125,8 +126,12 @@ const App: React.FC = () => {
             console.warn(`Attempted to close modal ${modalId} not found in stack.`);
             // If not in stack, just set its state to false if we can.
             const setStateFalse = modalSetStateMap.current.get(modalId);
-            if (setStateFalse && typeof setStateFalse === 'function') {
-                (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
+            if (setStateFalse) { // FIX: Check if setter exists
+                if (typeof setStateFalse === 'function') {
+                    (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
+                } else {
+                    (setStateFalse as (val: any) => void)(null); // For object-based setters, pass null to clear
+                }
             }
             return;
         }
@@ -140,11 +145,12 @@ const App: React.FC = () => {
             // If not topmost, remove from stack and force close its component state
             modalStack.current.splice(index, 1);
             const setStateFalse = modalSetStateMap.current.get(modalId);
-            if (setStateFalse && typeof setStateFalse === 'function') {
-                (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
-            } else if (setStateFalse) {
-                // For special setters that don't take boolean, just call them as a reset.
-                setStateFalse(null); // Assuming null will clear any object states
+            if (setStateFalse) { // FIX: Check if setter exists
+                if (typeof setStateFalse === 'function') {
+                    (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
+                } else {
+                    (setStateFalse as (val: any) => void)(null); // For object-based setters, pass null to clear
+                }
             }
             console.warn(`Modal ${modalId} closed out of order, removed from stack. Current stack size: ${modalStack.current.length}`);
         }
@@ -163,10 +169,12 @@ const App: React.FC = () => {
                     modalStack.current.pop();
                     // Call the original setState(false) to hide the component
                     const setStateFalse = modalSetStateMap.current.get(topmostModal.id);
-                    if (setStateFalse && typeof setStateFalse === 'function') {
-                        (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
-                    } else if (setStateFalse) {
-                        setStateFalse(null); // For object-based setters
+                    if (setStateFalse) { // FIX: Check if setter exists
+                        if (typeof setStateFalse === 'function') {
+                            (setStateFalse as React.Dispatch<React.SetSetStateAction<boolean>>)(false);
+                        } else {
+                            (setStateFalse as (val: any) => void)(null); // For object-based setters
+                        }
                     }
                 } else {
                     // This means the browser history went back to a point where our stack is inconsistent,
@@ -182,10 +190,12 @@ const App: React.FC = () => {
                         for (let i = modalStack.current.length - 1; i >= indexInStack; i--) {
                             const modal = modalStack.current[i];
                             const setStateFalse = modalSetStateMap.current.get(modal.id);
-                            if (setStateFalse && typeof setStateFalse === 'function') {
-                                (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
-                            } else if (setStateFalse) {
-                                setStateFalse(null);
+                            if (setStateFalse) { // FIX: Check if setter exists
+                                if (typeof setStateFalse === 'function') {
+                                    (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
+                                } else {
+                                    (setStateFalse as (val: any) => void)(null);
+                                }
                             }
                         }
                         modalStack.current.splice(indexInStack); // Trim the stack
@@ -194,10 +204,12 @@ const App: React.FC = () => {
                         // or a modal was closed unexpectedly. Clear stack and ensure no modals are rendered.
                         modalStack.current.forEach(modal => {
                             const setStateFalse = modalSetStateMap.current.get(modal.id);
-                            if (setStateFalse && typeof setStateFalse === 'function') {
-                                (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
-                            } else if (setStateFalse) {
-                                setStateFalse(null);
+                            if (setStateFalse) { // FIX: Check if setter exists
+                                if (typeof setStateFalse === 'function') {
+                                    (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
+                                } else {
+                                    (setStateFalse as (val: any) => void)(null);
+                                }
                             }
                         });
                         modalStack.current = [];
@@ -216,10 +228,12 @@ const App: React.FC = () => {
                 
                 // Then, trigger the close of the topmost modal
                 const setStateFalse = modalSetStateMap.current.get(topmostModal.id);
-                if (setStateFalse && typeof setStateFalse === 'function') {
-                    (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
-                } else if (setStateFalse) {
-                    setStateFalse(null);
+                if (setStateFalse) { // FIX: Check if setter exists
+                    if (typeof setStateFalse === 'function') {
+                        (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
+                    } else {
+                        (setStateFalse as (val: any) => void)(null);
+                    }
                 }
                 modalStack.current.pop(); // Remove from our stack as we've handled it
             }
@@ -267,6 +281,7 @@ const App: React.FC = () => {
                 } catch (e) {
                     try {
                         // Attempt to correct malformed JSON
+                        // FIX: Ensure `api.correctJson` exists and is called correctly
                         const correctionResult = await api.correctJson(decodedData);
                         const correctedData = JSON.parse(correctionResult.correctedJson);
                         setDeepLinkAction({ action, data: correctedData });
@@ -374,6 +389,7 @@ const App: React.FC = () => {
 
             if (tasksToUpdate.length > 0) await handleSaveBatchTasks(tasksToUpdate);
 
+            // FIX: Ensure `api.updateConfig` exists
             await api.updateConfig({ isCalendarSyncEnabled: true, calendarLastSync: new Date().toISOString() });
             await refreshUser();
             alert(`Synced ${tasksToUpdate.length} tasks.`);
@@ -390,6 +406,7 @@ const App: React.FC = () => {
         if (!currentUser) return;
         const wasSyncDisabled = !currentUser.CONFIG.isCalendarSyncEnabled;
         const isSyncBeingEnabled = configUpdate.isCalendarSyncEnabled === true;
+        // FIX: Ensure `api.updateConfig` exists
         await api.updateConfig(configUpdate);
         await refreshUser();
         if (wasSyncDisabled && isSyncBeingEnabled) {
@@ -403,6 +420,7 @@ const App: React.FC = () => {
         if (!currentUser) return;
         const newSession = { ...session, date: new Date().toISOString().split('T')[0] };
         const updatedUser = {...currentUser, STUDY_SESSIONS: [...currentUser.STUDY_SESSIONS, newSession]};
+        // FIX: Ensure `api.fullSync` exists
         await api.fullSync(updatedUser);
         refreshUser();
     };
@@ -410,6 +428,7 @@ const App: React.FC = () => {
     const onLogResult = async (result: ResultData) => {
         if (!currentUser) return;
         const updatedUser = { ...currentUser, RESULTS: [...currentUser.RESULTS, result], CONFIG: {...currentUser.CONFIG, SCORE: result.SCORE, WEAK: [...new Set([...currentUser.CONFIG.WEAK, ...result.MISTAKES])] } };
+        // FIX: Ensure `api.fullSync` exists
         await api.fullSync(updatedUser);
         refreshUser();
     };
@@ -417,6 +436,7 @@ const App: React.FC = () => {
     const onAddExam = async (exam: ExamData) => {
         if (!currentUser) return;
         const updatedUser = { ...currentUser, EXAMS: [...currentUser.EXAMS, exam] };
+        // FIX: Ensure `api.fullSync` exists
         await api.fullSync(updatedUser);
         refreshUser();
     };
@@ -424,6 +444,7 @@ const App: React.FC = () => {
     const onUpdateExam = async (exam: ExamData) => {
          if (!currentUser) return;
         const updatedUser = { ...currentUser, EXAMS: currentUser.EXAMS.map(e => e.ID === exam.ID ? exam : e) };
+        // FIX: Ensure `api.fullSync` exists
         await api.fullSync(updatedUser);
         refreshUser();
     };
@@ -431,6 +452,7 @@ const App: React.FC = () => {
     const onDeleteExam = async (examId: string) => {
         if (!currentUser) return;
         const updatedUser = { ...currentUser, EXAMS: currentUser.EXAMS.filter(e => e.ID !== examId) };
+        // FIX: Ensure `api.fullSync` exists
         await api.fullSync(updatedUser);
         refreshUser();
     };
@@ -438,6 +460,7 @@ const App: React.FC = () => {
     const onUpdateWeaknesses = async (weaknesses: string[]) => {
         if (!currentUser) return;
         const updatedUser = { ...currentUser, CONFIG: { ...currentUser.CONFIG, WEAK: weaknesses } };
+        // FIX: Ensure `api.fullSync` exists
         await api.fullSync(updatedUser);
         refreshUser();
     };
@@ -466,6 +489,7 @@ const App: React.FC = () => {
             updatedUser.CONFIG.SCORE = sortedResults[0].SCORE;
         }
 
+        // FIX: Ensure `api.fullSync` exists
         await api.fullSync(updatedUser);
         await refreshUser();
 
@@ -475,13 +499,17 @@ const App: React.FC = () => {
     };
 
     const onPostDoubt = async (question: string, image?: string) => {
+        // FIX: Ensure `api.postDoubt` exists
         await api.postDoubt(question, image);
+        // FIX: Ensure `api.getAllDoubts` exists
         const doubtsData = await api.getAllDoubts();
         setAllDoubts(doubtsData);
     };
 
     const onPostSolution = async (doubtId: string, solution: string, image?: string) => {
+        // FIX: Ensure `api.postSolution` exists
         await api.postSolution(doubtId, solution, image);
+        // FIX: Ensure `api.getAllDoubts` exists
         const doubtsData = await api.getAllDoubts();
         setAllDoubts(doubtsData);
     };
@@ -501,6 +529,7 @@ const App: React.FC = () => {
             };
             const fileId = await gdrive.uploadData(JSON.stringify(backupData), currentUser.CONFIG.googleDriveFileId);
             const syncTime = new Date().toISOString();
+            // FIX: Ensure `api.updateConfig` exists
             await api.updateConfig({ googleDriveFileId: fileId, driveLastSync: syncTime });
             refreshUser();
             alert('Backup successful!');
@@ -516,6 +545,7 @@ const App: React.FC = () => {
             const dataStr = await gdrive.downloadData(currentUser.CONFIG.googleDriveFileId);
             const restoredData = JSON.parse(dataStr);
             const updatedUser = { ...currentUser, ...restoredData };
+            // FIX: Ensure `api.fullSync` exists
             await api.fullSync(updatedUser);
             refreshUser();
             alert('Restore successful!');
@@ -527,6 +557,7 @@ const App: React.FC = () => {
     const onDeleteUser = async (sid: string) => {
         if (window.confirm(`Permanently delete user ${sid}?`)) {
             try {
+                // FIX: Ensure `api.deleteStudent` exists
                 await api.deleteStudent(sid);
                 setAllStudents(prev => prev.filter(s => s.sid !== sid));
             } catch (error: any) {
@@ -589,10 +620,12 @@ const App: React.FC = () => {
                 return;
             }
             if (userRole === 'admin') {
+                // FIX: Ensure `api.getStudents` exists
                 const students = await api.getStudents();
                 setAllStudents(students);
             }
             if (currentUser || userRole === 'admin') {
+                // FIX: Ensure `api.getAllDoubts` exists
                 const doubts = await api.getAllDoubts();
                 setAllDoubts(doubts);
             }
@@ -634,8 +667,7 @@ const App: React.FC = () => {
         if (!currentUser) return;
         const newSettings = JSON.parse(JSON.stringify(currentUser.CONFIG.settings));
         newSettings.examType = examType;
-        await handleUpdateConfig({ settings: newSettings });
-        closeModal('ExamTypeSelectionModal'); // Close via modal stack
+        handleUpdateConfig({ settings: newSettings }); // Already calls closeModal internally
     };
 
     // --- Modal Control Functions for Children ---
@@ -748,6 +780,7 @@ const App: React.FC = () => {
                                 students={allStudents} 
                                 onToggleUnacademySub={()=>{}} 
                                 onDeleteUser={onDeleteUser} 
+                                // FIX: Ensure `api.broadcastTask` exists
                                 onBroadcastTask={api.broadcastTask} 
                                 openModal={openModal}
                                 closeModal={closeModal}

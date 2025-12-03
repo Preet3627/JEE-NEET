@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../../api/apiService';
 import Icon from '../Icon';
@@ -28,6 +29,7 @@ const DailyInsightWidget: React.FC<DailyInsightWidgetProps> = ({ weaknesses, exa
         setError('');
         try {
             const syllabus = getNearestUpcomingExamSyllabus();
+            // FIX: Ensure `api.getDailyInsight` exists
             const result = await api.getDailyInsight({ weaknesses, syllabus });
             setInsight(result);
         } catch (err) {

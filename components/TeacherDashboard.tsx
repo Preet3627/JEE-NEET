@@ -121,6 +121,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleU
         const confirmation = window.prompt(`Type "${student.sid}" to confirm clearing ALL data for ${student.fullName}. This is irreversible.`);
         if (confirmation === student.sid) {
             try {
+                // FIX: `api.clearStudentData` needs to be defined in `apiService.ts`
                 await api.clearStudentData(student.sid);
                 alert("Data cleared.");
             } catch (error: any) {
@@ -132,6 +133,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleU
     const handleImpersonate = async (sid: string) => {
         if (window.confirm(`Log in as ${sid}? You will be logged out of Admin.`)) {
             try {
+                // FIX: `api.impersonateStudent` needs to be defined in `apiService.ts`
                 const { token } = await api.impersonateStudent(sid);
                 loginWithToken(token);
             } catch (error: any) {

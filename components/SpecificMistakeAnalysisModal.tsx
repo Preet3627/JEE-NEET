@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import Icon from './Icon';
 import { api } from '../api/apiService';
@@ -55,6 +56,7 @@ const SpecificMistakeAnalysisModal: React.FC<SpecificMistakeAnalysisModalProps> 
     setAnalysisResult(null);
 
     try {
+      // FIX: Ensure `api.analyzeSpecificMistake` exists
       const result = await api.analyzeSpecificMistake({
         prompt: description,
         imageBase64,

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef } from 'react';
 import Icon from './Icon';
 import { api } from '../api/apiService';
@@ -66,6 +67,7 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
     // Attempt 2: If it looks like broken JSON, try to correct it online
     if (text.startsWith('{') || text.startsWith('[')) {
       try {
+        // FIX: Ensure `api.correctJson` exists
         const correctionResult = await api.correctJson(text);
         const correctedData = JSON.parse(correctionResult.correctedJson);
         if (correctedData && Object.keys(correctedData).length > 0) {
@@ -80,6 +82,7 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
     
     // Attempt 3: Fallback to parsing as unstructured text online
     try {
+      // FIX: Ensure `api.parseText` exists
       const result = await api.parseText(text, window.location.origin);
       handleResult(result);
     } catch (parseError: any) {

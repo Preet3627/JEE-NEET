@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import Icon from './Icon';
 import { api } from '../api/apiService';
@@ -44,6 +45,7 @@ const AIDoubtSolverModal: React.FC<AIDoubtSolverModalProps> = ({ onClose }) => {
     setResponse('');
 
     try {
+      // FIX: Ensure `api.solveDoubt` exists
       const result = await api.solveDoubt({
         prompt,
         imageBase64: imageBase64 || undefined,

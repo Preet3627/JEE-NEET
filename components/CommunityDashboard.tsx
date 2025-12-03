@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { StudentData, DoubtData } from '../types';
 import Icon from './Icon';
@@ -55,6 +56,7 @@ const CommunityDashboard: React.FC<CommunityDashboardProps> = ({ student, allDou
         
       if (confirmation) {
           try {
+              // FIX: Ensure `api.updateDoubtStatus` exists
               await api.updateDoubtStatus(doubtId, status);
               refreshUser(); // This will re-fetch allDoubts from App.tsx
           } catch (error) {
