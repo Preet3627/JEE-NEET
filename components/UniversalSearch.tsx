@@ -139,7 +139,7 @@ const UniversalSearch: React.FC<UniversalSearchProps> = ({ isOpen, onClose, onNa
         if (listRef.current) {
             const selectedElement = listRef.current.children[selectedIndex] as HTMLElement;
             if (selectedElement) {
-                selectedElement.scrollIntoView({ block: 'nearest' });
+                selectedElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
         }
     }, [selectedIndex]);
@@ -165,7 +165,7 @@ const UniversalSearch: React.FC<UniversalSearchProps> = ({ isOpen, onClose, onNa
                     <div className="text-xs text-gray-500 border border-gray-700 rounded px-2 py-1 hidden sm:block">ESC</div>
                 </div>
 
-                <ul ref={listRef} className="overflow-y-auto py-2">
+                <ul ref={listRef} className="overflow-y-auto py-2 custom-scrollbar">
                     {results.length > 0 ? (
                         results.map((item, index) => (
                             <li key={item.id}>

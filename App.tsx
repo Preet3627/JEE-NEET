@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from './context/AuthContext';
-import { StudentData, ScheduleItem, StudySession, Config, ResultData, ExamData, DoubtData } from './types';
+// Added missing imports
+import { StudentData, ScheduleItem, StudySession, Config, ResultData, ExamData, DoubtData, HomeworkData, PracticeQuestion, FlashcardDeck, Flashcard, StudyMaterialItem } from './types';
 import { studentDatabase } from './data/mockData';
 import { api } from './api/apiService';
 
@@ -20,6 +21,35 @@ import { useMusicPlayer } from './context/MusicPlayerContext';
 import FullScreenMusicPlayer from './components/FullScreenMusicPlayer';
 import PersistentMusicPlayer from './components/PersistentMusicPlayer';
 import GlobalMusicVisualizer from './components/GlobalMusicVisualizer';
+import ProfileModal from './components/ProfileModal';
+import AIParserModal from './components/AIParserModal';
+import { CustomPracticeModal } from './components/CustomPracticeModal';
+import SettingsModal from './components/SettingsModal';
+import EditWeaknessesModal from './components/EditWeaknessesModal';
+import LogResultModal from './components/LogResultModal';
+import EditResultModal from './components/EditResultModal';
+import CreateEditExamModal from './components/CreateEditExamModal';
+import AIMistakeAnalysisModal from './components/AIMistakeAnalysisModal';
+import AIDoubtSolverModal from './components/AIDoubtSolverModal';
+import AIChatPopup from './components/AIChatPopup';
+import TestReportModal from './components/TestReportModal';
+import MoveTasksModal from './components/MoveTasksModal';
+import MusicLibraryModal from './components/MusicLibraryModal';
+import DeepLinkConfirmationModal from './components/DeepLinkConfirmationModal';
+import CreateEditDeckModal from './components/flashcards/CreateEditDeckModal';
+import AIGenerateFlashcardsModal from './components/flashcards/AIGenerateFlashcardsModal';
+import DeckViewModal from './components/flashcards/DeckViewModal';
+import CreateEditFlashcardModal from './components/flashcards/CreateEditFlashcardModal';
+import FlashcardReviewModal from './components/flashcards/FlashcardReviewModal';
+import FileViewerModal from './components/FileViewerModal';
+import GoogleAssistantGuideModal from './components/GoogleAssistantGuideModal';
+import AIGuideModal from './components/AIGuideModal';
+import CreateEditTaskModal from './components/CreateEditTaskModal';
+import MessagingModal from './components/MessagingModal';
+import UniversalSearch from './components/UniversalSearch';
+import AnswerKeyUploadModal from './components/AnswerKeyUploadModal';
+import SpecificMistakeAnalysisModal from './components/SpecificMistakeAnalysisModal';
+
 
 declare global {
   interface Window {
@@ -31,14 +61,14 @@ declare global {
 const API_URL = '/api';
 
 interface ModalState {
-    id: string;
-    onClose: () => void;
-    historyStateId: string;
+    id: string; // Unique identifier for the modal component (e.g., 'SettingsModal')
+    componentId: string; // Internal ID for history state
+    onCloseCallback: () => void; // The original setState(false) function for the modal component
 }
 
 const App: React.FC = () => {
     const { currentUser, userRole, isLoading, isDemoMode, enterDemoMode, logout, refreshUser } = useAuth();
-    const { isFullScreenPlayerOpen, currentTrack, toggleLibrary, isLibraryOpen: isMusicLibraryOpen } = useMusicPlayer();
+    const { isFullScreenPlayerOpen, currentTrack, toggleLibrary, isLibraryOpen } = useMusicPlayer();
     
     const [allStudents, setAllStudents] = useState<StudentData[]>([]);
     const [allDoubts, setAllDoubts] = useState<DoubtData[]>([]);
@@ -53,98 +83,154 @@ const App: React.FC = () => {
 
     // --- Modal Navigation State ---
     const modalStack = useRef<ModalState[]>([]);
-    const [currentModalId, setCurrentModalId] = useState<string | null>(null);
+    // This map stores the setState functions for each modal, allowing generic open/close
+    const modalSetStateMap = useRef<Map<string, React.Dispatch<React.SetStateAction<boolean>> | (() => void)>>(new Map());
 
-    const openModal = useCallback((modalId: string, onCloseCallback: () => void) => {
+    const openModal = useCallback((modalId: string, setStateTrue: React.Dispatch<React.SetStateAction<boolean>> | (() => void)) => {
+        // Prevent opening if already in stack, or if another modal with same ID is topmost
         if (modalStack.current.some(m => m.id === modalId)) {
-            // Modal already in stack, prevent opening twice or pushing duplicate history
-            return;
+            console.warn(`Attempted to open modal ${modalId} which is already in the stack.`);
+            // If it's already open, ensure it's at the top of the history
+            if (modalStack.current.length > 0 && modalStack.current[modalStack.current.length - 1].id === modalId) {
+                return;
+            }
         }
 
-        const historyStateId = `modal-${Date.now()}`;
-        window.history.pushState({ modalId: historyStateId }, ''); // Push a new state to browser history
+        const historyStateId = `modal-${modalId}-${Date.now()}`;
+        // Push a new state to browser history, linking it to our modal
+        window.history.pushState({ modalId: historyStateId, appModal: true }, '', window.location.pathname); 
+
+        // Store the original setState callback for this modal
+        modalSetStateMap.current.set(modalId, setStateTrue);
 
         const modalState: ModalState = {
             id: modalId,
-            onClose: () => {
-                // This onClose is called when the modal wants to close itself normally
-                // It should trigger a browser back to pop its history state
-                if (modalStack.current.length > 0 && modalStack.current[modalStack.current.length - 1].historyStateId === historyStateId) {
-                    window.history.back(); // Trigger popstate
-                } else {
-                    // Fallback for unexpected state (e.g. modal closed out of sync)
-                    modalStack.current = modalStack.current.filter(m => m.historyStateId !== historyStateId);
-                    setCurrentModalId(modalStack.current.length > 0 ? modalStack.current[modalStack.current.length - 1].id : null);
-                    onCloseCallback(); // Directly call the original callback
-                }
-            },
-            historyStateId: historyStateId,
+            componentId: historyStateId,
+            onCloseCallback: setStateTrue,
         };
         modalStack.current.push(modalState);
-        setCurrentModalId(modalId);
-    }, []);
-
-    const closeTopModal = useCallback(() => {
-        // This is called by the popstate listener when browser back is hit
-        const topModal = modalStack.current.pop();
-        if (topModal) {
-            topModal.onClose(); // Call the modal's original onClose logic
-            setCurrentModalId(modalStack.current.length > 0 ? modalStack.current[modalStack.current.length - 1].id : null);
-        }
-    }, []);
-
-    const genericOnClose = useCallback((modalId: string, setStateFalse: React.Dispatch<React.SetStateAction<boolean>>) => {
-        const modalToClose = modalStack.current.find(m => m.id === modalId);
-        if (modalToClose) {
-            // This will trigger window.history.back(), which in turn calls popstate,
-            // and the popstate listener then calls closeTopModal, handling actual state updates.
-            modalToClose.onClose();
+        
+        // Call the original setState to truly open the modal component
+        if (typeof setStateTrue === 'function') {
+            (setStateTrue as React.Dispatch<React.SetStateAction<boolean>>)(true);
         } else {
-            // If modal not found in stack, just close its state directly.
-            setStateFalse(false);
-            setCurrentModalId(modalStack.current.length > 0 ? modalStack.current[modalStack.current.length - 1].id : null);
+            // For special setters that don't take boolean, e.g., toggleLibrary() or setViewingDeck(deck)
+            setStateTrue();
+        }
+    }, []);
+
+    const closeModal = useCallback((modalId: string) => {
+        const index = modalStack.current.findIndex(m => m.id === modalId);
+        if (index === -1) {
+            console.warn(`Attempted to close modal ${modalId} not found in stack.`);
+            // If not in stack, just set its state to false if we can.
+            const setStateFalse = modalSetStateMap.current.get(modalId);
+            if (setStateFalse && typeof setStateFalse === 'function') {
+                (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
+            }
+            return;
+        }
+
+        const modalToClose = modalStack.current[index];
+        // Only trigger history.back() if this is the topmost modal
+        if (index === modalStack.current.length - 1) {
+            // This will trigger handlePopState
+            window.history.back(); 
+        } else {
+            // If not topmost, remove from stack and force close its component state
+            modalStack.current.splice(index, 1);
+            const setStateFalse = modalSetStateMap.current.get(modalId);
+            if (setStateFalse && typeof setStateFalse === 'function') {
+                (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
+            } else if (setStateFalse) {
+                // For special setters that don't take boolean, just call them as a reset.
+                setStateFalse(null); // Assuming null will clear any object states
+            }
+            console.warn(`Modal ${modalId} closed out of order, removed from stack. Current stack size: ${modalStack.current.length}`);
         }
     }, []);
 
 
-    // --- Global popstate listener for browser back button ---
+    // --- Global popstate listener for browser back button and modal `onClose` callbacks ---
     useEffect(() => {
         const handlePopState = (event: PopStateEvent) => {
-            // Check if it's a modal history state
-            if (event.state && event.state.modalId) {
-                // This means we are navigating back WITHIN the modal stack
-                if (modalStack.current.length > 0 && modalStack.current[modalStack.current.length - 1].historyStateId === event.state.modalId) {
-                    // It's the same modal state we just pushed, so let it pop naturally
-                    // (This should ideally not be called here if the modal handles its own history.back())
+            // Check if the state we are popping is one created by our modal system
+            if (event.state && event.state.appModal) {
+                const topmostModal = modalStack.current[modalStack.current.length - 1];
+
+                if (topmostModal && topmostModal.componentId === event.state.modalId) {
+                    // This is a controlled back navigation for our topmost modal
+                    modalStack.current.pop();
+                    // Call the original setState(false) to hide the component
+                    const setStateFalse = modalSetStateMap.current.get(topmostModal.id);
+                    if (setStateFalse && typeof setStateFalse === 'function') {
+                        (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
+                    } else if (setStateFalse) {
+                        setStateFalse(null); // For object-based setters
+                    }
                 } else {
-                    // Browser navigated to a state NOT managed by a modal, or modal stack is out of sync
-                    // Force-close the topmost modal if one exists
-                    const topModal = modalStack.current[modalStack.current.length - 1];
-                    if (topModal) {
-                         modalStack.current.pop(); // Remove it from our internal stack
-                         setCurrentModalId(modalStack.current.length > 0 ? modalStack.current[modalStack.current.length - 1].id : null);
-                         topModal.onClose(); // This should trigger its actual close effect
+                    // This means the browser history went back to a point where our stack is inconsistent,
+                    // or a modal was closed externally. We try to reconcile.
+                    console.warn("Popstate detected out of sync with modal stack. Reconciling...");
+                    
+                    // Find if any modal in stack matches the expected history state.
+                    const expectedModalIdInHistory = event.state.modalId;
+                    const indexInStack = modalStack.current.findIndex(m => m.componentId === expectedModalIdInHistory);
+
+                    if (indexInStack > -1) {
+                        // Close all modals from the top down to (and including) the one that was popped
+                        for (let i = modalStack.current.length - 1; i >= indexInStack; i--) {
+                            const modal = modalStack.current[i];
+                            const setStateFalse = modalSetStateMap.current.get(modal.id);
+                            if (setStateFalse && typeof setStateFalse === 'function') {
+                                (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
+                            } else if (setStateFalse) {
+                                setStateFalse(null);
+                            }
+                        }
+                        modalStack.current.splice(indexInStack); // Trim the stack
+                    } else {
+                        // If no modal in stack matches, it means we navigated completely past our modal history,
+                        // or a modal was closed unexpectedly. Clear stack and ensure no modals are rendered.
+                        modalStack.current.forEach(modal => {
+                            const setStateFalse = modalSetStateMap.current.get(modal.id);
+                            if (setStateFalse && typeof setStateFalse === 'function') {
+                                (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
+                            } else if (setStateFalse) {
+                                setStateFalse(null);
+                            }
+                        });
+                        modalStack.current = [];
                     }
                 }
             } else if (modalStack.current.length > 0) {
-                 // Browser back was pressed and there's a modal open, but it's not a modal-specific state being popped.
-                 // This means the user is trying to go back past the modal's entry point.
-                 // Prevent default and close the modal.
-                 const topModal = modalStack.current.pop();
-                 if (topModal) {
-                     topModal.onClose(); // Trigger its specific onClose logic
-                     setCurrentModalId(modalStack.current.length > 0 ? modalStack.current[modalStack.current.length - 1].id : null);
-                     // If we preventDefault here, it stops the browser navigation completely.
-                     // Instead, the modal's onClose should be designed to handle the history pop.
-                     // The modal's onClose() is expected to call window.history.back() or similar.
-                 }
+                 // Browser back triggered but not for our custom modal state.
+                 // This typically happens if user clicks back from a root route.
+                 // We want to prevent leaving the app if any modal is still active.
+                const topmostModal = modalStack.current[modalStack.current.length - 1];
+                console.log(`Intercepting browser back for modal ${topmostModal.id}.`);
+                // Re-push the state to stay on page and effectively prevent default browser navigation
+                // This might cause an infinite loop if not handled carefully, ensuring the next `popstate`
+                // is properly consumed by `closeModal` or `handlePopState` logic.
+                window.history.pushState(event.state, '', window.location.pathname); 
+                
+                // Then, trigger the close of the topmost modal
+                const setStateFalse = modalSetStateMap.current.get(topmostModal.id);
+                if (setStateFalse && typeof setStateFalse === 'function') {
+                    (setStateFalse as React.Dispatch<React.SetStateAction<boolean>>)(false);
+                } else if (setStateFalse) {
+                    setStateFalse(null);
+                }
+                modalStack.current.pop(); // Remove from our stack as we've handled it
             }
         };
         
+        // Initial history state for the base app page
+        window.history.replaceState({ appModal: false, page: 'home' }, '', window.location.pathname);
+
         window.addEventListener('popstate', handlePopState);
         return () => window.removeEventListener('popstate', handlePopState);
-    }, [closeTopModal]);
-
+    }, []);
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -180,10 +266,12 @@ const App: React.FC = () => {
                     setDeepLinkAction({ action, data });
                 } catch (e) {
                     try {
+                        // Attempt to correct malformed JSON
                         const correctionResult = await api.correctJson(decodedData);
                         const correctedData = JSON.parse(correctionResult.correctedJson);
                         setDeepLinkAction({ action, data: correctedData });
                     } catch (correctionError) {
+                        console.error("Deep link JSON correction failed:", correctionError);
                         alert("The data from the link is malformed and could not be corrected.");
                     }
                 } finally {
@@ -198,9 +286,9 @@ const App: React.FC = () => {
         const theme = currentUser?.CONFIG.settings.theme || 'default';
         document.body.className = `theme-${theme}`;
         if (currentUser && userRole === 'student' && !isDemoMode && !currentUser.CONFIG.settings.examType) {
-            setIsExamTypeModalOpen(true);
+            openModal('ExamTypeSelectionModal', setIsExamTypeModalOpen);
         }
-    }, [currentUser, userRole, isDemoMode]);
+    }, [currentUser, userRole, isDemoMode, openModal]);
     
 
     const handleGoogleSignOut = () => {
@@ -547,95 +635,89 @@ const App: React.FC = () => {
         const newSettings = JSON.parse(JSON.stringify(currentUser.CONFIG.settings));
         newSettings.examType = examType;
         await handleUpdateConfig({ settings: newSettings });
-        setIsExamTypeModalOpen(false);
+        closeModal('ExamTypeSelectionModal'); // Close via modal stack
     };
 
     // --- Modal Control Functions for Children ---
-    const [isCreateModalOpen, setCreateModalOpen] = useState(false);
-    const [isAiParserModalOpen, setAiParserModalOpen] = useState(false);
-    const [isPracticeModalOpen, setPracticeModalOpen] = useState(false);
-    const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
-    const [isEditWeaknessesModalOpen, setEditWeaknessesModalOpen] = useState(false);
+    // Corrected useState declarations
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isAiParserModalOpen, setisAiParserModalOpen] = useState(false);
+    const [isPracticeModalOpen, setIsPracticeModalOpen] = useState(false);
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    const [isEditWeaknessesModalOpen, setIsEditWeaknessesModalOpen] = useState(false);
     const [isLogResultModalOpen, setLogResultModalOpen] = useState(false);
     const [isEditResultModalOpen, setEditResultModalOpen] = useState(false);
-    const [isExamModalOpen, setExamModalOpen] = useState(false);
+    const [isExamModalOpen, setIsExamModalOpen] = useState(false);
     const [isAiMistakeModalOpen, setAiMistakeModalOpen] = useState(false);
     const [isAssistantGuideOpen, setAssistantGuideOpen] = useState(false);
     const [isAiGuideModalOpen, setAiGuideModalOpen] = useState(false);
-    const [isSelectMode, setSelectMode] = useState(false);
     const [isMoveModalOpen, setMoveModalOpen] = useState(false);
     const [isAiChatOpen, setAiChatOpen] = useState(false);
     const [isAiDoubtSolverOpen, setAiDoubtSolverOpen] = useState(false);
     const [isCreateDeckModalOpen, setCreateDeckModalOpen] = useState(false);
     const [isAiFlashcardModalOpen, setAiFlashcardModalOpen] = useState(false);
     const [isCreateCardModalOpen, setCreateCardModalOpen] = useState(false);
-    const [isMessagingModalOpen, setMessagingModalOpen] = useState(false); // For teacher dashboard
+    const [isMessagingModalOpen, setMessagingModalOpen] = useState(false); 
     const [isUniversalSearchOpen, setUniversalSearchOpen] = useState(false);
-    const [isFileViewerModalOpen, setFileViewerModalOpen] = useState(false);
     const [isAnswerKeyUploadModalOpen, setAnswerKeyUploadModalOpen] = useState(false);
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false); 
+    
+    // For modals that take objects, the setter should accept null to close
+    const [viewingTask, setViewingTask] = useState<ScheduleItem | null>(null); 
+    const [editingTask, setEditingTask] = useState<ScheduleItem | null>(null); 
+    const [practiceTask, setPracticeTask] = useState<HomeworkData | null>(null); 
+    const [aiPracticeTest, setAiPracticeTest] = useState<{ questions: PracticeQuestion[], answers: Record<string, string | string[]> } | null>(null); 
+    const [editingResult, setEditingResult] = useState<ResultData | null>(null); 
+    const [editingExam, setEditingExam] = useState<ExamData | null>(null); 
+    const [viewingReport, setViewingReport] = useState<ResultData | null>(null); 
+    const [editingDeck, setEditingDeck] = useState<FlashcardDeck | null>(null); 
+    const [viewingDeck, setViewingDeck] = useState<FlashcardDeck | null>(null); 
+    const [editingCard, setEditingCard] = useState<Flashcard | null>(null); 
+    const [reviewingDeck, setReviewingDeck] = useState<FlashcardDeck | null>(null); 
+    const [isFileViewerModalOpen, setFileViewerModalOpen] = useState(false); // Renamed for consistency
+    const [viewingFile, setViewingFile] = useState<StudyMaterialItem | null>(null);
+    const [initialScoreForModal, setInitialScoreForModal] = useState<string | undefined>(undefined); 
+    const [initialMistakesForModal, setInitialMistakesForModal] = useState<string | undefined>(undefined); 
+    const [analyzingMistake, setAnalyzingMistake] = useState<number | null>(null);
 
 
-    const modalMap = useRef<{[key: string]: React.Dispatch<React.SetStateAction<boolean>>}>({
-        'CreateEditTaskModal': setCreateModalOpen,
-        'AIParserModal': setAiParserModalOpen,
-        'CustomPracticeModal': setPracticeModalOpen,
-        'SettingsModal': setSettingsModalOpen,
-        'EditWeaknessesModal': setEditWeaknessesModalOpen,
-        'LogResultModal': setLogResultModalOpen,
-        'EditResultModal': setEditResultModalOpen,
-        'CreateEditExamModal': setExamModalOpen,
-        'AIMistakeAnalysisModal': setAiMistakeModalOpen,
-        'GoogleAssistantGuideModal': setAssistantGuideOpen,
-        'AIGuideModal': setAiGuideModalOpen,
-        'MoveTasksModal': setMoveModalOpen,
-        'AIChatPopup': setAiChatOpen,
-        'AIDoubtSolverModal': setAiDoubtSolverOpen,
-        'CreateEditDeckModal': setCreateDeckModalOpen,
-        'AIGenerateFlashcardsModal': setAiFlashcardModalOpen,
-        'CreateEditFlashcardModal': setCreateCardModalOpen,
-        'MusicLibraryModal': toggleLibrary, // Special case for MusicLibraryModal
-        'MessagingModal': setMessagingModalOpen,
-        'UniversalSearch': setUniversalSearchOpen,
-        'FileViewerModal': setFileViewerModalOpen,
-        'AnswerKeyUploadModal': setAnswerKeyUploadModalOpen,
-    });
+    // Map modal IDs to their respective setState functions
+    const modalSetters = useMemo(() => new Map<string, React.Dispatch<React.SetStateAction<boolean>> | ((val: any) => void)>([
+        ['ExamTypeSelectionModal', setIsExamTypeModalOpen],
+        ['SettingsModal', setIsSettingsModalOpen],
+        ['AIParserModal', setisAiParserModalOpen],
+        ['CreateEditTaskModal', setIsCreateModalOpen],
+        ['CustomPracticeModal', setIsPracticeModalOpen],
+        ['EditWeaknessesModal', setIsEditWeaknessesModalOpen],
+        ['LogResultModal', setLogResultModalOpen],
+        ['EditResultModal', setEditResultModalOpen], // For boolean control
+        ['CreateEditExamModal', setIsExamModalOpen],
+        ['AIMistakeAnalysisModal', setAiMistakeModalOpen],
+        ['AIDoubtSolverModal', setAiDoubtSolverOpen],
+        ['AIChatPopup', setAiChatOpen],
+        ['TestReportModal', setViewingReport], 
+        ['MoveTasksModal', setMoveModalOpen],
+        ['MusicLibraryModal', toggleLibrary], 
+        ['DeepLinkConfirmationModal', setDeepLinkAction], 
+        ['CreateEditDeckModal', setCreateDeckModalOpen],
+        ['AIGenerateFlashcardsModal', setAiFlashcardModalOpen],
+        ['DeckViewModal', setViewingDeck], 
+        ['CreateEditFlashcardModal', setCreateCardModalOpen],
+        ['FlashcardReviewModal', setReviewingDeck], 
+        ['FileViewerModal', setViewingFile], 
+        ['GoogleAssistantGuideModal', setAssistantGuideOpen],
+        ['AIGuideModal', setAiGuideModalOpen],
+        ['MessagingModal', setMessagingModalOpen],
+        ['UniversalSearch', setUniversalSearchOpen],
+        ['AnswerKeyUploadModal', setAnswerKeyUploadModalOpen],
+        ['ProfileModal', setIsProfileModalOpen], 
+        ['SpecificMistakeAnalysisModal', setAnalyzingMistake]
+    ]), [toggleLibrary]);
 
-    const openModalHandler = useCallback((modalId: string, customOnClose?: () => void) => {
-        const setStateTrue = modalMap.current[modalId];
-        if (setStateTrue) {
-            // Special handling for MusicLibraryModal which uses a context toggle
-            if (modalId === 'MusicLibraryModal') {
-                toggleLibrary(); // Directly toggle the music library
-                // We still want it in the history stack if needed for navigation
-                openModal(modalId, () => toggleLibrary());
-            } else {
-                setStateTrue(true);
-                openModal(modalId, () => setStateTrue(false)); // Pass actual setter for history handling
-            }
-        } else {
-            console.warn(`Attempted to open unknown modal: ${modalId}`);
-        }
-    }, [openModal, toggleLibrary]);
-
-    const closeModalHandler = useCallback((modalId: string) => {
-        const setStateFalse = modalMap.current[modalId];
-        if (setStateFalse) {
-            // Special handling for MusicLibraryModal
-            if (modalId === 'MusicLibraryModal') {
-                if (isMusicLibraryOpen) toggleLibrary(); // Only toggle if it's open
-            } else {
-                setStateFalse(false);
-            }
-            // Remove from modalStack if found (should be handled by history.back())
-            const index = modalStack.current.findIndex(m => m.id === modalId);
-            if (index !== -1) {
-                modalStack.current.splice(index, 1);
-                setCurrentModalId(modalStack.current.length > 0 ? modalStack.current[modalStack.current.length - 1].id : null);
-            }
-        } else {
-            console.warn(`Attempted to close unknown modal: ${modalId}`);
-        }
-    }, [toggleLibrary, isMusicLibraryOpen]);
+    // Update modalSetStateMap for the global popstate listener
+    useEffect(() => {
+        modalSetStateMap.current = modalSetters;
+    }, [modalSetters]);
 
 
     const renderContent = () => {
@@ -643,8 +725,8 @@ const App: React.FC = () => {
             return <div className="flex items-center justify-center min-h-screen"><div className="text-xl animate-pulse">Loading...</div></div>;
         }
 
-        if (isExamTypeModalOpen) {
-            return <ExamTypeSelectionModal onClose={() => genericOnClose('ExamTypeSelectionModal', setIsExamTypeModalOpen)} onSelect={handleSelectExamType} />;
+        if (resetToken) {
+            return <AuthScreen backendStatus={backendStatus} googleClientId={googleClientId} resetToken={resetToken} />;
         }
 
         if (backendStatus === 'misconfigured') {
@@ -660,15 +742,15 @@ const App: React.FC = () => {
                     {dashboardUser.CONFIG.settings.notchSettings?.enabled !== false && <GlobalMusicVisualizer />}
                     {isFullScreenPlayerOpen && <FullScreenMusicPlayer />}
                     <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 ${useToolbarLayout || currentTrack ? 'pb-24' : ''}`}>
-                        <Header user={{ name: dashboardUser.fullName, id: dashboardUser.sid, profilePhoto: dashboardUser.profilePhoto }} onLogout={logout} backendStatus={backendStatus} isSyncing={isSyncing} />
+                        <Header user={{ name: dashboardUser.fullName, id: dashboardUser.sid, profilePhoto: dashboardUser.profilePhoto }} onLogout={logout} backendStatus={backendStatus} isSyncing={isSyncing} onOpenProfile={() => openModal('ProfileModal', setIsProfileModalOpen)} />
                         {userRole === 'admin' ? (
                             <TeacherDashboard 
                                 students={allStudents} 
                                 onToggleUnacademySub={()=>{}} 
                                 onDeleteUser={onDeleteUser} 
                                 onBroadcastTask={api.broadcastTask} 
-                                openModal={openModalHandler}
-                                closeModal={closeModalHandler}
+                                openModal={openModal}
+                                closeModal={closeModal}
                             />
                         ) : (
                             <StudentDashboard 
@@ -695,8 +777,49 @@ const App: React.FC = () => {
                                 onPostDoubt={onPostDoubt} 
                                 onPostSolution={onPostSolution} 
                                 deepLinkAction={deepLinkAction}
-                                openModal={openModalHandler}
-                                closeModal={closeModalHandler}
+                                openModal={openModal}
+                                closeModal={closeModal}
+                                // Pass specific modal state setters and getters for granular control
+                                isCreateModalOpen={isCreateModalOpen} setIsCreateModalOpen={setIsCreateModalOpen}
+                                isAiParserModalOpen={isAiParserModalOpen} setisAiParserModalOpen={setisAiParserModalOpen}
+                                isPracticeModalOpen={isPracticeModalOpen} setIsPracticeModalOpen={setIsPracticeModalOpen}
+                                isSettingsModalOpen={isSettingsModalOpen} setIsSettingsModalOpen={setIsSettingsModalOpen}
+                                editingTask={editingTask} setEditingTask={setEditingTask}
+                                viewingTask={viewingTask} setViewingTask={setViewingTask}
+                                practiceTask={practiceTask} setPracticeTask={setPracticeTask}
+                                aiPracticeTest={aiPracticeTest} setAiPracticeTest={setAiPracticeTest}
+                                isEditWeaknessesModalOpen={isEditWeaknessesModalOpen} setIsEditWeaknessesModalOpen={setIsEditWeaknessesModalOpen}
+                                isLogResultModalOpen={isLogResultModalOpen} setLogResultModalOpen={setLogResultModalOpen}
+                                initialScoreForModal={initialScoreForModal} setInitialScoreForModal={setInitialScoreForModal}
+                                initialMistakesForModal={initialMistakesForModal} setInitialMistakesForModal={setInitialMistakesForModal}
+                                isEditResultModalOpen={isEditResultModalOpen} setEditResultModalOpen={setEditResultModalOpen}
+                                editingResult={editingResult} setEditingResult={setEditingResult}
+                                isExamModalOpen={isExamModalOpen} setIsExamModalOpen={setIsExamModalOpen}
+                                editingExam={editingExam} setEditingExam={setEditingExam}
+                                isAiMistakeModalOpen={isAiMistakeModalOpen} setAiMistakeModalOpen={setAiMistakeModalOpen}
+                                viewingReport={viewingReport} setViewingReport={setViewingReport}
+                                isAssistantGuideOpen={isAssistantGuideOpen} setAssistantGuideOpen={setAssistantGuideOpen}
+                                isAiGuideModalOpen={isAiGuideModalOpen} setAiGuideModalOpen={setAiGuideModalOpen}
+                                isSearchOpen={isUniversalSearchOpen} setIsSearchOpen={setUniversalSearchOpen}
+                                searchInitialQuery={null} setSearchInitialQuery={()=>{}} // Not directly used in studentDashboard
+                                isSelectMode={false} setIsSelectMode={()=>{}} // Not directly used in studentDashboard
+                                selectedTaskIds={[]} setSelectedTaskIds={()=>{}} // Not directly used in studentDashboard
+                                isMoveModalOpen={isMoveModalOpen} setMoveModalOpen={setMoveModalOpen}
+                                isAiChatOpen={isAiChatOpen} setAiChatOpen={setAiChatOpen}
+                                aiChatHistory={[]} setAiChatHistory={()=>{}} // Not directly used in studentDashboard
+                                showAiChatFab={false} setShowAiChatFab={()=>{}} // Not directly used in studentDashboard
+                                isAiChatLoading={false} setIsAiChatLoading={()=>{}} // Not directly used in studentDashboard
+                                isAiDoubtSolverOpen={isAiDoubtSolverOpen} setAiDoubtSolverOpen={setAiDoubtSolverOpen}
+                                isCreateDeckModalOpen={isCreateDeckModalOpen} setCreateDeckModalOpen={setCreateDeckModalOpen}
+                                isAiFlashcardModalOpen={isAiFlashcardModalOpen} setAiFlashcardModalOpen={setAiFlashcardModalOpen}
+                                editingDeck={editingDeck} setEditingDeck={setEditingDeck}
+                                viewingDeck={viewingDeck} setViewingDeck={setViewingDeck}
+                                isCreateCardModalOpen={isCreateCardModalOpen} setCreateCardModalOpen={setCreateCardModalOpen}
+                                editingCard={editingCard} setEditingCard={setEditingCard}
+                                reviewingDeck={reviewingDeck} setReviewingDeck={setReviewingDeck}
+                                viewingFile={viewingFile} setViewingFile={setViewingFile}
+                                isMusicLibraryOpen={isLibraryOpen} setIsMusicLibraryOpen={toggleLibrary}
+                                analyzingMistake={analyzingMistake} setAnalyzingMistake={setAnalyzingMistake}
                             />
                         )}
                     </div>
@@ -709,14 +832,14 @@ const App: React.FC = () => {
              return (
                  <div style={{'--accent-color': '#0891b2'} as React.CSSProperties} className="safe-padding-left safe-padding-right safe-padding-top safe-padding-bottom">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                        <Header user={{ name: 'Admin', id: 'ADMIN_DEMO', profilePhoto: currentUser?.profilePhoto }} onLogout={logout} backendStatus={backendStatus} isSyncing={isSyncing} />
+                        <Header user={{ name: 'Admin', id: 'ADMIN_DEMO', profilePhoto: currentUser?.profilePhoto }} onLogout={logout} backendStatus={backendStatus} isSyncing={isSyncing} onOpenProfile={() => openModal('ProfileModal', setIsProfileModalOpen)} />
                         <TeacherDashboard 
                             students={allStudents} 
                             onToggleUnacademySub={()=>{}} 
                             onDeleteUser={() => alert("Disabled in demo mode")} 
                             onBroadcastTask={() => alert("Disabled in demo mode")}
-                            openModal={openModalHandler}
-                            closeModal={closeModalHandler}
+                            openModal={openModal}
+                            closeModal={closeModal}
                         />
                     </div>
                 </div>
@@ -730,7 +853,51 @@ const App: React.FC = () => {
         return <AuthScreen backendStatus={backendStatus} googleClientId={googleClientId} resetToken={resetToken} />;
     };
 
-    return <div className="min-h-screen bg-gray-950 text-gray-200 font-sans">{renderContent()}</div>;
+    return (
+        <div className="min-h-screen bg-gray-950 text-gray-200 font-sans">
+            {renderContent()}
+
+            {/* All Modals (Conditionally Rendered based on their own state, controlled by openModal/closeModal) */}
+            {isExamTypeModalOpen && <ExamTypeSelectionModal onClose={() => closeModal('ExamTypeSelectionModal')} onSelect={handleSelectExamType} />}
+            {isSettingsModalOpen && currentUser && <SettingsModal settings={currentUser.CONFIG.settings} decks={currentUser.CONFIG.flashcardDecks || []} onClose={() => closeModal('SettingsModal')} onSave={(s) => handleUpdateConfig({ settings: { ...currentUser.CONFIG.settings, ...s } as any })} onExportToIcs={() => exportCalendar(currentUser.SCHEDULE_ITEMS, currentUser.EXAMS, currentUser.fullName)} googleAuthStatus={googleAuthStatus} onGoogleSignIn={auth.handleSignIn} onGoogleSignOut={handleGoogleSignOut} onBackupToDrive={onBackupToDrive} onRestoreFromDrive={onRestoreFromDrive} onApiKeySet={() => openModal('AIChatPopup', setAiChatOpen)} onOpenAssistantGuide={() => openModal('GoogleAssistantGuideModal', setAssistantGuideOpen)} onOpenAiGuide={() => openModal('AIGuideModal', setAiGuideModalOpen)} onClearAllSchedule={() => api.clearAllSchedule().then(refreshUser)} onToggleEditLayout={() => { handleUpdateConfig({ settings: { ...currentUser.CONFIG.settings, dashboardLayout: currentUser.CONFIG.settings.dashboardLayout } }); closeModal('SettingsModal'); }} />}
+            {isAiParserModalOpen && currentUser && <AIParserModal onClose={() => closeModal('AIParserModal')} onDataReady={handleBatchImport} onPracticeTestReady={(data) => {setAiPracticeTest(data); openModal('CustomPracticeModal', setIsPracticeModalOpen);}} onOpenGuide={() => openModal('AIGuideModal', setAiGuideModalOpen)} examType={currentUser.CONFIG.settings.examType} />}
+            {isCreateModalOpen && currentUser && <CreateEditTaskModal task={editingTask || null} onClose={() => { closeModal('CreateEditTaskModal'); setEditingTask(null); setViewingTask(null); }} onSave={handleSaveTask} decks={currentUser.CONFIG.flashcardDecks || []} />}
+            {isPracticeModalOpen && currentUser && <CustomPracticeModal initialTask={practiceTask} aiPracticeTest={aiPracticeTest} onClose={() => { closeModal('CustomPracticeModal'); setPracticeTask(null); setAiPracticeTest(null); }} onSessionComplete={(duration, solved, skipped) => onLogStudySession({ duration, questions_solved: solved, questions_skipped: skipped })} defaultPerQuestionTime={currentUser.CONFIG.settings.perQuestionTime || 180} onLogResult={onLogResult} student={currentUser} onUpdateWeaknesses={onUpdateWeaknesses} onSaveTask={handleSaveTask} />}
+            {isEditWeaknessesModalOpen && currentUser && <EditWeaknessesModal currentWeaknesses={currentUser.CONFIG.WEAK} onClose={() => closeModal('EditWeaknessesModal')} onSave={onUpdateWeaknesses} />}
+            {isLogResultModalOpen && currentUser && <LogResultModal onClose={() => {closeModal('LogResultModal'); setInitialScoreForModal(undefined); setInitialMistakesForModal(undefined);}} onSave={onLogResult} initialScore={initialScoreForModal} initialMistakes={initialMistakesForModal} />}
+            {isEditResultModalOpen && currentUser && editingResult && <EditResultModal result={editingResult} onClose={() => { closeModal('EditResultModal'); setEditingResult(null); }} onSave={api.updateResult} />}
+            {isExamModalOpen && currentUser && <CreateEditExamModal exam={editingExam} onClose={() => { closeModal('CreateEditExamModal'); setEditingExam(null); }} onSave={(exam) => editingExam ? onUpdateExam(exam) : onAddExam(exam)} />}
+            {isAiMistakeModalOpen && currentUser && <AIMistakeAnalysisModal onClose={() => closeModal('AIMistakeAnalysisModal')} onSaveWeakness={onUpdateWeaknesses} />}
+            {isAiDoubtSolverOpen && currentUser && <AIDoubtSolverModal onClose={() => closeModal('AIDoubtSolverModal')} />}
+            {isAiChatOpen && currentUser && <AIChatPopup history={[]} onSendMessage={() => {}} onClose={() => closeModal('AIChatPopup')} isLoading={false} />}
+            {currentUser && viewingReport && <TestReportModal result={viewingReport} onClose={() => setViewingReport(null)} onUpdateWeaknesses={onUpdateWeaknesses} student={currentUser} onSaveDeck={() => {}} />}
+            {isMoveModalOpen && currentUser && <MoveTasksModal onClose={() => closeModal('MoveTasksModal')} onConfirm={() => {}} selectedCount={0} />}
+            {isLibraryOpen && currentUser && <MusicLibraryModal onClose={() => closeModal('MusicLibraryModal')} />}
+            {deepLinkAction && currentUser && <DeepLinkConfirmationModal data={deepLinkAction.data} onClose={() => setDeepLinkAction(null)} onConfirm={() => handleBatchImport(deepLinkAction.data)} />}
+
+            {/* Flashcard Modals */}
+            {isCreateDeckModalOpen && currentUser && <CreateEditDeckModal deck={editingDeck} onClose={() => { closeModal('CreateEditDeckModal'); setEditingDeck(null); }} onSave={() => {}} />}
+            {isAiFlashcardModalOpen && currentUser && <AIGenerateFlashcardsModal student={currentUser} onClose={() => closeModal('AIGenerateFlashcard sModal')} onSaveDeck={() => {}} />}
+            {currentUser && viewingDeck && <DeckViewModal deck={viewingDeck} onClose={() => setViewingDeck(null)} onAddCard={() => openModal('CreateEditFlashcardModal', setCreateCardModalOpen)} onEditCard={() => {}} onDeleteCard={() => {}} onStartReview={() => {setReviewingDeck(viewingDeck); openModal('FlashcardReviewModal', setReviewingDeck);}} />}
+            {isCreateCardModalOpen && currentUser && viewingDeck && <CreateEditFlashcardModal card={editingCard} deckId={viewingDeck.id} onClose={() => { closeModal('CreateEditFlashcardModal'); setEditingCard(null); }} onSave={() => {}} />}
+            {currentUser && reviewingDeck && <FlashcardReviewModal deck={reviewingDeck} onClose={() => closeModal('FlashcardReviewModal')} />}
+            
+            {/* Study Material Modal */}
+            {currentUser && viewingFile && <FileViewerModal file={viewingFile} onClose={() => closeModal('FileViewerModal')} />}
+
+            {/* Assistant & AI Guide Modals */}
+            {isAssistantGuideOpen && <GoogleAssistantGuideModal onClose={() => closeModal('GoogleAssistantGuideModal')} />}
+            {isAiGuideModalOpen && currentUser && <AIGuideModal onClose={() => closeModal('AIGuideModal')} examType={currentUser.CONFIG.settings.examType} />}
+            
+            {/* Other Modals */}
+            {isProfileModalOpen && currentUser && <ProfileModal user={currentUser} onClose={() => closeModal('ProfileModal')} />}
+            {currentUser && <MessagingModal student={allStudents[0]} onClose={() => closeModal('MessagingModal')} isDemoMode={isDemoMode} />} {/* FIX: Needs actual messagingStudent */}
+            {isUniversalSearchOpen && currentUser && <UniversalSearch isOpen={true} onClose={() => closeModal('UniversalSearch')} onNavigate={() => {}} onAction={() => {}} scheduleItems={currentUser.SCHEDULE_ITEMS} exams={currentUser.EXAMS} decks={currentUser.CONFIG.flashcardDecks || []} />}
+            {isAnswerKeyUploadModalOpen && <AnswerKeyUploadModal onClose={() => closeModal('AnswerKeyUploadModal')} onGrade={() => {}} />}
+            {currentUser && viewingReport && analyzingMistake !== null && <SpecificMistakeAnalysisModal questionNumber={analyzingMistake} onClose={() => closeModal('SpecificMistakeAnalysisModal')} onSaveWeakness={() => {}} />} {/* FIX: Needs questionNumber, onSaveWeakness, etc. */}
+
+        </div>
+    );
 };
 
 export default App;

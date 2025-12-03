@@ -220,28 +220,6 @@ export interface StudentData {
   DOUBTS: DoubtData[];
 }
 
-export interface SolutionData {
-  id: string;
-  user_sid: string;
-  solution: string;
-  solution_image?: string;
-  created_at: string;
-  solver_name: string;
-  solver_photo?: string;
-}
-
-export interface DoubtData {
-  id: string;
-  user_sid: string;
-  question: string;
-  question_image?: string;
-  created_at: string;
-  author_name: string;
-  author_photo?: string;
-  solutions: SolutionData[];
-  status?: 'active' | 'archived' | 'deleted';
-}
-
 export interface MessageData {
     id: number;
     sender_sid: string;

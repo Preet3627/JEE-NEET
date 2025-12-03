@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { StudentData, ScheduleItem, HomeworkData, ScheduleCardData } from '../types';
 import Icon from './Icon';
@@ -15,7 +16,7 @@ interface TeacherDashboardProps {
     onDeleteUser: (sid: string) => void;
     onAddTeacher?: (teacherData: any) => void;
     onBroadcastTask: (task: ScheduleItem, examType: 'JEE' | 'NEET' | 'ALL') => void;
-    openModal: (modalId: string, onCloseCallback: () => void) => void; // New prop
+    openModal: (modalId: string, setStateTrue: React.Dispatch<React.SetStateAction<boolean>> | ((val: any) => void)) => void; // New prop
     closeModal: (modalId: string) => void; // New prop
 }
 
@@ -149,8 +150,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleU
                 </nav>
             </div>
             <div className="mt-6">
-                {activeTab === 'grid' && <StudentGrid students={students} onToggleSub={onToggleUnacademySub} onDeleteUser={onDeleteUser} onStartMessage={(student) => { setMessagingStudent(student); openModal('MessagingModal', () => setMessagingStudent(null)); }} onClearData={handleClearData} onImpersonate={handleImpersonate} />}
-                {activeTab === 'broadcast' && <BroadcastManager onOpenModal={() => openModal('CreateEditTaskModal', () => setIsBroadcastModalOpen(false))} onOpenAIModal={() => openModal('AIParserModal', () => setIsAIBroadcastModalOpen(false))} target={broadcastTarget} setTarget={setBroadcastTarget} />}
+                {activeTab === 'grid' && <StudentGrid students={students} onToggleSub={()=>{}} onDeleteUser={onDeleteUser} onStartMessage={(student) => { setMessagingStudent(student); openModal('MessagingModal', setMessagingStudent); }} onClearData={handleClearData} onImpersonate={handleImpersonate} />}
+                {activeTab === 'broadcast' && <BroadcastManager onOpenModal={() => openModal('CreateEditTaskModal', setIsBroadcastModalOpen)} onOpenAIModal={() => openModal('AIParserModal', setIsAIBroadcastModalOpen)} target={broadcastTarget} setTarget={setBroadcastTarget} />}
                 {activeTab === 'guide' && <AIGuide />}
             </div>
 

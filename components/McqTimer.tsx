@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Icon from './Icon';
 import { playNextSound, playStopSound, playMarkSound, vibrate } from '../utils/sounds';
@@ -111,7 +112,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
             return { subject: subject, type: questions[index].type };
         }
         if (practiceMode !== 'jeeMains') {
-            return { subject, type: 'MCQ' as 'MCQ' | 'NUM' | 'MULTI_CHOICE' };
+            return { subject: subject, type: 'MCQ' as 'MCQ' | 'NUM' | 'MULTI_CHOICE' };
         }
         // JEE Mains specific question type distribution (example, adjust as needed)
         if (index < 20) return { subject: 'Physics', type: 'MCQ' as const };
@@ -505,11 +506,12 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
   
     return (
         <div ref={timerRef} className="flex flex-col h-[70vh] max-h-[600px] relative fullscreen:h-screen fullscreen:max-h-screen bg-gray-900/50 p-4 rounded-lg">
-            {/* MacOS Traffic Light Header (Inside Timer) */}
+            {/* MacOS Traffic Light Header */}
             <div className="flex-shrink-0 flex justify-between items-start pb-3 border-b border-gray-700">
                 <div className="flex items-center gap-4">
                      <div className="flex items-center gap-1.5">
-                        <button onClick={onClose} className="w-3 h-3 rounded-full bg-[#ff5f56] hover:bg-[#ff5f56]/80 shadow-inner" title="Close"></button>
+                        <button onClick={onClose} className="w-3 h-3 rounded-full bg-[#ff5f56] hover:bg-[#ff5f56]/80 shadow-inner"></button>
+                        <div className="w-3 h-3 rounded-full bg-[#ffbd2e] hover:bg-[#ffbd2e]/80 shadow-inner"></div>
                         <button onClick={toggleFullscreen} className="w-3 h-3 rounded-full bg-[#27c93f] hover:bg-[#27c93f]/80 shadow-inner" title="Toggle Fullscreen"></button>
                      </div>
                     <div>

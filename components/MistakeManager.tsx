@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { ResultData } from '../types';
 import { useLocalization } from '../context/LocalizationContext';

@@ -143,8 +143,11 @@ export const exportCalendar = (items: ScheduleItem[], exams: ExamData[], student
         'END:VCALENDAR\r\n'
     ];
     
+    const icsString = calendarParts.join('');
+    console.log("Generated ICS string:", icsString); // For debugging blank output
+
     try {
-        const blob = new Blob(calendarParts, { type: 'text/calendar;charset=utf-8;' });
+        const blob = new Blob([icsString], { type: 'text/calendar;charset=utf-8;' });
         const link = document.createElement("a");
         const url = URL.createObjectURL(blob);
         link.setAttribute("href", url);

@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import Icon from './Icon';
 import { api } from '../api/apiService';
@@ -36,31 +37,24 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
     const text = inputText.trim();
     
     const handleResult = (result: any) => {
-        if (!result || typeof result !== 'object' || Object.keys(result).length === 0) {
-            setError("The AI couldn't find any actionable data in your text. Please check the Guide for formatting examples.");
-            return;
-        }
-
         if (result.practice_test || result.homework_assignment) {
             onPracticeTestReady(result.practice_test || result.homework_assignment);
         } else if (result.flashcard_deck) {
             onDataReady(result);
-        } else if (result.custom_widget) { // Handle custom widgets
-            onDataReady(result);
-        } else if ((result.schedules?.length > 0 || Array.isArray(result.schedule) && result.schedule.length > 0) || result.exams?.length || result.metrics?.length) {
+        } else if (result.schedules?.length || result.exams?.length || result.metrics?.length || result.custom_widget) { // Added custom_widget
             onDataReady(result);
         } else {
-            setError("The AI couldn't find any actionable data in your text. Please check the Guide for formatting examples.");
-            return; // Explicitly return false for no data found
+            setError("The AI couldn't find any actionable data in your text. Please check the format or try rephrasing.");
         }
-        return true; // Data found and handled
     };
 
     // Attempt 1: Parse as valid JSON (works offline)
     try {
       const jsonData = JSON.parse(text);
       if (jsonData && typeof jsonData === 'object') {
-        if (handleResult(jsonData)) {
+        // Check if it contains any of our expected top-level keys
+        if (jsonData.flashcard_deck || jsonData.homework_assignment || jsonData.practice_test || jsonData.schedules?.length || jsonData.exams?.length || jsonData.metrics?.length || jsonData.custom_widget) { // Added custom_widget
+          handleResult(jsonData);
           setIsLoading(false);
           return;
         }
@@ -70,17 +64,14 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
     }
 
     // Attempt 2: If it looks like broken JSON, try to correct it online
-    // Check for potential JSON structure even if it's broken
     if (text.startsWith('{') || text.startsWith('[')) {
       try {
         const correctionResult = await api.correctJson(text);
-        // api.correctJson now returns { correctedJson: "..." }
-        const correctedData = JSON.parse(correctionResult.correctedJson); 
+        const correctedData = JSON.parse(correctionResult.correctedJson);
         if (correctedData && Object.keys(correctedData).length > 0) {
-            if (handleResult(correctedData)) {
-                setIsLoading(false);
-                return;
-            }
+            handleResult(correctedData);
+            setIsLoading(false);
+            return;
         }
       } catch (correctionError) {
         console.warn("AI JSON correction failed, falling back to text parser:", correctionError);
@@ -90,7 +81,7 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
     // Attempt 3: Fallback to parsing as unstructured text online
     try {
       const result = await api.parseText(text, window.location.origin);
-      handleResult(result); // handleResult will set error if no data found
+      handleResult(result);
     } catch (parseError: any) {
       console.error("AI Parser error:", parseError);
       setError(parseError.error || 'Failed to parse data. The AI service may be unavailable or the format is unrecognized.');

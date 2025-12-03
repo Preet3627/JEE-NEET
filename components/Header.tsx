@@ -15,13 +15,13 @@ interface HeaderProps {
     onLogout: () => void;
     backendStatus: 'checking' | 'online' | 'offline';
     isSyncing: boolean;
+    onOpenProfile: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ user, onLogout, backendStatus, isSyncing }) => {
+const Header: React.FC<HeaderProps> = ({ user, onLogout, backendStatus, isSyncing, onOpenProfile }) => {
     const { language, setLanguage, t } = useLocalization();
     const { currentUser } = useAuth();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
     const appTitle = t({EN: "JEE Scheduler Pro", GU: "JEE શેડ્યૂલર પ્રો"});
 
@@ -98,7 +98,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, backendStatus, isSyncin
                             <div className={`popup-menu ${isMenuOpen ? 'popup-enter' : 'popup-exit'} absolute right-0 mt-2 w-48 bg-gray-900/80 border border-gray-700 rounded-lg shadow-lg backdrop-blur-xl z-20`}>
                                 <ul className="py-1">
                                     <li>
-                                        <button onClick={() => { setIsProfileModalOpen(true); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700/50">
+                                        <button onClick={() => { onOpenProfile(); setIsMenuOpen(false); }} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700/50">
                                             <Icon name="user-plus" className="w-4 h-4" /> My Profile
                                         </button>
                                     </li>
@@ -113,12 +113,6 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, backendStatus, isSyncin
                     </div>
                 </div>
             </header>
-            {isProfileModalOpen && currentUser && (
-                <ProfileModal 
-                    user={currentUser} 
-                    onClose={() => setIsProfileModalOpen(false)} 
-                />
-            )}
         </>
     );
 };
