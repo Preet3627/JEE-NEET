@@ -1,4 +1,5 @@
 
+
 import { ScheduleItem, ExamData } from '../types';
 
 // Helper to format date to ICS format (YYYYMMDDTHHMMSSZ)

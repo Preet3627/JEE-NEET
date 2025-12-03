@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import Icon from './Icon';
 
@@ -66,83 +67,4 @@ const GuideRenderer: React.FC<{ content: string }> = ({ content }) => {
           <tbody>
             {rows.map((row, rIndex) => (
               <tr key={rIndex} className="border-b border-gray-700/50 hover:bg-gray-800/50">
-                {row.split('|').map(c => c.trim()).slice(1, -1).map((cell, cIndex) => {
-                   let content = cell.replace(/`/g, '');
-                   content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                   return <td key={cIndex} className="py-2 px-3" dangerouslySetInnerHTML={{ __html: content }}></td>;
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      );
-      i = currentLine;
-      continue;
-    }
-    
-    if (line.startsWith('```')) {
-       elements.push(renderLine(line, i));
-       let currentLine = i + 1;
-       while (currentLine < lines.length && !lines[currentLine].startsWith('```')) {
-         currentLine++;
-       }
-       i = currentLine + 1;
-       continue;
-    }
-
-    elements.push(renderLine(line, i));
-    i++;
-  }
-
-  return <div className="text-gray-300 text-sm leading-relaxed">{elements}</div>;
-};
-
-
-const AIGuide: React.FC<AIGuideProps> = ({ examType = 'JEE' }) => {
-    const [guideText, setGuideText] = useState('');
-    const [isLoading, setIsLoading] = useState(true);
-    const [copied, setCopied] = useState(false);
-
-    useEffect(() => {
-        const guideFile = examType === 'NEET' ? '/ai-agent-guide-neet.txt' : '/ai-agent-guide-jee.txt'; // FIX: Corrected JEE guide filename
-        setIsLoading(true);
-        fetch(guideFile)
-            .then(response => {
-                if (!response.ok) throw new Error('Guide not found');
-                return response.text();
-            })
-            .then(text => setGuideText(text))
-            .catch(error => {
-                console.error('Error loading AI guide:', error);
-                setGuideText('Error: Could not load the AI guide.');
-            })
-            .finally(() => setIsLoading(false));
-    }, [examType]);
-
-
-    const handleCopy = () => {
-        const plainText = guideText.replace(/`/g, '').replace(/\*/g, '');
-        navigator.clipboard.writeText(plainText);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    return (
-        <div>
-             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold text-white">AI Agent Guide ({examType})</h2>
-                <button onClick={handleCopy} disabled={isLoading} className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600 disabled:opacity-50">
-                    <Icon name={copied ? 'check' : 'copy'} className="w-4 h-4" /> {copied ? 'Copied!' : 'Copy Guide'}
-                </button>
-            </div>
-            <p className="text-gray-400 mb-6 text-sm">
-                Use this documentation to instruct a Large Language Model (like Gemini) to generate valid JSON data for batch importing schedules, exams, or student metrics.
-            </p>
-            <div className="bg-gray-900/70 p-4 rounded-md border border-gray-600 max-h-[60vh] overflow-y-auto">
-                {isLoading ? <p>Loading guide...</p> : <GuideRenderer content={guideText} />}
-            </div>
-        </div>
-    );
-};
-
-export default AIGuide;
+                {row

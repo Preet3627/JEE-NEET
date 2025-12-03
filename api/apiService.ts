@@ -52,7 +52,7 @@ export const authFetch = async (url: string, options: RequestInit = {}) => {
              throw new Error('Unauthorized');
         }
         // For blob response types, handle them directly here without parsing as JSON
-        if ((options as any).returnRawResponse) { // Custom option to signal raw response needed
+        if ((options as { returnRawResponse?: boolean }).returnRawResponse) { // Custom option to signal raw response needed
             return response;
         }
         return handleResponse(response);

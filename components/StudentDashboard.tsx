@@ -57,33 +57,7 @@ import CustomWidget from './widgets/CustomWidget';
 import PracticeLauncherWidget from './widgets/PracticeLauncherWidget';
 import UniversalSearch from './UniversalSearch';
 
-interface StudentDashboardProps {
-    student: StudentData;
-    onSaveTask: (task: ScheduleItem) => void;
-    onSaveBatchTasks: (tasks: ScheduleItem[]) => void;
-    onDeleteTask: (taskId: string) => void;
-    onToggleMistakeFixed: (resultId: string, mistake: string) => void;
-    onUpdateConfig: (config: Partial<Config>) => void;
-    onLogStudySession: (session: Omit<StudySession, 'date'>) => void;
-    onUpdateWeaknesses: (weaknesses: string[]) => void;
-    onLogResult: (result: ResultData) => void;
-    onAddExam: (exam: ExamData) => void;
-    onUpdateExam: (exam: ExamData) => void;
-    onDeleteExam: (examId: string) => void;
-    onExportToIcs: () => void;
-    onBatchImport: (data: { schedules: ScheduleItem[], exams: ExamData[], results: ResultData[], weaknesses: string[] }) => void;
-    googleAuthStatus: 'signed_in' | 'signed_out' | 'loading' | 'unconfigured';
-    onGoogleSignIn: () => void;
-    onGoogleSignOut: () => void;
-    onBackupToDrive: () => void;
-    onRestoreFromDrive: () => void;
-    allDoubts: DoubtData[];
-    onPostDoubt: (question: string, image?: string) => void;
-    onPostSolution: (doubtId: string, solution: string, image?: string) => void;
-    deepLinkAction: { action: string; data: any } | null;
-    // FIX: Add setDeepLinkAction to props
-    setDeepLinkAction: React.Dispatch<React.SetStateAction<any>>;
-    // FIX: Add openModal and closeModal to props
+interface ModalControlProps {
     openModal: (modalId: string, setter: React.Dispatch<React.SetStateAction<boolean>> | ((val: any) => void), initialValue?: any) => void;
     closeModal: (modalId: string) => void;
 
@@ -117,12 +91,12 @@ interface StudentDashboardProps {
     aiChatHistory: { role: string; parts: { text: string }[] }[]; setAiChatHistory: React.Dispatch<React.SetStateAction<{ role: string; parts: { text: string }[] }[]>>;
     showAiChatFab: boolean; setShowAiChatFab: React.Dispatch<React.SetStateAction<boolean>>;
     isAiChatLoading: boolean; setIsAiChatLoading: React.Dispatch<React.SetStateAction<boolean>>;
-    isAiDoubtSolverOpen: boolean; setIsAiDoubtSolverOpen: React.Dispatch<React.SetStateAction<boolean>>; // FIX: Destructure setIsAiDoubtSolverOpen
+    isAiDoubtSolverOpen: boolean; setIsAiDoubtSolverOpen: React.Dispatch<React.SetStateAction<boolean>>;
     isCreateDeckModalOpen: boolean; setCreateDeckModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
-    isAiFlashcardModalOpen: boolean; setIsAiFlashcardModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isAiFlashcardModalOpen: boolean; setAiFlashcardModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     editingDeck: FlashcardDeck | null; setEditingDeck: React.Dispatch<React.SetStateAction<FlashcardDeck | null>>;
     viewingDeck: FlashcardDeck | null; setViewingDeck: React.Dispatch<React.SetStateAction<FlashcardDeck | null>>;
-    isCreateCardModalOpen: boolean; setCreateCardModalOpen: React.Dispatch<React.SetStateAction<boolean>>; // FIX: Add setCreateCardModalOpen
+    isCreateCardModalOpen: boolean; setCreateCardModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     editingCard: Flashcard | null; setEditingCard: React.Dispatch<React.SetStateAction<Flashcard | null>>;
     reviewingDeck: FlashcardDeck | null; setReviewingDeck: React.Dispatch<React.SetStateAction<FlashcardDeck | null>>;
     viewingFile: StudyMaterialItem | null; setViewingFile: React.Dispatch<React.SetStateAction<StudyMaterialItem | null>>;
@@ -132,6 +106,34 @@ interface StudentDashboardProps {
     handleSaveDeck: (deck: FlashcardDeck) => void;
     handleDeleteCard: (deckId: string, cardId: string) => void;
     handleSaveCard: (deckId: string, card: Flashcard) => void;
+    setDeepLinkAction: React.Dispatch<React.SetStateAction<any>>;
+}
+
+
+interface StudentDashboardProps extends ModalControlProps {
+    student: StudentData;
+    onSaveTask: (task: ScheduleItem) => void;
+    onSaveBatchTasks: (tasks: ScheduleItem[]) => void;
+    onDeleteTask: (taskId: string) => void;
+    onToggleMistakeFixed: (resultId: string, mistake: string) => void;
+    onUpdateConfig: (config: Partial<Config>) => void;
+    onLogStudySession: (session: Omit<StudySession, 'date'>) => void;
+    onUpdateWeaknesses: (weaknesses: string[]) => void;
+    onLogResult: (result: ResultData) => void;
+    onAddExam: (exam: ExamData) => void;
+    onUpdateExam: (exam: ExamData) => void;
+    onDeleteExam: (examId: string) => void;
+    onExportToIcs: () => void;
+    onBatchImport: (data: { schedules: ScheduleItem[], exams: ExamData[], results: ResultData[], weaknesses: string[] }) => void;
+    googleAuthStatus: 'signed_in' | 'signed_out' | 'loading' | 'unconfigured';
+    onGoogleSignIn: () => void;
+    onGoogleSignOut: () => void;
+    onBackupToDrive: () => void;
+    onRestoreFromDrive: () => void;
+    allDoubts: DoubtData[];
+    onPostDoubt: (question: string, image?: string) => void;
+    onPostSolution: (doubtId: string, solution: string, image?: string) => void;
+    deepLinkAction: { action: string; data: any } | null;
 }
 
 const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
@@ -139,9 +141,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         student, onSaveTask, onSaveBatchTasks, onDeleteTask, onToggleMistakeFixed, onUpdateConfig, onLogStudySession, 
         onUpdateWeaknesses, onLogResult, onAddExam, onUpdateExam, onDeleteExam, onExportToIcs, onBatchImport, 
         googleAuthStatus, onGoogleSignIn, onGoogleSignOut, onBackupToDrive, onRestoreFromDrive, allDoubts, 
-        onPostDoubt, onPostSolution, deepLinkAction, setDeepLinkAction, openModal, closeModal, // FIX: Destructure openModal and closeModal
+        onPostDoubt, onPostSolution, deepLinkAction, setDeepLinkAction, openModal, closeModal, // Destructure openModal and closeModal
         
-        // Destructure all modal state setters and getters
+        // Destructure all modal state setters and getters from modalControlProps
         isCreateModalOpen, setIsCreateModalOpen,
         isAiParserModalOpen, setisAiParserModalOpen,
         isPracticeModalOpen, setIsPracticeModalOpen,
@@ -171,29 +173,27 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         aiChatHistory, setAiChatHistory,
         showAiChatFab, setShowAiChatFab,
         isAiChatLoading, setIsAiChatLoading,
-        isAiDoubtSolverOpen, setIsAiDoubtSolverOpen, // FIX: Destructure setIsAiDoubtSolverOpen
+        isAiDoubtSolverOpen, setIsAiDoubtSolverOpen, 
         isCreateDeckModalOpen, setCreateDeckModalOpen,
         isAiFlashcardModalOpen, setIsAiFlashcardModalOpen,
         editingDeck, setEditingDeck,
         viewingDeck, setViewingDeck,
-        isCreateCardModalOpen, setCreateCardModalOpen, // FIX: Destructure setCreateCardModalOpen
+        isCreateCardModalOpen, setCreateCardModalOpen, 
         editingCard, setEditingCard,
         reviewingDeck, setReviewingDeck,
         viewingFile, setViewingFile,
         isMusicLibraryOpen, setIsMusicLibraryOpen,
         analyzingMistake, setAnalyzingMistake,
-        handleMoveSelected, handleSaveDeck, handleDeleteCard, handleSaveCard, // FIX: Destructure new handlers
+        handleMoveSelected, handleSaveDeck, handleDeleteCard, handleSaveCard, // Destructure new handlers
     } = props;
     const { refreshUser } = useAuth();
     const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
     const [scheduleView, setScheduleView] = useState<'upcoming' | 'past'>('upcoming');
     
-    // Modals & Features State
-    // These states are now controlled by App.tsx and passed as props, but some internal state is still needed
     // Local state for dashboard widgets
-    const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidgetItem[]>([]); // FIX: Remove duplicate declaration
-    const dragItemRef = useRef<number | null>(null); // FIX: Remove duplicate declaration
-    const dragOverItemRef = useRef<number | null>(null); // FIX: Remove duplicate declaration
+    const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidgetItem[]>([]); 
+    const dragItemRef = useRef<number | null>(null); 
+    const dragOverItemRef = useRef<number | null>(null); 
 
     // Layout Editor State
     const [isEditLayoutMode, setIsEditLayoutMode] = useState(false);
@@ -214,8 +214,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     }, [student.CONFIG.settings.dashboardLayout]);
 
     // --- Handlers ---
-    // handleSaveDeck is now passed from App.tsx, remove local definition.
-    // handleDataImport now uses setDeepLinkAction from props
+    // handleSaveDeck is now passed from App.tsx, so no local definition needed.
+
     const handleDataImport = (data: any) => {
         // Check for custom widgets
         if (data.custom_widget) {
@@ -250,11 +250,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             return;
         }
 
-        setDeepLinkAction(data); // FIX: Use setDeepLinkAction from props
+        setDeepLinkAction(data); // Use setDeepLinkAction from props
         closeModal('AIParserModal'); // Use closeModal
     };
 
-    const handleEditClick = (item: ScheduleItem) => { setEditingTask(item); openModal('CreateEditTaskModal', setIsCreateModalOpen); }; // Use openModal
+    const handleEditClick = (item: ScheduleItem) => { setEditingTask(item); openModal('CreateEditTaskModal', setIsCreateModalOpen, true); }; // Use openModal
     const handleAiPracticeTest = (data: any) => { setAiPracticeTest(data); closeModal('AIParserModal'); setTimeout(() => openModal('CustomPracticeModal', setIsPracticeModalOpen), 300); }; // Use closeModal, openModal
     const handleCompleteTask = (task: ScheduleCardData) => { onDeleteTask(task.ID); };
     const handleStarTask = (taskId: string) => { const task = student.SCHEDULE_ITEMS.find(t => t.ID === taskId); if (task) onSaveTask({ ...task, isStarred: !task.isStarred }); };
@@ -281,7 +281,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     };
     const handleToggleSelectMode = () => { setIsSelectMode(prev => !prev); setSelectedTaskIds([]); };
     const handleTaskSelect = (taskId: string) => { setSelectedTaskIds(prev => prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]); };
-    // handleMoveSelected is now passed from App.tsx, remove local definition.
+    // handleMoveSelected is now passed from App.tsx, so no local definition needed.
     const handleDeleteSelected = async () => { 
         if (selectedTaskIds.length === 0) return;
         if (!window.confirm(`Are you sure you want to delete ${selectedTaskIds.length} selected tasks?`)) return;
@@ -314,8 +314,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         onUpdateConfig({ flashcardDecks: newDecks });
         alert("Deck deleted.");
     };
-    // handleSaveCard is now passed from App.tsx, remove local definition.
-    // handleDeleteCard is now passed from App.tsx, remove local definition.
+    // handleSaveCard is now passed from App.tsx, so no local definition needed.
+    // handleDeleteCard is now passed from App.tsx, so no local definition needed.
     const handleStartReviewSession = (deckId: string) => { const deck = student.CONFIG.flashcardDecks?.find(d => d.id === deckId); if (deck) setReviewingDeck(deck); openModal('FlashcardReviewModal', setReviewingDeck, deck); }; // Use openModal
     const handleSearchAction = (action: string, data?: any) => {
         switch (action) {
@@ -331,11 +331,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     };
     
     // DND Handlers for dashboard widgets
-    // FIX: Remove duplicate declarations
-    // const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidgetItem[]>([]); 
-    // const dragItemRef = useRef<number | null>(null);
-    // const dragOverItemRef = useRef<number | null>(null);
-
     const handleDragStart = (index: number) => { dragItemRef.current = index; };
     const handleDragEnter = (index: number) => { dragOverItemRef.current = index; };
     const handleDragEnd = () => {
@@ -550,7 +545,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                             onDeleteDeck={handleDeleteDeck}
                             onViewDeck={viewingDeck => openModal('DeckViewModal', setViewingDeck, viewingDeck)}
                             onStartReview={handleStartReviewSession}
-                            onGenerateWithAI={() => openModal('AIGenerateFlashcardsModal', setIsAiFlashcardModalOpen, true)}
+                            onGenerateWithAI={() => openModal('AIGenerateFlashcardsModal', setAiFlashcardModalOpen, true)}
                         />;
             case 'exams':
                 return <ExamsView exams={student.EXAMS} onAdd={() => { setEditingExam(null); openModal('CreateEditExamModal', setIsExamModalOpen, true); }} onEdit={(exam) => { setEditingExam(exam); openModal('CreateEditExamModal', setIsExamModalOpen, true); }} onDelete={onDeleteExam} />;

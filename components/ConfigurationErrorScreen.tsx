@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import Icon from './Icon';
 
@@ -13,7 +14,7 @@ const ConfigurationErrorScreen: React.FC<ConfigurationErrorScreenProps> = ({ onR
 
     return (
         <div className="min-h-screen flex items-center justify-center p-4">
-            <div className="w-full max-w-lg p-8 space-y-6 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl shadow-2xl shadow-red-500/10 backdrop-blur-md text-center">
+            <div className="w-full max-w-md p-8 space-y-6 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl shadow-2xl shadow-red-500/10 backdrop-blur-md text-center">
                 <Icon name="settings" className="w-16 h-16 text-red-500 mx-auto animate-spin [animation-duration:3s]" />
                 <h1 className="text-3xl font-bold text-white mt-4">Server Misconfigured</h1>
                 <div className="text-left bg-gray-900/50 p-4 rounded-lg border border-red-500/30 text-sm text-gray-300 space-y-2">
