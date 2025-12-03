@@ -66,6 +66,7 @@ const CreateEditExamModal: React.FC<CreateEditExamModalProps> = ({ exam, onClose
               <option value="PHYSICS">Physics</option>
               <option value="CHEMISTRY">Chemistry</option>
               <option value="MATHS">Maths</option>
+              <option value="BIOLOGY">Biology</option>
             </select>
           </div>
           

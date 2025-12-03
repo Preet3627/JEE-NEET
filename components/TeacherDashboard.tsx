@@ -1,9 +1,8 @@
-
-
 import React, { useState } from 'react';
 import { StudentData, ScheduleItem, HomeworkData, ScheduleCardData } from '../types';
 import Icon from './Icon';
-import { AIGuide } from './AIGuide'; // FIX: Changed to named import for AIGuide
+// FIX: Changed to named import for AIGuide
+import { AIGuide } from './AIGuide';
 import { MessagingModal } from './MessagingModal';
 import CreateEditTaskModal from './CreateEditTaskModal';
 import AIParserModal from './AIParserModal';
@@ -17,7 +16,8 @@ interface ModalControlProps { // Define common modal control props
     isCreateModalOpen: boolean; setIsCreateModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     isAiParserModalOpen: boolean; setisAiParserModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     isMessagingModalOpen: boolean; setMessagingModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
-    messagingStudent: StudentData | null; setMessagingStudent: React.Dispatch<React.SetStateAction<StudentData | null>>; // FIX: Add messagingStudent to ModalControlProps
+    // FIX: Add messagingStudent to ModalControlProps
+    messagingStudent: StudentData | null; setMessagingStudent: React.Dispatch<React.SetStateAction<StudentData | null>>;
 }
 
 interface TeacherDashboardProps extends ModalControlProps {
@@ -26,13 +26,11 @@ interface TeacherDashboardProps extends ModalControlProps {
     onDeleteUser: (sid: string) => void;
     onAddTeacher?: (teacherData: any) => void;
     onBroadcastTask: (task: ScheduleItem, examType: 'JEE' | 'NEET' | 'ALL') => void;
-    // Removed messagingStudent and setMessagingStudent from here as they are now in ModalControlProps
 }
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleUnacademySub, onDeleteUser, onAddTeacher, onBroadcastTask, openModal, closeModal, setIsCreateModalOpen, setisAiParserModalOpen, isCreateModalOpen, isAiParserModalOpen, isMessagingModalOpen, setMessagingModalOpen, messagingStudent, setMessagingStudent }) => { // FIX: Destructure messagingStudent and setMessagingStudent from props
     const { loginWithToken } = useAuth();
     const [activeTab, setActiveTab] = useState<'grid' | 'broadcast' | 'guide'>('grid');
-    // Removed local messagingStudent state as it's now passed via props
     const [broadcastTarget, setBroadcastTarget] = useState<'ALL' | 'JEE' | 'NEET'>('ALL');
 
     const TabButton: React.FC<{ tabId: string; children: React.ReactNode; }> = ({ tabId, children }) => (
@@ -115,7 +113,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleU
             if(window.confirm(`Broadcast ${tasksToBroadcast.length} tasks to ${broadcastTarget} students?`)) {
                 tasksToBroadcast.forEach(task => onBroadcastTask(task, broadcastTarget));
                 closeModal('AIParserModal'); // Use closeModal
-                // setIsAIBroadcastModalOpen(false); // No longer needed, as modal state is global
                 alert("Broadcast queued successfully.");
             }
         } catch (error: any) {

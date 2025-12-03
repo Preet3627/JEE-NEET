@@ -1,5 +1,3 @@
-
-
 import { ScheduleItem } from "../types";
 
 declare const gapi: any;
@@ -106,4 +104,18 @@ export const deleteEvent = async (eventId: string): Promise<void> => {
         'eventId': eventId,
     });
     await request;
+};
+
+// FIX: Added missing listEvents function for calendar sync.
+export const listEvents = async (): Promise<any[]> => {
+    const request = gapi.client.calendar.events.list({
+        'calendarId': 'primary',
+        'timeMin': (new Date()).toISOString(),
+        'showDeleted': false,
+        'singleEvents': true,
+        'maxResults': 100,
+        'orderBy': 'startTime',
+    });
+    const response = await request;
+    return response.result.items;
 };

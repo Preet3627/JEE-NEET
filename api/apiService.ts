@@ -1,5 +1,4 @@
-
-import { StudentData, ScheduleItem, Config, ResultData, ExamData, DoubtData } from '../types';
+import { StudentData, ScheduleItem, Config, ResultData, ExamData, DoubtData, StudySession } from '../types';
 
 const API_URL = '/api';
 
@@ -105,11 +104,14 @@ export const api = {
     addExam: (exam: ExamData) => authFetch('/exams', { method: 'POST', body: JSON.stringify({ exam }) }),
     updateExam: (exam: ExamData) => authFetch(`/exams/${exam.ID}`, { method: 'PUT', body: JSON.stringify({ exam }) }),
     deleteExam: (examId: string) => authFetch(`/exams/${examId}`, { method: 'DELETE' }),
+    // FIX: Added missing saveStudySession API endpoint.
+    saveStudySession: (session: Omit<StudySession, 'date'> & { date: string }) => authFetch('/study-sessions', { method: 'POST', body: JSON.stringify({ session }) }),
 
     // Doubts
     getAllDoubts: () => authFetch('/doubts/all'),
     postDoubt: (question: string, image?: string) => authFetch('/doubts', { method: 'POST', body: JSON.stringify({ question, question_image: image }) }),
     postSolution: (doubtId: string, solution: string, image?: string) => authFetch(`/doubts/${doubtId}/solutions`, { method: 'POST', body: JSON.stringify({ solution, solution_image: image }) }),
+    // FIX: Added missing updateDoubtStatus API endpoint.
     updateDoubtStatus: (doubtId: string, status: 'archived' | 'deleted') => authFetch(`/admin/doubts/${doubtId}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
 
     // Admin
@@ -120,8 +122,11 @@ export const api = {
     broadcastTask: (task: ScheduleItem, examType: 'ALL' | 'JEE' | 'NEET') => authFetch('/admin/broadcast-task', { method: 'POST', body: JSON.stringify({ task, examType }) }),
 
     // Study Material
+    // FIX: Added missing getStudyMaterial API endpoint.
     getStudyMaterial: (path: string) => authFetch(`/study-material/browse?path=${encodeURIComponent(path)}`),
-    getStudyMaterialContent: (path: string) => authFetch(`/study-material/content?path=${encodeURIComponent(path)}`, { returnRawResponse: true } as RequestInit).then(res => res.blob()), // FIX: Handle blob response explicitly
+    // FIX: Correctly handle blob response for file content.
+    getStudyMaterialContent: (path: string) => authFetch(`/study-material/content?path=${encodeURIComponent(path)}`, { returnRawResponse: true } as RequestInit).then(res => (res as Response).blob()),
+    // FIX: Added missing getStudyMaterialDetails API endpoint.
     getStudyMaterialDetails: (paths: string[]) => authFetch('/study-material/details', { method: 'POST', body: JSON.stringify({ paths }) }),
     
     // Music
@@ -133,12 +138,17 @@ export const api = {
     parseText: (text: string, domain: string) => authFetch('/ai/parse-text', { method: 'POST', body: JSON.stringify({ text, domain }) }),
     correctJson: (brokenJson: string) => authFetch('/ai/correct-json', { method: 'POST', body: JSON.stringify({ brokenJson }) }),
     aiChat: (data: { history: any[]; prompt: string; imageBase64?: string; domain: string }) => authFetch('/ai/chat', { method: 'POST', body: JSON.stringify(data) }),
+    // FIX: Added missing getDailyInsight API endpoint.
     getDailyInsight: (data: { weaknesses: string[]; syllabus?: string }) => authFetch('/ai/daily-insight', { method: 'POST', body: JSON.stringify(data) }),
+    // FIX: Added missing analyzeMistake API endpoint.
     analyzeMistake: (data: { prompt: string; imageBase64?: string }) => authFetch('/ai/analyze-mistake', { method: 'POST', body: JSON.stringify(data) }),
+    // FIX: Added missing solveDoubt API endpoint.
     solveDoubt: (data: { prompt: string; imageBase64?: string }) => authFetch('/ai/solve-doubt', { method: 'POST', body: JSON.stringify(data) }),
+    // FIX: Added missing analyzeSpecificMistake API endpoint.
     analyzeSpecificMistake: (data: { prompt: string; imageBase64?: string }) => authFetch('/ai/analyze-specific-mistake', { method: 'POST', body: JSON.stringify(data) }),
     analyzeTestResults: (data: { imageBase64: string; userAnswers: Record<string, string | string[]>; timings: Record<number, number>; syllabus: string }) => authFetch('/ai/analyze-test-results', { method: 'POST', body: JSON.stringify(data) }),
     generateFlashcards: (data: { topic: string; syllabus?: string }) => authFetch('/ai/generate-flashcards', { method: 'POST', body: JSON.stringify(data) }),
     generateAnswerKey: (prompt: string) => authFetch('/ai/generate-answer-key', { method: 'POST', body: JSON.stringify({ prompt }) }),
+    // FIX: Updated generatePracticeTest to include more specific parameters for AI generation.
     generatePracticeTest: (data: { topic: string; numQuestions: number; difficulty: string; questionTypes: ('MCQ' | 'NUM' | 'MULTI_CHOICE')[]; isPYQ: boolean; chapters: string[] }) => authFetch('/ai/generate-practice-test', { method: 'POST', body: JSON.stringify(data) }),
 };

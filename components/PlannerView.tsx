@@ -80,7 +80,7 @@ const PlannerView: React.FC<PlannerViewProps> = ({ items, onEdit }) => {
                 {Object.keys(monthlySchedule).map(dateString => (
                      <div key={dateString}>
                         <h3 className="text-lg font-bold text-cyan-400 tracking-wider mb-2 border-b-2 border-cyan-500/30 pb-1">
-                           {new Date(dateString).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                           {new Date(dateString + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                         </h3>
                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                              {monthlySchedule[dateString].map(item => (

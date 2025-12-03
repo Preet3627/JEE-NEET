@@ -1,5 +1,3 @@
-
-
 import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback } from 'react';
 import { StudentData } from '../types';
 // FIX: Corrected import path to point to apiService.
@@ -22,6 +20,9 @@ interface AuthContextType {
     refreshUser: () => Promise<void>;
     updateProfile: (data: { fullName?: string; profilePhoto?: string }) => Promise<void>;
     setVerificationEmail: (email: string | null) => void;
+    // FIX: Add googleAuthStatus and its setter to the context type
+    googleAuthStatus: 'signed_in' | 'signed_out' | 'loading' | 'unconfigured';
+    setGoogleAuthStatus: React.Dispatch<React.SetStateAction<'signed_in' | 'signed_out' | 'loading' | 'unconfigured'>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -33,6 +34,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [isDemoMode, setIsDemoMode] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [verificationEmail, setVerificationEmail] = useState<string | null>(null);
+    // FIX: Add state for googleAuthStatus
+    const [googleAuthStatus, setGoogleAuthStatus] = useState<'signed_in' | 'signed_out' | 'loading' | 'unconfigured'>('unconfigured');
 
     const logout = useCallback(() => {
         setCurrentUser(null);
@@ -108,7 +111,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
         };
         loadInitialState();
-    }, []); // Run only on initial mount
+    }, [refreshUser, logout]); // Added dependencies
 
     const login = async (sid: string, password: string) => {
         try {
@@ -166,7 +169,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setIsLoading(false);
     };
 
-    const value = { currentUser, userRole, token, isDemoMode, isLoading, verificationEmail, login, googleLogin, logout, enterDemoMode, loginWithToken, refreshUser, updateProfile, setVerificationEmail };
+    const value = { currentUser, userRole, token, isDemoMode, isLoading, verificationEmail, login, googleLogin, logout, enterDemoMode, loginWithToken, refreshUser, updateProfile, setVerificationEmail, googleAuthStatus, setGoogleAuthStatus };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

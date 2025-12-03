@@ -14,10 +14,10 @@ const TestAnalysisReport: React.FC<TestAnalysisReportProps> = ({ result, onAnaly
     }
 
     const { subjectTimings, chapterScores, aiSuggestions, incorrectQuestionNumbers } = result.analysis;
-    // Safely calculate total and max time by casting the values to number[]
+    // FIX: Safely calculate total and max time by casting the values to number[].
     const timeValues = Object.values(subjectTimings) as number[];
     const totalTime = timeValues.reduce((a, b) => a + b, 0);
-    const maxTime = Math.max(...timeValues);
+    const maxTime = Math.max(...timeValues, 1); // Use 1 to avoid division by zero
 
     return (
         <div className="space-y-6 text-left">
@@ -65,7 +65,7 @@ const TestAnalysisReport: React.FC<TestAnalysisReportProps> = ({ result, onAnaly
                         </thead>
                         <tbody className="divide-y divide-gray-700/50">
                             {Object.entries(chapterScores).map(([chapter, scores]) => {
-                                // Assert the type of scores to safely access its properties.
+                                // FIX: Assert the type of scores to safely access its properties.
                                 const scoreData = scores as { correct: number; incorrect: number; accuracy: number };
                                 return (
                                 <tr key={chapter}>

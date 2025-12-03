@@ -1,6 +1,6 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { McqTimer } from './McqTimer';
+// FIX: Changed import to default as McqTimer has a default export.
+import McqTimer from './McqTimer';
 import Icon from './Icon';
 import { getQuestionNumbersFromRanges } from '../utils/qRangesParser';
 import { HomeworkData, ResultData, StudentData, ScheduleItem, PracticeQuestion } from '../types';
@@ -25,6 +25,7 @@ interface CustomPracticeModalProps {
   animationOrigin?: { x: string, y: string };
 }
 
+// FIX: Updated parseAnswers to correctly handle string or string[] values for multi-correct questions.
 const parseAnswers = (text: string): Record<string, string | string[]> => {
   const answers: Record<string, string | string[]> = {};
   if (!text) return answers;
@@ -51,7 +52,13 @@ const parseAnswers = (text: string): Record<string, string | string[]> => {
       if (parts.length === 2) {
         const qNum = parts[0].trim();
         const answer = parts[1].trim();
-        if (qNum && answer) answers[qNum] = answer;
+        if (qNum && answer) {
+            if (answer.startsWith('[') && answer.endsWith(']')) {
+                answers[qNum] = answer.slice(1, -1).split(',');
+            } else {
+                answers[qNum] = answer;
+            }
+        }
       }
     });
   } else {
@@ -65,7 +72,7 @@ const parseAnswers = (text: string): Record<string, string | string[]> => {
 };
 
 
-// Helper to format answers back to a displayable string
+// FIX: Updated formatAnswers to correctly handle string or string[] values.
 const formatAnswers = (answers?: Record<string, string | string[]>): string => {
   if (!answers) return '';
   return Object.entries(answers).map(([q, a]) => {
@@ -87,7 +94,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
   const [category, setCategory] = useState(initialTask ? 'Homework Practice' : 'AI Generated');
   const [perQuestionTime, setPerQuestionTime] = useState(defaultPerQuestionTime);
   const [syllabus, setSyllabus] = useState('');
-  const [correctAnswersText, setCorrectAnswersText] = useState('');
+  const [correctAnswersText, setCorrectAnswersText] = useState(formatAnswers(initialTask?.answers));
   const [jeeMainsCorrectAnswersText, setJeeMainsCorrectAnswersText] = useState('');
 
   // AI state
@@ -159,14 +166,13 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
 
     setIsLoading(true);
     try {
-      // FIX: Pass new AI generation parameters
       const result = await api.generatePracticeTest({
         topic: aiTopic,
         numQuestions: aiNumQuestions,
         difficulty: aiDifficulty,
-        questionTypes: aiQuestionTypes, // NEW
-        isPYQ: aiIsPYQ, // NEW
-        chapters: aiPYQChapters, // NEW
+        questionTypes: aiQuestionTypes,
+        isPYQ: aiIsPYQ,
+        chapters: aiPYQChapters,
       });
       if (result.questions && result.answers) {
         setPracticeMode('custom');
@@ -217,7 +223,6 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
       try {
         const txt = evt.target?.result as string;
         const json = JSON.parse(txt);
-        // Using parseAnswers to handle both string and string[]
         const formatted = formatAnswers(parseAnswers(JSON.stringify(json))); 
         setCorrectAnswersText(formatted);
       } catch {
@@ -235,7 +240,6 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
       try {
         const txt = evt.target?.result as string;
         const json = JSON.parse(txt);
-        // Using parseAnswers to handle both string and string[]
         const formatted = formatAnswers(parseAnswers(JSON.stringify(json)));
         setJeeMainsCorrectAnswersText(formatted);
       } catch {
@@ -250,7 +254,6 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
     if (data.practice_test && data.practice_test.questions && data.practice_test.answers) {
       let parsedAnswers = data.practice_test.answers;
 
-      // Ensure answers are correctly parsed if they come as a stringified JSON
       if (typeof parsedAnswers === 'string' && parsedAnswers.trim().startsWith('{')) {
         try {
           parsedAnswers = JSON.parse(parsedAnswers);

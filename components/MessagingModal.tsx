@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { StudentData, MessageData } from '../types';
 import Icon from './Icon';
@@ -63,7 +62,8 @@ const MessagingModal: React.FC<MessagingModalProps> = ({ student, onClose, isDem
         const res = await fetch(`${API_URL}/messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ recipient_sid: student.sid, content: newMessage }) // Added missing body
+            // FIX: Added missing body to the fetch request.
+            body: JSON.stringify({ recipient_sid: student.sid, content: newMessage })
         });
         if (!res.ok) throw new Error('Failed to send message');
         const sentMessage = await res.json();

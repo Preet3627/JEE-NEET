@@ -176,6 +176,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         isAiChatLoading, setIsAiChatLoading,
         isAiDoubtSolverOpen, setIsAiDoubtSolverOpen, 
         isCreateDeckModalOpen, setCreateDeckModalOpen,
+        // FIX: Add isAiFlashcardModalOpen and its setter
         isAiFlashcardModalOpen, setIsAiFlashcardModalOpen,
         editingDeck, setEditingDeck,
         viewingDeck, setViewingDeck,
@@ -550,69 +551,4 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                             onGenerateWithAI={() => openModal('AIGenerateFlashcardsModal', setIsAiFlashcardModalOpen, true)}
                         />;
             case 'exams':
-                return <ExamsView exams={student.EXAMS} onAdd={() => { setEditingExam(null); openModal('CreateEditExamModal', setIsExamModalOpen, true); }} onEdit={(exam) => { setEditingExam(exam); openModal('CreateEditExamModal', setIsExamModalOpen, true); }} onDelete={onDeleteExam} />;
-            case 'performance':
-                 return (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div className="lg:col-span-2 space-y-8">
-                            <div className="flex justify-end gap-4">
-                                <button onClick={() => openModal('AIMistakeAnalysisModal', setAiMistakeModalOpen, true)} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600"><Icon name="book-open" /> Analyze Mistake with AI</button>
-                                <button onClick={() => openModal('LogResultModal', setLogResultModalOpen, true)} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-[var(--accent-color)] to-[var(--gradient-purple)]"><Icon name="plus" /> Log Mock Result</button>
-                            </div>
-                            {student.RESULTS.length > 0 ? [...student.RESULTS].reverse().map(result => (<MistakeManager key={result.ID} result={result} onToggleMistakeFixed={onToggleMistakeFixed} onViewAnalysis={viewingReport => openModal('TestReportModal', setViewingReport, viewingReport)} onEdit={handleEditResult} onDelete={onDeleteResult} />)) : <p className="text-gray-500 text-center py-10">No results recorded.</p>}
-                        </div>
-                        <div className="space-y-8">
-                             <PerformanceMetrics score={student.CONFIG.SCORE} weaknesses={student.CONFIG.WEAK} onEditWeaknesses={() => openModal('EditWeaknessesModal', setIsEditWeaknessesModalOpen, true)} />
-                             <AchievementsWidget student={student} allDoubts={allDoubts} />
-                        </div>
-                    </div>
-                );
-            case 'doubts':
-                return <CommunityDashboard student={student} allDoubts={allDoubts} onPostDoubt={onPostDoubt} onPostSolution={onPostSolution} onAskAi={() => openModal('AIDoubtSolverModal', setIsAiDoubtSolverOpen, true)} />;
-            default:
-                return null;
-        }
-    };
-
-    return (
-        <main className={`mt-8 ${useToolbarLayout ? 'pb-24' : ''}`}>
-            <UniversalSearch 
-                isOpen={isSearchOpen}
-                onClose={() => { closeModal('UniversalSearch'); setSearchInitialQuery(null); }} // Use closeModal
-                onNavigate={(tab) => setActiveTab(tab as ActiveTab)}
-                onAction={handleSearchAction}
-                scheduleItems={student.SCHEDULE_ITEMS}
-                exams={student.EXAMS}
-                decks={student.CONFIG.flashcardDecks || []}
-                initialQuery={searchInitialQuery || undefined}
-            />
-
-            {showAiChatFab && !isAiChatOpen && (
-                <button 
-                    onClick={() => openModal('AIChatPopup', setAiChatOpen, true)} // Use openModal
-                    className="fixed bottom-6 right-6 z-40 w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/30 transition-transform hover:scale-110 active:scale-95 animate-pulse"
-                    title="Open AI Assistant"
-                >
-                    <Icon name="gemini" className="w-8 h-8"/>
-                </button>
-            )}
-            
-            {useToolbarLayout ? (
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-2xl font-bold capitalize text-white font-sf-display">{activeTab}</h2>
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => openModal('SettingsModal', setIsSettingsModalOpen, true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700"><Icon name="settings" /></button>
-                    </div>
-                </div>
-            ) : <TopTabBar />}
-
-            <div key={activeTab} className="tab-content-enter">
-              {renderContent()}
-            </div>
-
-            {/* Modals are rendered in App.tsx now, but their state setters/getters are passed down */}
-        </main>
-    );
-};
-
-export default StudentDashboard;
+                return <ExamsView exams={student.EXAMS} onAdd={() => { setEditingExam(null); openModal('CreateEditExamModal', setIsExamModalOpen, true); }} onEdit={(exam) => { setEditingExam(

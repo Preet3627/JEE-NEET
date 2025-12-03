@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import AIGuide from './AIGuide';
+// FIX: Changed to a named import as AIGuide is a named export.
+import { AIGuide } from './AIGuide';
 
 interface AIGuideModalProps {
   onClose: () => void;
