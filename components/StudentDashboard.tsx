@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { StudentData, ScheduleItem, ActivityData, Config, StudySession, HomeworkData, ExamData, ResultData, DoubtData, FlashcardDeck, Flashcard, StudyMaterialItem, ScheduleCardData, PracticeQuestion, ActiveTab, DashboardWidgetItem } from '../types';
 import ScheduleList from './ScheduleList';
@@ -82,6 +81,8 @@ interface StudentDashboardProps {
     onPostDoubt: (question: string, image?: string) => void;
     onPostSolution: (doubtId: string, solution: string, image?: string) => void;
     deepLinkAction: { action: string; data: any } | null;
+    // FIX: Add setDeepLinkAction to props
+    setDeepLinkAction: React.Dispatch<React.SetStateAction<any>>;
     // FIX: Add openModal and closeModal to props
     openModal: (modalId: string, setter: React.Dispatch<React.SetStateAction<boolean>> | ((val: any) => void), initialValue?: any) => void;
     closeModal: (modalId: string) => void;
@@ -116,12 +117,12 @@ interface StudentDashboardProps {
     aiChatHistory: { role: string; parts: { text: string }[] }[]; setAiChatHistory: React.Dispatch<React.SetStateAction<{ role: string; parts: { text: string }[] }[]>>;
     showAiChatFab: boolean; setShowAiChatFab: React.Dispatch<React.SetStateAction<boolean>>;
     isAiChatLoading: boolean; setIsAiChatLoading: React.Dispatch<React.SetStateAction<boolean>>;
-    isAiDoubtSolverOpen: boolean; setIsAiDoubtSolverOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isAiDoubtSolverOpen: boolean; setIsAiDoubtSolverOpen: React.Dispatch<React.SetStateAction<boolean>>; // FIX: Destructure setIsAiDoubtSolverOpen
     isCreateDeckModalOpen: boolean; setCreateDeckModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     isAiFlashcardModalOpen: boolean; setIsAiFlashcardModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     editingDeck: FlashcardDeck | null; setEditingDeck: React.Dispatch<React.SetStateAction<FlashcardDeck | null>>;
     viewingDeck: FlashcardDeck | null; setViewingDeck: React.Dispatch<React.SetStateAction<FlashcardDeck | null>>;
-    isCreateCardModalOpen: boolean; setCreateCardModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isCreateCardModalOpen: boolean; setCreateCardModalOpen: React.Dispatch<React.SetStateAction<boolean>>; // FIX: Add setCreateCardModalOpen
     editingCard: Flashcard | null; setEditingCard: React.Dispatch<React.SetStateAction<Flashcard | null>>;
     reviewingDeck: FlashcardDeck | null; setReviewingDeck: React.Dispatch<React.SetStateAction<FlashcardDeck | null>>;
     viewingFile: StudyMaterialItem | null; setViewingFile: React.Dispatch<React.SetStateAction<StudyMaterialItem | null>>;
@@ -138,7 +139,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         student, onSaveTask, onSaveBatchTasks, onDeleteTask, onToggleMistakeFixed, onUpdateConfig, onLogStudySession, 
         onUpdateWeaknesses, onLogResult, onAddExam, onUpdateExam, onDeleteExam, onExportToIcs, onBatchImport, 
         googleAuthStatus, onGoogleSignIn, onGoogleSignOut, onBackupToDrive, onRestoreFromDrive, allDoubts, 
-        onPostDoubt, onPostSolution, deepLinkAction, openModal, closeModal, // FIX: Destructure openModal and closeModal
+        onPostDoubt, onPostSolution, deepLinkAction, setDeepLinkAction, openModal, closeModal, // FIX: Destructure openModal and closeModal
         
         // Destructure all modal state setters and getters
         isCreateModalOpen, setIsCreateModalOpen,
@@ -171,11 +172,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         showAiChatFab, setShowAiChatFab,
         isAiChatLoading, setIsAiChatLoading,
         isAiDoubtSolverOpen, setIsAiDoubtSolverOpen, // FIX: Destructure setIsAiDoubtSolverOpen
-        isCreateDeckModalOpen, setIsCreateDeckModalOpen,
+        isCreateDeckModalOpen, setCreateDeckModalOpen,
         isAiFlashcardModalOpen, setIsAiFlashcardModalOpen,
         editingDeck, setEditingDeck,
         viewingDeck, setViewingDeck,
-        isCreateCardModalOpen, setCreateCardModalOpen,
+        isCreateCardModalOpen, setCreateCardModalOpen, // FIX: Destructure setCreateCardModalOpen
         editingCard, setEditingCard,
         reviewingDeck, setReviewingDeck,
         viewingFile, setViewingFile,
@@ -381,7 +382,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                     if(deck) {
                         setViewingDeck(deck);
                         setEditingCard(null);
-                        openModal('CreateEditFlashcardModal', setIsCreateCardModalOpen); // Use openModal
+                        openModal('CreateEditFlashcardModal', setCreateCardModalOpen); // Use openModal
                     } else {
                         alert("Please create a deck first.");
                     }
@@ -544,8 +545,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             case 'flashcards':
                 return <FlashcardManager 
                             decks={student.CONFIG.flashcardDecks || []}
-                            onAddDeck={() => { setEditingDeck(null); openModal('CreateEditDeckModal', setIsCreateDeckModalOpen, true); }}
-                            onEditDeck={(deck) => { setEditingDeck(deck); openModal('CreateEditDeckModal', setIsCreateDeckModalOpen, true); }}
+                            onAddDeck={() => { setEditingDeck(null); openModal('CreateEditDeckModal', setCreateDeckModalOpen, true); }}
+                            onEditDeck={(deck) => { setEditingDeck(deck); openModal('CreateEditDeckModal', setCreateDeckModalOpen, true); }}
                             onDeleteDeck={handleDeleteDeck}
                             onViewDeck={viewingDeck => openModal('DeckViewModal', setViewingDeck, viewingDeck)}
                             onStartReview={handleStartReviewSession}

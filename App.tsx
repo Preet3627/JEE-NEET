@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from './context/AuthContext';
 // Added missing imports
@@ -771,14 +770,14 @@ const App: React.FC = () => {
         ['CreateEditFlashcardModal', setCreateCardModalOpen],
         ['FlashcardReviewModal', setReviewingDeck], 
         ['FileViewerModal', setViewingFile], 
-        ['GoogleAssistantGuideModal', setAssistantGuideOpen],
-        ['AIGuideModal', setAiGuideModalOpen],
+        ['GoogleAssistantGuideModal', setAssistantGuideOpen], // Fix: changed setIsAssistantGuideOpen
+        ['AIGuideModal', setAiGuideModalOpen], // Fix: changed setIsAiGuideModalOpen
         ['MessagingModal', setMessagingModalOpen],
         ['UniversalSearch', setUniversalSearchOpen],
         ['AnswerKeyUploadModal', setAnswerKeyUploadModalOpen],
         ['ProfileModal', setIsProfileModalOpen], 
         ['SpecificMistakeAnalysisModal', setIsSpecificMistakeAnalysisModalOpen] // New modal
-    ]), [toggleLibrary]);
+    ]), [toggleLibrary, setDeepLinkAction, setViewingDeck, setReviewingDeck, setViewingFile]); // Added dependencies for useMemo
 
     // Update modalSetStateMap for the global popstate listener
     useEffect(() => {
@@ -849,6 +848,7 @@ const App: React.FC = () => {
                                 onPostDoubt={onPostDoubt} 
                                 onPostSolution={onPostSolution} 
                                 deepLinkAction={deepLinkAction}
+                                setDeepLinkAction={setDeepLinkAction} {/* Fix: Pass setDeepLinkAction */}
                                 openModal={openModal}
                                 closeModal={closeModal}
                                 // Pass specific modal state setters and getters for granular control
@@ -870,8 +870,8 @@ const App: React.FC = () => {
                                 editingExam={editingExam} setEditingExam={setEditingExam}
                                 isAiMistakeModalOpen={isAiMistakeModalOpen} setAiMistakeModalOpen={setAiMistakeModalOpen}
                                 viewingReport={viewingReport} setViewingReport={setViewingReport}
-                                isAssistantGuideOpen={isAssistantGuideOpen} setAssistantGuideOpen={setIsAssistantGuideOpen}
-                                isAiGuideModalOpen={isAiGuideModalOpen} setAiGuideModalOpen={setIsAiGuideModalOpen}
+                                isAssistantGuideOpen={isAssistantGuideOpen} setAssistantGuideOpen={setAssistantGuideOpen}
+                                isAiGuideModalOpen={isAiGuideModalOpen} setAiGuideModalOpen={setAiGuideModalOpen}
                                 isSearchOpen={isUniversalSearchOpen} setIsSearchOpen={setUniversalSearchOpen}
                                 searchInitialQuery={null} setSearchInitialQuery={()=>{}} // Not directly used in studentDashboard
                                 isSelectMode={false} setIsSelectMode={()=>{}} // Not directly used in studentDashboard
@@ -886,7 +886,7 @@ const App: React.FC = () => {
                                 isAiFlashcardModalOpen={isAiFlashcardModalOpen} setIsAiFlashcardModalOpen={setAiFlashcardModalOpen}
                                 editingDeck={editingDeck} setEditingDeck={setEditingDeck}
                                 viewingDeck={viewingDeck} setViewingDeck={setViewingDeck}
-                                isCreateCardModalOpen={isCreateCardModalOpen} setCreateCardModalOpen={setCreateCardModalOpen}
+                                isCreateCardModalOpen={isCreateCardModalOpen} setCreateCardModalOpen={setCreateCardModalOpen} {/* Fix: Pass setCreateCardModalOpen */}
                                 editingCard={editingCard} setEditingCard={setEditingCard}
                                 reviewingDeck={reviewingDeck} setReviewingDeck={setReviewingDeck}
                                 viewingFile={viewingFile} setViewingFile={setViewingFile}

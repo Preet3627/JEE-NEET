@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { StudentData, ScheduleItem, HomeworkData, ScheduleCardData } from '../types';
 import Icon from './Icon';
@@ -191,7 +190,7 @@ const StudentGrid: React.FC<{ students: StudentData[], onToggleSub: (sid: string
                 <div className="mt-4 grid grid-cols-2 gap-2">
                     <button onClick={() => onImpersonate(student.sid)} className="w-full flex items-center justify-center gap-2 bg-green-800 hover:bg-green-700 text-white text-xs font-semibold py-1.5 px-3 rounded"><Icon name="login" className="w-3.5 h-3.5"/> Login As</button>
                     <button onClick={() => onStartMessage(student)} className="w-full flex items-center justify-center gap-2 bg-cyan-800 hover:bg-cyan-700 text-white text-xs font-semibold py-1.5 px-3 rounded"><Icon name="message" className="w-3.5 h-3.5"/> Message</button>
-                    <button onClick={() => handleClearData(student)} className="w-full bg-yellow-800 hover:bg-yellow-700 text-white text-xs font-semibold py-1.5 px-3 rounded">Reset</button>
+                    <button onClick={() => onClearData(student)} className="w-full bg-yellow-800 hover:bg-yellow-700 text-white text-xs font-semibold py-1.5 px-3 rounded">Reset</button>
                     <button onClick={() => onDeleteUser(student.sid)} className="w-full bg-red-800 hover:bg-red-700 text-white text-xs font-semibold py-1.5 px-3 rounded">Delete</button>
                 </div>
             </div>

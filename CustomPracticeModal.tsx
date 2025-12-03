@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import McqTimer from './components/McqTimer';
+import { McqTimer } from './components/McqTimer';
 import Icon from './components/Icon';
 import { getQuestionNumbersFromRanges } from './utils/qRangesParser';
 import { HomeworkData, ResultData, StudentData, ScheduleItem, PracticeQuestion } from './types';
