@@ -86,7 +86,7 @@ interface StudentDashboardProps {
     openModal: (modalId: string, setter: React.Dispatch<React.SetStateAction<boolean>> | ((val: any) => void), initialValue?: any) => void;
     closeModal: (modalId: string) => void;
 
-    // Direct modal state setters/getters passed from App.tsx
+    // Direct modal state setters and getters passed from App.tsx
     isCreateModalOpen: boolean; setIsCreateModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     isAiParserModalOpen: boolean; setisAiParserModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     isPracticeModalOpen: boolean; setIsPracticeModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -116,7 +116,7 @@ interface StudentDashboardProps {
     aiChatHistory: { role: string; parts: { text: string }[] }[]; setAiChatHistory: React.Dispatch<React.SetStateAction<{ role: string; parts: { text: string }[] }[]>>;
     showAiChatFab: boolean; setShowAiChatFab: React.Dispatch<React.SetStateAction<boolean>>;
     isAiChatLoading: boolean; setIsAiChatLoading: React.Dispatch<React.SetStateAction<boolean>>;
-    isAiDoubtSolverOpen: boolean; setAiDoubtSolverOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isAiDoubtSolverOpen: boolean; setIsAiDoubtSolverOpen: React.Dispatch<React.SetStateAction<boolean>>;
     isCreateDeckModalOpen: boolean; setCreateDeckModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     isAiFlashcardModalOpen: boolean; setIsAiFlashcardModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     editingDeck: FlashcardDeck | null; setEditingDeck: React.Dispatch<React.SetStateAction<FlashcardDeck | null>>;
@@ -127,6 +127,10 @@ interface StudentDashboardProps {
     viewingFile: StudyMaterialItem | null; setViewingFile: React.Dispatch<React.SetStateAction<StudyMaterialItem | null>>;
     isMusicLibraryOpen: boolean; setIsMusicLibraryOpen: (val: boolean) => void; // Use function for toggle
     analyzingMistake: number | null; setAnalyzingMistake: React.Dispatch<React.SetStateAction<number | null>>;
+    handleMoveSelected: (taskIds: string[], newDate: string) => void;
+    handleSaveDeck: (deck: FlashcardDeck) => void;
+    handleDeleteCard: (deckId: string, cardId: string) => void;
+    handleSaveCard: (deckId: string, card: Flashcard) => void;
 }
 
 const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
@@ -166,22 +170,30 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         aiChatHistory, setAiChatHistory,
         showAiChatFab, setShowAiChatFab,
         isAiChatLoading, setIsAiChatLoading,
-        isAiDoubtSolverOpen, setIsAiDoubtSolverOpen,
+        isAiDoubtSolverOpen, setIsAiDoubtSolverOpen, // FIX: Destructure setIsAiDoubtSolverOpen
         isCreateDeckModalOpen, setIsCreateDeckModalOpen,
         isAiFlashcardModalOpen, setIsAiFlashcardModalOpen,
         editingDeck, setEditingDeck,
         viewingDeck, setViewingDeck,
-        isCreateCardModalOpen, setIsCreateCardModalOpen,
+        isCreateCardModalOpen, setCreateCardModalOpen,
         editingCard, setEditingCard,
         reviewingDeck, setReviewingDeck,
         viewingFile, setViewingFile,
         isMusicLibraryOpen, setIsMusicLibraryOpen,
         analyzingMistake, setAnalyzingMistake,
+        handleMoveSelected, handleSaveDeck, handleDeleteCard, handleSaveCard, // FIX: Destructure new handlers
     } = props;
     const { refreshUser } = useAuth();
     const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
     const [scheduleView, setScheduleView] = useState<'upcoming' | 'past'>('upcoming');
     
+    // Modals & Features State
+    // These states are now controlled by App.tsx and passed as props, but some internal state is still needed
+    // Local state for dashboard widgets
+    const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidgetItem[]>([]); // FIX: Remove duplicate declaration
+    const dragItemRef = useRef<number | null>(null); // FIX: Remove duplicate declaration
+    const dragOverItemRef = useRef<number | null>(null); // FIX: Remove duplicate declaration
+
     // Layout Editor State
     const [isEditLayoutMode, setIsEditLayoutMode] = useState(false);
     
@@ -201,19 +213,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     }, [student.CONFIG.settings.dashboardLayout]);
 
     // --- Handlers ---
-    const handleSaveDeck = (deck: FlashcardDeck) => { 
-        const currentDecks = student.CONFIG.flashcardDecks || [];
-        const existingIndex = currentDecks.findIndex(d => d.id === deck.id);
-        let newDecks;
-        if (existingIndex >= 0) {
-            newDecks = [...currentDecks];
-            newDecks[existingIndex] = deck;
-        } else {
-            newDecks = [...currentDecks, deck];
-        }
-        onUpdateConfig({ flashcardDecks: newDecks });
-    };
-
+    // handleSaveDeck is now passed from App.tsx, remove local definition.
+    // handleDataImport now uses setDeepLinkAction from props
     const handleDataImport = (data: any) => {
         // Check for custom widgets
         if (data.custom_widget) {
@@ -229,7 +230,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                 }
             });
             alert("New Custom Widget Added to Dashboard!");
-            setisAiParserModalOpen(false);
+            closeModal('AIParserModal'); // Use closeModal
             return;
         }
         
@@ -242,23 +243,23 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                 isLocked: false,
                 cards: (data.flashcard_deck.cards || []).map((c: any, i: number) => ({ ...c, id: `card_${Date.now()}_${i}` }))
             };
-            handleSaveDeck(newDeck);
+            handleSaveDeck(newDeck); // Use handleSaveDeck from props
             alert(`Imported new deck: ${newDeck.name}`);
-            setisAiParserModalOpen(false);
+            closeModal('AIParserModal'); // Use closeModal
             return;
         }
 
-        setDeepLinkData(data);
-        setisAiParserModalOpen(false);
+        setDeepLinkAction(data); // FIX: Use setDeepLinkAction from props
+        closeModal('AIParserModal'); // Use closeModal
     };
 
-    const handleEditClick = (item: ScheduleItem) => { setEditingTask(item); setIsCreateModalOpen(true); };
-    const handleAiPracticeTest = (data: any) => { setAiPracticeTest(data); setisAiParserModalOpen(false); setTimeout(() => setIsPracticeModalOpen(true), 300); };
+    const handleEditClick = (item: ScheduleItem) => { setEditingTask(item); openModal('CreateEditTaskModal', setIsCreateModalOpen); }; // Use openModal
+    const handleAiPracticeTest = (data: any) => { setAiPracticeTest(data); closeModal('AIParserModal'); setTimeout(() => openModal('CustomPracticeModal', setIsPracticeModalOpen), 300); }; // Use closeModal, openModal
     const handleCompleteTask = (task: ScheduleCardData) => { onDeleteTask(task.ID); };
     const handleStarTask = (taskId: string) => { const task = student.SCHEDULE_ITEMS.find(t => t.ID === taskId); if (task) onSaveTask({ ...task, isStarred: !task.isStarred }); };
-    const handleStartPractice = (homework: HomeworkData) => { setPracticeTask(homework); setIsPracticeModalOpen(true); };
+    const handleStartPractice = (homework: HomeworkData) => { setPracticeTask(homework); openModal('CustomPracticeModal', setIsPracticeModalOpen); }; // Use openModal
     const handleSaveWeakness = (newWeakness: string) => { const updatedWeaknesses = [...new Set([...student.CONFIG.WEAK, newWeakness])]; onUpdateWeaknesses(updatedWeaknesses); };
-    const handleApiKeySet = () => { if (!student.CONFIG.settings.hasGeminiKey) setIsAiChatOpen(true); setShowAiChatFab(true); };
+    const handleApiKeySet = () => { if (!student.CONFIG.settings.hasGeminiKey) openModal('AIChatPopup', setAiChatOpen); setShowAiChatFab(true); }; // Use openModal
     const handleAiChatMessage = async (prompt: string, imageBase64?: string) => {
         const newHistory = [...aiChatHistory, { role: 'user', parts: [{ text: prompt }] }];
         setAiChatHistory(newHistory);
@@ -279,20 +280,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     };
     const handleToggleSelectMode = () => { setIsSelectMode(prev => !prev); setSelectedTaskIds([]); };
     const handleTaskSelect = (taskId: string) => { setSelectedTaskIds(prev => prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]); };
-    const handleMoveSelected = async (newDate: string) => { 
-        if (selectedTaskIds.length === 0) return;
-        try {
-            await api.batchMoveTasks(selectedTaskIds, newDate);
-            refreshUser();
-            alert(`Moved ${selectedTaskIds.length} tasks to ${new Date(newDate).toLocaleDateString()}.`);
-            setIsMoveModalOpen(false);
-            setIsSelectMode(false);
-            setSelectedTaskIds([]);
-        } catch (error: any) {
-            alert(`Failed to move tasks: ${error.message}`);
-        }
-    };
-    const handleDeleteSelected = async () => {
+    // handleMoveSelected is now passed from App.tsx, remove local definition.
+    const handleDeleteSelected = async () => { 
         if (selectedTaskIds.length === 0) return;
         if (!window.confirm(`Are you sure you want to delete ${selectedTaskIds.length} selected tasks?`)) return;
         try {
@@ -315,8 +304,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             alert(`Failed to clear schedule: ${error.message}`);
         }
     };
-    const handleEditResult = (result: ResultData) => { setEditingResult(result); setIsEditResultModalOpen(true); };
-    const onUpdateResult = async (result: ResultData) => { await api.updateResult(result); };
+    const handleEditResult = (result: ResultData) => { setEditingResult(result); openModal('EditResultModal', setEditResultModalOpen); }; // Use openModal
+    const onUpdateResult = async (result: ResultData) => { await api.updateResult(result); refreshUser(); }; // Refresh after update
     const onDeleteResult = async (resultId: string) => { await api.deleteResult(resultId); refreshUser(); }; // Refresh after delete
     const handleDeleteDeck = async (deckId: string) => {
         if (!window.confirm("Are you sure you want to delete this deck and all its cards?")) return;
@@ -324,52 +313,28 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         onUpdateConfig({ flashcardDecks: newDecks });
         alert("Deck deleted.");
     };
-    const handleSaveCard = (deckId: string, card: Flashcard) => { 
-        const decks = student.CONFIG.flashcardDecks || [];
-        const targetDeckIndex = decks.findIndex(d => d.id === deckId);
-        if (targetDeckIndex >= 0) {
-            const currentCards = decks[targetDeckIndex].cards;
-            const existingCardIndex = currentCards.findIndex(c => c.id === card.id);
-            let newCards;
-            if (existingCardIndex >= 0) {
-                newCards = currentCards.map(c => c.id === card.id ? card : c);
-            } else {
-                newCards = [...currentCards, card];
-            }
-            const newDecks = [...decks];
-            newDecks[targetDeckIndex] = { ...newDecks[targetDeckIndex], cards: newCards };
-            onUpdateConfig({ flashcardDecks: newDecks });
-            alert("Card saved!");
-        } else {
-            alert("Error: Deck not found.");
-        }
-    };
-    const handleDeleteCard = (deckId: string, cardId: string) => { 
-        if (!window.confirm("Are you sure you want to delete this card?")) return;
-        const decks = student.CONFIG.flashcardDecks || [];
-        const targetDeckIndex = decks.findIndex(d => d.id === deckId);
-        if (targetDeckIndex >= 0) {
-            const newCards = decks[targetDeckIndex].cards.filter(c => c.id !== cardId);
-            const newDecks = [...decks];
-            newDecks[targetDeckIndex] = { ...newDecks[targetDeckIndex], cards: newCards };
-            onUpdateConfig({ flashcardDecks: newDecks });
-            alert("Card deleted.");
-        }
-    };
-    const handleStartReviewSession = (deckId: string) => { const deck = student.CONFIG.flashcardDecks?.find(d => d.id === deckId); if (deck) setReviewingDeck(deck); };
+    // handleSaveCard is now passed from App.tsx, remove local definition.
+    // handleDeleteCard is now passed from App.tsx, remove local definition.
+    const handleStartReviewSession = (deckId: string) => { const deck = student.CONFIG.flashcardDecks?.find(d => d.id === deckId); if (deck) setReviewingDeck(deck); openModal('FlashcardReviewModal', setReviewingDeck, deck); }; // Use openModal
     const handleSearchAction = (action: string, data?: any) => {
         switch (action) {
-            case 'create_task': setEditingTask(null); setIsCreateModalOpen(true); break;
-            case 'practice': setIsPracticeModalOpen(true); break;
-            case 'log_result': setIsLogResultModalOpen(true); break;
-            case 'analyze_mistake': setIsAiMistakeModalOpen(true); break;
-            case 'edit_task': setEditingTask(data); setIsCreateModalOpen(true); break;
-            case 'edit_exam': setEditingExam(data); setIsExamModalOpen(true); break;
-            case 'view_deck': setViewingDeck(data); break;
+            case 'create_task': setEditingTask(null); openModal('CreateEditTaskModal', setIsCreateModalOpen); break; // Use openModal
+            case 'practice': openModal('CustomPracticeModal', setIsPracticeModalOpen); break; // Use openModal
+            case 'log_result': openModal('LogResultModal', setLogResultModalOpen); break; // Use openModal
+            case 'analyze_mistake': openModal('AIMistakeAnalysisModal', setAiMistakeModalOpen); break; // Use openModal
+            case 'edit_task': setEditingTask(data); openModal('CreateEditTaskModal', setIsCreateModalOpen); break; // Use openModal
+            case 'edit_exam': setEditingExam(data); openModal('CreateEditExamModal', setIsExamModalOpen); break; // Use openModal
+            case 'view_deck': setViewingDeck(data); openModal('DeckViewModal', setViewingDeck, data); break; // Use openModal
+            default: break;
         }
     };
     
-    // DND Handlers
+    // DND Handlers for dashboard widgets
+    // FIX: Remove duplicate declarations
+    // const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidgetItem[]>([]); 
+    // const dragItemRef = useRef<number | null>(null);
+    // const dragOverItemRef = useRef<number | null>(null);
+
     const handleDragStart = (index: number) => { dragItemRef.current = index; };
     const handleDragEnter = (index: number) => { dragOverItemRef.current = index; };
     const handleDragEnd = () => {
@@ -403,8 +368,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             'countdown': <CountdownWidget items={student.SCHEDULE_ITEMS} />,
             'dailyInsight': <DailyInsightWidget weaknesses={student.CONFIG.WEAK} exams={student.EXAMS} />,
             'quote': <MotivationalQuoteWidget quote="The expert in anything was once a beginner." />,
-            'music': <MusicPlayerWidget onOpenLibrary={() => setIsMusicLibraryOpen(true)} />,
-            'practice': <PracticeLauncherWidget onLaunch={() => setIsPracticeModalOpen(true)} />,
+            'music': <MusicPlayerWidget onOpenLibrary={() => openModal('MusicLibraryModal', setIsMusicLibraryOpen, true)} />, // Use openModal
+            'practice': <PracticeLauncherWidget onLaunch={() => openModal('CustomPracticeModal', setIsPracticeModalOpen)} />, // Use openModal
             'subjectAllocation': <SubjectAllocationWidget items={student.SCHEDULE_ITEMS} />,
             'scoreTrend': <ScoreTrendWidget results={student.RESULTS} />,
             'flashcards': <InteractiveFlashcardWidget 
@@ -412,19 +377,18 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                 onUpdateConfig={onUpdateConfig} 
                 onReviewDeck={handleStartReviewSession}
                 onAddCard={() => {
-                    // Open card modal with first available deck
                     const deck = (student.CONFIG.flashcardDecks && student.CONFIG.flashcardDecks.length > 0) ? student.CONFIG.flashcardDecks[0] : null;
                     if(deck) {
                         setViewingDeck(deck);
                         setEditingCard(null);
-                        setIsCreateCardModalOpen(true);
+                        openModal('CreateEditFlashcardModal', setIsCreateCardModalOpen); // Use openModal
                     } else {
                         alert("Please create a deck first.");
                     }
                 }}
                 onOpenDeck={(deckId) => {
                     const deck = student.CONFIG.flashcardDecks?.find(d => d.id === deckId);
-                    if(deck) setViewingDeck(deck);
+                    if(deck) openModal('DeckViewModal', setViewingDeck, deck); // Use openModal
                 }}
             />,
             'readingHours': <ReadingHoursWidget student={student} />,
@@ -521,15 +485,15 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
           <TabButton tabId="doubts" icon="community">Doubts</TabButton>
         </div>
         <div className="flex items-center gap-2 mb-2 sm:mb-0">
-          <button onClick={() => setIsSearchOpen(true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 hover:text-white" title="Search (Cmd+K)">
+          <button onClick={() => openModal('UniversalSearch', setIsSearchOpen, true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 hover:text-white" title="Search (Cmd+K)">
             <Icon name="search" className="w-4 h-4" />
           </button>
-          <button onClick={() => setisAiParserModalOpen(true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700 flex items-center gap-2 text-sm font-semibold" title="AI Import">
+          <button onClick={() => openModal('AIParserModal', setisAiParserModalOpen, true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700 flex items-center gap-2 text-sm font-semibold" title="AI Import">
             <Icon name="gemini" className="w-4 h-4" /> AI Import
           </button>
-          <button onClick={() => setIsPracticeModalOpen(true)} className="p-2.5 rounded-lg bg-purple-600/50 hover:bg-purple-600" title="Custom Practice"><Icon name="stopwatch" /></button>
-          <button onClick={() => setIsSettingsModalOpen(true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700"><Icon name="settings" /></button>
-          <button onClick={() => { setEditingTask(null); setIsCreateModalOpen(true); }} className="flex items-center gap-2 px-3 py-2.5 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-[var(--accent-color)] to-[var(--gradient-purple)]">
+          <button onClick={() => openModal('CustomPracticeModal', setIsPracticeModalOpen, true)} className="p-2.5 rounded-lg bg-purple-600/50 hover:bg-purple-600" title="Custom Practice"><Icon name="stopwatch" /></button>
+          <button onClick={() => openModal('SettingsModal', setIsSettingsModalOpen, true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700"><Icon name="settings" /></button>
+          <button onClick={() => { setEditingTask(null); openModal('CreateEditTaskModal', setIsCreateModalOpen, true); }} className="flex items-center gap-2 px-3 py-2.5 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-[var(--accent-color)] to-[var(--gradient-purple)]">
             <Icon name="plus" /> Create
           </button>
         </div>
@@ -564,7 +528,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                                 onTaskSelect={handleTaskSelect}
                                 onToggleSelectMode={handleToggleSelectMode}
                                 onDeleteSelected={handleDeleteSelected}
-                                onMoveSelected={() => setIsMoveModalOpen(true)}
+                                onMoveSelected={() => openModal('MoveTasksModal', setMoveModalOpen, true)} // Use openModal
                             />
                         </div>
                         <div className="space-y-8">
@@ -580,33 +544,33 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             case 'flashcards':
                 return <FlashcardManager 
                             decks={student.CONFIG.flashcardDecks || []}
-                            onAddDeck={() => { setEditingDeck(null); openModal('CreateEditDeckModal', setIsCreateDeckModalOpen); }}
-                            onEditDeck={(deck) => { setEditingDeck(deck); openModal('CreateEditDeckModal', setIsCreateDeckModalOpen); }}
+                            onAddDeck={() => { setEditingDeck(null); openModal('CreateEditDeckModal', setIsCreateDeckModalOpen, true); }}
+                            onEditDeck={(deck) => { setEditingDeck(deck); openModal('CreateEditDeckModal', setIsCreateDeckModalOpen, true); }}
                             onDeleteDeck={handleDeleteDeck}
                             onViewDeck={viewingDeck => openModal('DeckViewModal', setViewingDeck, viewingDeck)}
                             onStartReview={handleStartReviewSession}
-                            onGenerateWithAI={() => openModal('AIGenerateFlashcardsModal', setIsAiFlashcardModalOpen)}
+                            onGenerateWithAI={() => openModal('AIGenerateFlashcardsModal', setIsAiFlashcardModalOpen, true)}
                         />;
             case 'exams':
-                return <ExamsView exams={student.EXAMS} onAdd={() => { setEditingExam(null); openModal('CreateEditExamModal', setIsExamModalOpen); }} onEdit={(exam) => { setEditingExam(exam); openModal('CreateEditExamModal', setIsExamModalOpen); }} onDelete={onDeleteExam} />;
+                return <ExamsView exams={student.EXAMS} onAdd={() => { setEditingExam(null); openModal('CreateEditExamModal', setIsExamModalOpen, true); }} onEdit={(exam) => { setEditingExam(exam); openModal('CreateEditExamModal', setIsExamModalOpen, true); }} onDelete={onDeleteExam} />;
             case 'performance':
                  return (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div className="lg:col-span-2 space-y-8">
                             <div className="flex justify-end gap-4">
-                                <button onClick={() => openModal('AIMistakeAnalysisModal', setAiMistakeModalOpen)} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600"><Icon name="book-open" /> Analyze Mistake with AI</button>
-                                <button onClick={() => openModal('LogResultModal', setLogResultModalOpen)} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-[var(--accent-color)] to-[var(--gradient-purple)]"><Icon name="plus" /> Log Mock Result</button>
+                                <button onClick={() => openModal('AIMistakeAnalysisModal', setAiMistakeModalOpen, true)} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600"><Icon name="book-open" /> Analyze Mistake with AI</button>
+                                <button onClick={() => openModal('LogResultModal', setLogResultModalOpen, true)} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-[var(--accent-color)] to-[var(--gradient-purple)]"><Icon name="plus" /> Log Mock Result</button>
                             </div>
                             {student.RESULTS.length > 0 ? [...student.RESULTS].reverse().map(result => (<MistakeManager key={result.ID} result={result} onToggleMistakeFixed={onToggleMistakeFixed} onViewAnalysis={viewingReport => openModal('TestReportModal', setViewingReport, viewingReport)} onEdit={handleEditResult} onDelete={onDeleteResult} />)) : <p className="text-gray-500 text-center py-10">No results recorded.</p>}
                         </div>
                         <div className="space-y-8">
-                             <PerformanceMetrics score={student.CONFIG.SCORE} weaknesses={student.CONFIG.WEAK} onEditWeaknesses={() => openModal('EditWeaknessesModal', setIsEditWeaknessesModalOpen)} />
+                             <PerformanceMetrics score={student.CONFIG.SCORE} weaknesses={student.CONFIG.WEAK} onEditWeaknesses={() => openModal('EditWeaknessesModal', setIsEditWeaknessesModalOpen, true)} />
                              <AchievementsWidget student={student} allDoubts={allDoubts} />
                         </div>
                     </div>
                 );
             case 'doubts':
-                return <CommunityDashboard student={student} allDoubts={allDoubts} onPostDoubt={onPostDoubt} onPostSolution={onPostSolution} onAskAi={() => openModal('AIDoubtSolverModal', setIsAiDoubtSolverOpen)} />;
+                return <CommunityDashboard student={student} allDoubts={allDoubts} onPostDoubt={onPostDoubt} onPostSolution={onPostSolution} onAskAi={() => openModal('AIDoubtSolverModal', setIsAiDoubtSolverOpen, true)} />;
             default:
                 return null;
         }
@@ -616,7 +580,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         <main className={`mt-8 ${useToolbarLayout ? 'pb-24' : ''}`}>
             <UniversalSearch 
                 isOpen={isSearchOpen}
-                onClose={() => { setIsSearchOpen(false); setSearchInitialQuery(null); }}
+                onClose={() => { closeModal('UniversalSearch'); setSearchInitialQuery(null); }} // Use closeModal
                 onNavigate={(tab) => setActiveTab(tab as ActiveTab)}
                 onAction={handleSearchAction}
                 scheduleItems={student.SCHEDULE_ITEMS}
@@ -627,7 +591,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
 
             {showAiChatFab && !isAiChatOpen && (
                 <button 
-                    onClick={() => openModal('AIChatPopup', setAiChatOpen)}
+                    onClick={() => openModal('AIChatPopup', setAiChatOpen, true)} // Use openModal
                     className="fixed bottom-6 right-6 z-40 w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/30 transition-transform hover:scale-110 active:scale-95 animate-pulse"
                     title="Open AI Assistant"
                 >
@@ -639,7 +603,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-2xl font-bold capitalize text-white font-sf-display">{activeTab}</h2>
                     <div className="flex items-center gap-2">
-                        <button onClick={() => openModal('SettingsModal', setIsSettingsModalOpen)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700"><Icon name="settings" /></button>
+                        <button onClick={() => openModal('SettingsModal', setIsSettingsModalOpen, true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700"><Icon name="settings" /></button>
                     </div>
                 </div>
             ) : <TopTabBar />}
@@ -648,60 +612,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
               {renderContent()}
             </div>
 
-            {/* Modals */}
-            {isSettingsModalOpen && <SettingsModal settings={student.CONFIG.settings} decks={student.CONFIG.flashcardDecks || []} onClose={() => closeModal('SettingsModal')} onSave={(s) => onUpdateConfig({ settings: { ...student.CONFIG.settings, ...s } as any })} onExportToIcs={onExportToIcs} googleAuthStatus={googleAuthStatus} onGoogleSignIn={onGoogleSignIn} onGoogleSignOut={onGoogleSignOut} onBackupToDrive={onBackupToDrive} onRestoreFromDrive={onRestoreFromDrive} onApiKeySet={handleApiKeySet} onOpenAssistantGuide={() => openModal('GoogleAssistantGuideModal', setIsAssistantGuideOpen)} onOpenAiGuide={() => openModal('AIGuideModal', setIsAiGuideModalOpen)} onClearAllSchedule={handleClearAllSchedule} onToggleEditLayout={() => setIsEditLayoutMode(!isEditLayoutMode)} />}
-            {isAiParserModalOpen && <AIParserModal onClose={() => closeModal('AIParserModal')} onDataReady={handleDataImport} onPracticeTestReady={handleAiPracticeTest} onOpenGuide={() => openModal('AIGuideModal', setIsAiGuideModalOpen)} examType={student.CONFIG.settings.examType} />}
-            {isCreateModalOpen && <CreateEditTaskModal task={editingTask || viewingTask} viewOnly={!!viewingTask} onClose={() => { closeModal('CreateEditTaskModal'); setEditingTask(null); setViewingTask(null); }} onSave={onSaveTask} decks={student.CONFIG.flashcardDecks || []} />}
-            {isPracticeModalOpen && <CustomPracticeModal initialTask={practiceTask} aiPracticeTest={aiPracticeTest} onClose={() => { closeModal('CustomPracticeModal'); setPracticeTask(null); setAiPracticeTest(null); }} onSessionComplete={(duration, solved, skipped) => onLogStudySession({ duration, questions_solved: solved, questions_skipped: skipped })} defaultPerQuestionTime={student.CONFIG.settings.perQuestionTime || 180} onLogResult={onLogResult} student={student} onUpdateWeaknesses={onUpdateWeaknesses} onSaveTask={onSaveTask} />}
-            {isEditWeaknessesModalOpen && <EditWeaknessesModal currentWeaknesses={student.CONFIG.WEAK} onClose={() => closeModal('EditWeaknessesModal')} onSave={onUpdateWeaknesses} />}
-            {isLogResultModalOpen && <LogResultModal onClose={() => {closeModal('LogResultModal'); setInitialScoreForModal(undefined); setInitialMistakesForModal(undefined);}} onSave={onLogResult} initialScore={initialScoreForModal} initialMistakes={initialMistakesForModal} />}
-            {isEditResultModalOpen && editingResult && <EditResultModal result={editingResult} onClose={() => { closeModal('EditResultModal'); setEditingResult(null); }} onSave={onUpdateResult} />}
-            {isExamModalOpen && <CreateEditExamModal exam={editingExam} onClose={() => { closeModal('CreateEditExamModal'); setEditingExam(null); }} onSave={(exam) => editingExam ? onUpdateExam(exam) : onAddExam(exam)} />}
-            {isAiMistakeModalOpen && <AIMistakeAnalysisModal onClose={() => closeModal('AIMistakeAnalysisModal')} onSaveWeakness={handleSaveWeakness} />}
-            {isAiDoubtSolverOpen && <AIDoubtSolverModal onClose={() => closeModal('AIDoubtSolverModal')} />}
-            {isAiChatOpen && <AIChatPopup history={aiChatHistory} onSendMessage={handleAiChatMessage} onClose={() => closeModal('AIChatPopup')} isLoading={isAiChatLoading} />}
-            {viewingReport && <TestReportModal result={viewingReport} onClose={() => closeModal('TestReportModal')} onUpdateWeaknesses={onUpdateWeaknesses} student={student} onSaveDeck={handleSaveDeck} />}
-            {isMoveModalOpen && <MoveTasksModal onClose={() => closeModal('MoveTasksModal')} onConfirm={handleMoveSelected} selectedCount={selectedTaskIds.length} />}
-            {isMusicLibraryOpen && <MusicLibraryModal onClose={() => closeModal('MusicLibraryModal')} />}
-            {deepLinkData && (
-                <DeepLinkConfirmationModal
-                    data={deepLinkData}
-                    onClose={() => setDeepLinkData(null)}
-                    onConfirm={() => {
-                        const importData = {
-                            schedules: deepLinkData.schedules || [],
-                            exams: deepLinkData.exams || [],
-                            results: deepLinkData.results || [],
-                            weaknesses: deepLinkData.weaknesses || [],
-                        };
-                        onBatchImport(importData);
-                    }}
-                />
-            )}
-
-            {/* Flashcard Modals */}
-            {isCreateDeckModalOpen && <CreateEditDeckModal deck={editingDeck} onClose={() => { closeModal('CreateEditDeckModal'); setEditingDeck(null); }} onSave={handleSaveDeck} />}
-            {isAiFlashcardModalOpen && <AIGenerateFlashcardsModal student={student} onClose={() => closeModal('AIGenerateFlashcardsModal')} onSaveDeck={handleSaveDeck} />}
-            {viewingDeck && <DeckViewModal deck={viewingDeck} onClose={() => closeModal('DeckViewModal')} onAddCard={() => { setEditingCard(null); openModal('CreateEditFlashcardModal', setIsCreateCardModalOpen); }} onEditCard={(card) => { setEditingCard(card); openModal('CreateEditFlashcardModal', setIsCreateCardModalOpen); }} onDeleteCard={(cardId) => handleDeleteCard(viewingDeck.id, cardId)} onStartReview={() => { setReviewingDeck(viewingDeck); setViewingDeck(null); }} />}
-            {isCreateCardModalOpen && viewingDeck && <CreateEditFlashcardModal card={editingCard} deckId={viewingDeck.id} onClose={() => { closeModal('CreateEditFlashcardModal'); setEditingCard(null); }} onSave={handleSaveCard} />}
-            {reviewingDeck && <FlashcardReviewModal deck={reviewingDeck} onClose={() => closeModal('FlashcardReviewModal')} />}
-            
-            {/* Study Material Modal */}
-            {viewingFile && <FileViewerModal file={viewingFile} onClose={() => closeModal('FileViewerModal')} />}
-
-            {/* Assistant & AI Guide Modals */}
-            {isAssistantGuideOpen && <GoogleAssistantGuideModal onClose={() => closeModal('GoogleAssistantGuideModal')} />}
-            {isAiGuideModalOpen && <AIGuideModal onClose={() => closeModal('AIGuideModal')} examType={student.CONFIG.settings.examType} />}
-            
-            {/* Other Modals */}
-            {isProfileModalOpen && currentUser && <ProfileModal user={currentUser} onClose={() => closeModal('ProfileModal')} />}
-            {currentUser && isMessagingModalOpen && <MessagingModal student={allStudents[0]} onClose={() => closeModal('MessagingModal')} isDemoMode={false} />} {/* FIX: Needs actual messagingStudent */}
-            {isUniversalSearchOpen && currentUser && <UniversalSearch isOpen={true} onClose={() => closeModal('UniversalSearch')} onNavigate={() => {}} onAction={() => {}} scheduleItems={currentUser.SCHEDULE_ITEMS} exams={currentUser.EXAMS} decks={currentUser.CONFIG.flashcardDecks || []} />}
-            {isAnswerKeyUploadModalOpen && <AnswerKeyUploadModal onClose={() => closeModal('AnswerKeyUploadModal')} onGrade={() => {}} />}
-            {currentUser && viewingReport && analyzingMistake !== null && <SpecificMistakeAnalysisModal questionNumber={analyzingMistake} onClose={() => closeModal('SpecificMistakeAnalysisModal')} onSaveWeakness={(topic) => onUpdateWeaknesses([...new Set([...(currentUser.CONFIG.WEAK || []), topic])])} />} {/* FIX: Needs questionNumber, onSaveWeakness, etc. */}
-
-        </div>
+            {/* Modals are rendered in App.tsx now, but their state setters/getters are passed down */}
+        </main>
     );
 };
 
-export default App;
+export default StudentDashboard;

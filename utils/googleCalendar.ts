@@ -1,3 +1,4 @@
+
 import { ScheduleItem } from "../types";
 
 declare const gapi: any;
@@ -28,14 +29,18 @@ const transformTaskToEvent = (task: ScheduleItem) => {
 
     const [hours, minutes] = task.TIME.split(':').map(Number);
     let startDate: Date;
-    let recurrence: string[] | undefined = ['RRULE:FREQ=WEEKLY'];
+    let recurrence: string[] | undefined = undefined; // Default to non-recurring
 
-    // FIX: Handle one-off events that have a specific date
+    // Handle one-off events that have a specific date
     if ('date' in task && task.date) {
         startDate = new Date(`${task.date}T00:00:00`); // Use a neutral time to avoid timezone shifts
-        recurrence = undefined; // This is a single event, not recurring
+        // No recurrence for specific-date events
     } else {
         startDate = getNextDateForDay(task.DAY.EN);
+        // Only set recurrence if it's explicitly recurring and not a specific date
+        if ('isRecurring' in task && task.isRecurring) {
+            recurrence = ['RRULE:FREQ=WEEKLY'];
+        }
     }
     
     startDate.setHours(hours, minutes, 0, 0);

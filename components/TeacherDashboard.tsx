@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { StudentData, ScheduleItem, HomeworkData, ScheduleCardData } from '../types';
 import Icon from './Icon';
 import AIGuide from './AIGuide';
-import MessagingModal from './MessagingModal';
+import { MessagingModal } from './MessagingModal';
 import CreateEditTaskModal from './CreateEditTaskModal';
 import AIParserModal from './AIParserModal';
 import { api } from '../api/apiService';
@@ -16,16 +16,18 @@ interface TeacherDashboardProps {
     onDeleteUser: (sid: string) => void;
     onAddTeacher?: (teacherData: any) => void;
     onBroadcastTask: (task: ScheduleItem, examType: 'JEE' | 'NEET' | 'ALL') => void;
-    openModal: (modalId: string, setStateTrue: React.Dispatch<React.SetStateAction<boolean>> | ((val: any) => void)) => void; // New prop
+    openModal: (modalId: string, setStateTrue: React.Dispatch<React.SetStateAction<boolean>> | ((val: any) => void), initialValue?: any) => void; // New prop
     closeModal: (modalId: string) => void; // New prop
+    // New props for controlling specific modal states
+    isCreateModalOpen: boolean; setIsCreateModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isAiParserModalOpen: boolean; setisAiParserModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isMessagingModalOpen: boolean; setMessagingModalOpen: React.Dispatch<React.SetStateAction<boolean>>; // FIX: Changed to mandatory
 }
 
-const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleUnacademySub, onDeleteUser, onAddTeacher, onBroadcastTask, openModal, closeModal }) => {
+const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleUnacademySub, onDeleteUser, onAddTeacher, onBroadcastTask, openModal, closeModal, setIsCreateModalOpen, setisAiParserModalOpen, isCreateModalOpen, isAiParserModalOpen, isMessagingModalOpen, setMessagingModalOpen }) => {
     const { loginWithToken } = useAuth();
     const [activeTab, setActiveTab] = useState<'grid' | 'broadcast' | 'guide'>('grid');
     const [messagingStudent, setMessagingStudent] = useState<StudentData | null>(null);
-    const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
-    const [isAIBroadcastModalOpen, setIsAIBroadcastModalOpen] = useState(false);
     const [broadcastTarget, setBroadcastTarget] = useState<'ALL' | 'JEE' | 'NEET'>('ALL');
 
     const TabButton: React.FC<{ tabId: string; children: React.ReactNode; }> = ({ tabId, children }) => (
@@ -42,7 +44,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleU
         if (window.confirm(`Are you sure you want to send this task to all ${broadcastTarget} students?`)) {
             onBroadcastTask(taskWithUniqueId, broadcastTarget);
             closeModal('CreateEditTaskModal'); // Use closeModal
-            setIsBroadcastModalOpen(false);
         }
     };
     
@@ -109,7 +110,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleU
             if(window.confirm(`Broadcast ${tasksToBroadcast.length} tasks to ${broadcastTarget} students?`)) {
                 tasksToBroadcast.forEach(task => onBroadcastTask(task, broadcastTarget));
                 closeModal('AIParserModal'); // Use closeModal
-                setIsAIBroadcastModalOpen(false);
+                // setIsAIBroadcastModalOpen(false); // No longer needed, as modal state is global
                 alert("Broadcast queued successfully.");
             }
         } catch (error: any) {
@@ -152,14 +153,12 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleU
                 </nav>
             </div>
             <div className="mt-6">
-                {activeTab === 'grid' && <StudentGrid students={students} onToggleSub={()=>{}} onDeleteUser={onDeleteUser} onStartMessage={(student) => { setMessagingStudent(student); openModal('MessagingModal', setMessagingStudent); }} onClearData={handleClearData} onImpersonate={handleImpersonate} />}
-                {activeTab === 'broadcast' && <BroadcastManager onOpenModal={() => openModal('CreateEditTaskModal', setIsBroadcastModalOpen)} onOpenAIModal={() => openModal('AIParserModal', setIsAIBroadcastModalOpen)} target={broadcastTarget} setTarget={setBroadcastTarget} />}
+                {activeTab === 'grid' && <StudentGrid students={students} onToggleSub={()=>{}} onDeleteUser={onDeleteUser} onStartMessage={(student) => { setMessagingStudent(student); openModal('MessagingModal', setMessagingModalOpen, true); }} onClearData={handleClearData} onImpersonate={handleImpersonate} />}
+                {activeTab === 'broadcast' && <BroadcastManager onOpenModal={() => openModal('CreateEditTaskModal', setIsCreateModalOpen, true)} onOpenAIModal={() => openModal('AIParserModal', setisAiParserModalOpen, true)} target={broadcastTarget} setTarget={setBroadcastTarget} />}
                 {activeTab === 'guide' && <AIGuide />}
             </div>
 
-            {messagingStudent && <MessagingModal student={messagingStudent} onClose={() => closeModal('MessagingModal')} isDemoMode={false} />}
-            {isBroadcastModalOpen && <CreateEditTaskModal task={null} onClose={() => closeModal('CreateEditTaskModal')} onSave={handleBroadcastSave} decks={[]} />}
-            {isAIBroadcastModalOpen && <AIParserModal onClose={() => closeModal('AIParserModal')} onDataReady={handleAIBroadcastSave} onPracticeTestReady={()=>{}} onOpenGuide={()=>{}} />}
+            {/* Modals are handled by App.tsx now */}
         </main>
     );
 };
@@ -192,7 +191,7 @@ const StudentGrid: React.FC<{ students: StudentData[], onToggleSub: (sid: string
                 <div className="mt-4 grid grid-cols-2 gap-2">
                     <button onClick={() => onImpersonate(student.sid)} className="w-full flex items-center justify-center gap-2 bg-green-800 hover:bg-green-700 text-white text-xs font-semibold py-1.5 px-3 rounded"><Icon name="login" className="w-3.5 h-3.5"/> Login As</button>
                     <button onClick={() => onStartMessage(student)} className="w-full flex items-center justify-center gap-2 bg-cyan-800 hover:bg-cyan-700 text-white text-xs font-semibold py-1.5 px-3 rounded"><Icon name="message" className="w-3.5 h-3.5"/> Message</button>
-                    <button onClick={() => onClearData(student)} className="w-full bg-yellow-800 hover:bg-yellow-700 text-white text-xs font-semibold py-1.5 px-3 rounded">Reset</button>
+                    <button onClick={() => handleClearData(student)} className="w-full bg-yellow-800 hover:bg-yellow-700 text-white text-xs font-semibold py-1.5 px-3 rounded">Reset</button>
                     <button onClick={() => onDeleteUser(student.sid)} className="w-full bg-red-800 hover:bg-red-700 text-white text-xs font-semibold py-1.5 px-3 rounded">Delete</button>
                 </div>
             </div>

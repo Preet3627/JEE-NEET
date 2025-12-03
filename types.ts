@@ -77,13 +77,20 @@ export interface HomeworkData {
 
 export interface ActivityData {
   ID: string;
-  type: 'ACTIVITY';
+  DAY: LocalizedString; // Assuming activities can also be scheduled by day
   CARD_TITLE: LocalizedString;
-  STATUS: number;
-  DAY: LocalizedString;
   FOCUS_DETAIL: LocalizedString;
   SUBJECT_TAG: LocalizedString;
+  STATUS: number; // e.g., percentage completion
+  type: 'ACTIVITY';
+  isUserCreated?: boolean;
   isStarred?: boolean;
+  googleEventId?: string;
+  date?: string; // For one-off activities
+  gradient?: string;
+  imageUrl?: string;
+  externalLink?: string;
+  isRecurring?: boolean;
 }
 
 export type ScheduleItem = ScheduleCardData | HomeworkData | ActivityData;

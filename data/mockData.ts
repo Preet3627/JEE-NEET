@@ -1,5 +1,4 @@
 
-
 import { StudentData, UiText, ScheduleItem } from '../types';
 
 // Mock uiTextData
@@ -72,7 +71,7 @@ const mockScheduleItems: ScheduleItem[] = [
       "DAY": { "EN": "MONDAY", "GU": "" },
       "date": "2025-11-24",
       "CARD_TITLE": { "EN": "PHYSICS: COM Homework", "GU": "" },
-      "FOCUS_DETAIL": { "EN": "School Material Homework MCQs. Concepts: COM of standard bodies and momentum conservation problems.", "GU": "" },
+      "FOCUS_DETAIL": { "EN": "School Material Homework MCQs. Concepts: Centrifugal force and momentum conservation problems.", "GU": "" },
       "SUBJECT_TAG": { "EN": "PHYSICS", "GU": "" },
       "Q_RANGES": "1-35",
       "isUserCreated": true

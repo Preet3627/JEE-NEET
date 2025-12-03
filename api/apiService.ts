@@ -1,6 +1,4 @@
 
-
-
 import { StudentData, ScheduleItem, Config, ResultData, ExamData, DoubtData } from '../types';
 
 const API_URL = '/api';
@@ -59,7 +57,7 @@ export const authFetch = async (url: string, options: RequestInit = {}) => {
         }
         return handleResponse(response);
     } catch (error) {
-        console.warn('API call failed, request might be queued.', error);
+        console.warn('API call failed, request might be queued. Make sure the backend is running and accessible.', error);
         // Offline queueing logic could be implemented here if needed
         throw error;
     }
@@ -123,7 +121,7 @@ export const api = {
 
     // Study Material
     getStudyMaterial: (path: string) => authFetch(`/study-material/browse?path=${encodeURIComponent(path)}`),
-    getStudyMaterialContent: (path: string) => authFetch(`/study-material/content?path=${encodeURIComponent(path)}`, { returnRawResponse: true }).then(res => res.blob()), // FIX: Handle blob response explicitly
+    getStudyMaterialContent: (path: string) => authFetch(`/study-material/content?path=${encodeURIComponent(path)}`, { returnRawResponse: true } as RequestInit).then(res => res.blob()), // FIX: Handle blob response explicitly
     getStudyMaterialDetails: (paths: string[]) => authFetch('/study-material/details', { method: 'POST', body: JSON.stringify({ paths }) }),
     
     // Music
