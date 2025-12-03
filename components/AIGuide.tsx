@@ -85,7 +85,6 @@ const GuideRenderer: React.FC<{ content: string }> = ({ content }) => {
       i++;
     }
   }
-  // FIX: Added return statement. The component was not returning any JSX.
   return <>{elements}</>;
 };
 
@@ -175,7 +174,7 @@ Provide a topic, and the AI will generate cards. Or provide the cards directly i
   }
 }
 \`\`\`
-`;
+`; // Added missing backtick here
 
 const neetGuide = `
 # AI Data Import Guide (NEET)
@@ -254,7 +253,3 @@ export const AIGuide: React.FC<AIGuideProps> = ({ examType }) => {
   const content = examType === 'NEET' ? neetGuide : jeeGuide;
   return <GuideRenderer content={content} />;
 };
-`;
-
-// Default export if needed, but named export is better for clarity.
-// export default AIGuide;
