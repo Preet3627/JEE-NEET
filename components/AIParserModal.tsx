@@ -36,11 +36,12 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
     const text = inputText.trim();
     
     const handleResult = (result: any) => {
+        // FIX: Re-added result.custom_widget check here
         if (result.practice_test || result.homework_assignment) {
             onPracticeTestReady(result.practice_test || result.homework_assignment);
         } else if (result.flashcard_deck) {
             onDataReady(result);
-        } else if (result.schedules?.length || result.exams?.length || result.metrics?.length || result.custom_widget) { // FIX: Added result.custom_widget
+        } else if (result.schedules?.length || result.exams?.length || result.metrics?.length || result.custom_widget) { 
             onDataReady(result);
         } else {
             setError("The AI couldn't find any actionable data in your text. Please check the format or try rephrasing.");
@@ -52,7 +53,8 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
       const jsonData = JSON.parse(text);
       if (jsonData && typeof jsonData === 'object') {
         // Check if it contains any of our expected top-level keys
-        if (jsonData.flashcard_deck || jsonData.homework_assignment || jsonData.practice_test || jsonData.schedules?.length || jsonData.exams?.length || jsonData.metrics?.length || jsonData.custom_widget) { // FIX: Added jsonData.custom_widget
+        // FIX: Re-added jsonData.custom_widget check here
+        if (jsonData.flashcard_deck || jsonData.homework_assignment || jsonData.practice_test || jsonData.schedules?.length || jsonData.exams?.length || jsonData.metrics?.length || jsonData.custom_widget) { 
           handleResult(jsonData);
           setIsLoading(false);
           return;

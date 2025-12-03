@@ -1,4 +1,31 @@
-
+<script type="importmap">
+{
+  "imports": {
+    "crypto": "https://aistudiocdn.com/crypto@^1.0.1",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "express": "https://aistudiocdn.com/express@^5.2.1",
+    "cors": "https://aistudiocdn.com/cors@^2.8.5",
+    "vite": "https://aistudiocdn.com/vite@^7.2.6",
+    "path": "https://aistudiocdn.com/path@^0.12.7",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "dotenv": "https://aistudiocdn.com/dotenv@^17.2.3",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "google-auth-library": "https://aistudiocdn.com/google-auth-library@^10.5.0",
+    "bcryptjs": "https://aistudiocdn.com/bcryptjs@^3.0.3",
+    "vite-plugin-pwa": "https://aistudiocdn.com/vite-plugin-pwa@^1.2.0",
+    "url": "https://aistudiocdn.com/url@^0.11.4",
+    "jsonwebtoken": "https://aistudiocdn.com/jsonwebtoken@^9.0.2",
+    "mysql2/": "https://aistudiocdn.com/mysql2@^3.15.3/",
+    "webdav": "https://aistudiocdn.com/webdav@^5.8.0",
+    "music-metadata-browser": "https://aistudiocdn.com/music-metadata-browser@^2.5.11",
+    "workbox-precaching": "https://aistudiocdn.com/workbox-precaching@^7.4.0",
+    "nodemailer": "https://aistudiocdn.com/nodemailer@^7.0.11",
+    "vite-plugin-node-polyfills": "https://aistudiocdn.com/vite-plugin-node-polyfills@^0.24.0"
+  }
+}
+</script>
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -136,128 +163,4 @@
         opacity: 0;
         transition: opacity 0.1s;
         font-size: 8px;
-        color: rgba(0,0,0,0.6);
-        font-weight: bold;
-      }
-      .window-controls:hover .traffic-light::after { opacity: 1; }
-      .window-controls:hover .traffic-red::after { content: '×'; }
-      .window-controls:hover .traffic-yellow::after { content: '-'; }
-      .window-controls:hover .traffic-green::after { content: '+'; }
-
-
-      /* Widget Specifics */
-      .widget-container {
-        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-      }
-      .widget-minimized {
-        height: 48px !important;
-        overflow: hidden;
-      }
-
-      /* Scrollbar */
-      ::-webkit-scrollbar { width: 6px; }
-      ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 3px; }
-      ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
-
-      /* Flashcard Flip */
-      .flashcard-container {
-        display: grid;
-        perspective: 1000px;
-        min-height: 150px;
-      }
-      .flashcard-inner {
-        position: relative;
-        width: 100%;
-        transition: transform 0.6s;
-        transform-style: preserve-3d;
-        grid-area: 1 / 1 / 2 / 2;
-      }
-      .flashcard-flipped { transform: rotateY(180deg); }
-      .flashcard-front, .flashcard-back {
-        width: 100%;
-        height: 100%;
-        backface-visibility: hidden;
-        -webkit-backface-visibility: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 1rem;
-        border-radius: 0.75rem;
-        text-align: center;
-        grid-area: 1 / 1 / 2 / 2;
-        position: absolute;
-        top: 0;
-        left: 0;
-      }
-      .flashcard-front { z-index: 2; transform: rotateY(0deg); }
-      .flashcard-back { transform: rotateY(180deg); }
-
-      /* Animations */
-      @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      .animate-spin-slow { animation: spin-slow 12s linear infinite; }
-      
-      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-      @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
-      @keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-      @keyframes scaleOut { from { transform: scale(1); opacity: 1; } to { transform: scale(0.95); opacity: 0; } }
-      
-      .modal-enter { animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-      .modal-content-enter { animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-      .modal-exit { animation: fadeOut 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-      .modal-content-exit { animation: scaleOut 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-
-      /* Genie Animation (MacOS Style) */
-      @keyframes genie-in {
-        0% { clip-path: circle(0% at var(--clip-origin-x) var(--clip-origin-y)); opacity: 0; }
-        100% { clip-path: circle(150% at var(--clip-origin-x) var(--clip-origin-y)); opacity: 1; }
-      }
-      @keyframes genie-out {
-        0% { clip-path: circle(150% at var(--clip-origin-x) var(--clip-origin-y)); opacity: 1; }
-        100% { clip-path: circle(0% at var(--clip-origin-x) var(--clip-origin-y)); opacity: 0; }
-      }
-      .genie-in { animation: genie-in 0.5s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
-      .genie-out { animation: genie-out 0.5s cubic-bezier(0.65, 0, 0.35, 1) forwards; }
-
-      .no-blur .backdrop-blur-sm, .no-blur .backdrop-blur-md, .no-blur .backdrop-blur-lg {
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-      }
-    </style>
-<script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "express": "https://aistudiocdn.com/express@^5.1.0",
-    "mysql2/": "https://aistudiocdn.com/mysql2@^3.15.3/",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "cors": "https://aistudiocdn.com/cors@^2.8.5",
-    "dotenv": "https://aistudiocdn.com/dotenv@^17.2.3",
-    "path": "https://aistudiocdn.com/path@^0.12.7",
-    "crypto": "https://aistudiocdn.com/crypto@^1.0.1",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-    "url": "https://aistudiocdn.com/url@^0.11.4",
-    "vite": "https://aistudiocdn.com/vite@^7.2.2",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
-    "workbox-precaching": "https://aistudiocdn.com/workbox-precaching@^7.3.0",
-    "bcryptjs": "https://aistudiocdn.com/bcryptjs@^2.4.3",
-    "jsonwebtoken": "https://aistudiocdn.com/jsonwebtoken@^9.0.2",
-    "vite-plugin-pwa": "https://aistudiocdn.com/vite-plugin-pwa@^0.20.0",
-    "nodemailer": "https://aistudiocdn.com/nodemailer@^7.0.10",
-    "google-auth-library": "https://aistudiocdn.com/google-auth-library@^10.5.0",
-    "xml2js": "https://aistudiocdn.com/xml2js@^0.6.2",
-    "music-metadata-browser": "https://aistudiocdn.com/music-metadata-browser@^2.5.11",
-    "vite-plugin-node-polyfills": "https://aistudiocdn.com/vite-plugin-node-polyfills@^0.24.0",
-    "webdav": "https://aistudiocdn.com/webdav@^5.8.0"
-  }
-}
-</script>
-</head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-    <script src="https://apis.google.com/js/api.js"></script>
-    <script src="https://accounts.google.com/gsi/client"></script>
-  </body>
-</html>
+        

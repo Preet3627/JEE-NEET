@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Icon from './Icon';
 
@@ -159,7 +158,7 @@ Provide questions and answers for a structured practice session.
 }
 \`\`\`
 
-## Flashcards
+<h2>Flashcards</h2>
 
 Provide a topic, and the AI will generate cards. Or provide the cards directly in JSON.
 
@@ -211,9 +210,9 @@ You can provide a structured JSON object for precise control.
 }
 \`\`\`
 
-## Practice Tests
+<h2>Practice Tests</h2>
 
-### From JSON
+<h3>From JSON</h3>
 Provide questions and answers for a structured practice session. Biology questions are typically MCQs.
 
 \`\`\`json
@@ -231,7 +230,7 @@ Provide questions and answers for a structured practice session. Biology questio
 }
 \`\`\`
 
-## Flashcards
+<h2>Flashcards</h2>
 
 Provide a topic, and the AI will generate cards. This is great for Botany, Zoology, and Chemistry definitions.
 

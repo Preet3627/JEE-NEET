@@ -62,7 +62,8 @@ export interface HomeworkData {
   isUserCreated?: boolean;
   isStarred?: boolean;
   googleEventId?: string;
-  answers?: Record<string, string | string[]>; // Modified to accept string or array of strings
+  // FIX: Updated to correctly accept string or array of strings for answers.
+  answers?: Record<string, string | string[]>;
   solutions?: Record<string, string>;
   date?: string;
   practiceHistory?: PracticeHistory[];
@@ -288,6 +289,20 @@ export interface Track {
     path?: string;
     isLocal: boolean;
     file?: File;
+}
+
+// Added missing types for video generation models, if they were used (not directly in current error files)
+export interface VideoGenerationReferenceImage {
+  image: {
+    imageBytes: string;
+    mimeType: string;
+  };
+  referenceType: VideoGenerationReferenceType;
+}
+
+export enum VideoGenerationReferenceType {
+  UNKNOWN = 'UNKNOWN',
+  ASSET = 'ASSET',
 }
 
 export type ActiveTab = 'dashboard' | 'today' | 'schedule' | 'planner' | 'material' | 'flashcards' | 'exams' | 'performance' | 'doubts';
