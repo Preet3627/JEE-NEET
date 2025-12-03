@@ -237,7 +237,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
         if (correctAnswers) {
             const correctAnswer = correctAnswers[currentQuestionNumber.toString()];
             // FIX: Ensure normalizeAnswer can handle string | string[] for both arguments
-            const isCorrect = normalizeAnswer(value) === normalizeAnswer(correctAnswer);
+            const isCorrect = JSON.stringify(normalizeAnswer(value)) === JSON.stringify(normalizeAnswer(correctAnswer));
             setFeedback({
                 status: isCorrect ? 'correct' : 'incorrect',
                 correctAnswer: correctAnswer,
@@ -360,7 +360,9 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
             const answer = correctAnswers[currentQuestionNumber.toString()];
             if (Array.isArray(answer)) return 'MULTI_CHOICE';
             // Simple check: if answer contains only A-D, it's likely MCQ. Otherwise, NUM.
-            return ['A', 'B', 'C', 'D'].includes(answer.toUpperCase().trim()) ? 'MCQ' : 'NUM';
+            if (typeof answer === 'string') { // Ensure answer is string before .toUpperCase()
+                return ['A', 'B', 'C', 'D'].includes(answer.toUpperCase().trim()) ? 'MCQ' : 'NUM';
+            }
         }
         if (practiceMode === 'jeeMains') {
             return getQuestionInfo(currentQuestionIndex).type;
@@ -438,7 +440,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
                 {isUploadingKey && <AnswerKeyUploadModal onClose={() => setIsUploadingKey(false)} onGrade={handleGradeWithAI} />}
                 {analyzingMistake !== null && onUpdateWeaknesses && (
                     <SpecificMistakeAnalysisModal 
-                        questionNumber={analyzingMistake}
+                        questionNumber={analyposingMistake}
                         onClose={() => setAnalyzingMistake(null)}
                         onSaveWeakness={(topic) => onUpdateWeaknesses([...new Set([...(student.CONFIG.WEAK || []), topic])])}
                     />
@@ -466,7 +468,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
         }
         
         const normalizedCorrectAnswer = normalizeAnswer(feedback.correctAnswer);
-        const currentOption = normalizeAnswer(option);
+        const currentOption = normalizeAnswer(option) as string;
 
         // Feedback logic for Multi-Choice
         if (isMultiChoice) {
@@ -485,8 +487,11 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
             }
             return 'bg-gray-800 border-gray-700 opacity-60'; // Unselected irrelevant options
         } else { // MCQ or NUM
+            const normalizedUserAnswer = normalizeAnswer(userAnswer); // Can be string or string[]
+            
             if (currentOption === normalizedCorrectAnswer) return 'bg-green-800/50 border-green-500';
-            if (currentOption === normalizeAnswer(userAnswer) && normalizeAnswer(userAnswer) !== normalizedCorrectAnswer) return 'bg-red-800/50 border-red-500';
+            // FIX: Add type guard to ensure normalizedUserAnswer is a string before comparison
+            if (typeof normalizedUserAnswer === 'string' && currentOption === normalizedUserAnswer && normalizedUserAnswer !== normalizedCorrectAnswer) return 'bg-red-800/50 border-red-500';
             return 'bg-gray-800 border-gray-700 opacity-60';
         }
     };

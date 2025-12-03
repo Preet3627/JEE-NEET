@@ -7,7 +7,6 @@ import { studentDatabase } from './data/mockData';
 import { api } from './api/apiService';
 
 import Header from './components/Header';
-// FIX: Changed to named import as StudentDashboard does not have a default export.
 import StudentDashboard from './components/StudentDashboard';
 import TeacherDashboard from './components/TeacherDashboard';
 import AuthScreen from './screens/AuthScreen';
@@ -101,6 +100,7 @@ interface ModalControlProps {
   aiChatHistory: { role: string; parts: { text: string }[] }[]; setAiChatHistory: React.Dispatch<React.SetStateAction<{ role: string; parts: { text: string }[] }[]>>;
   showAiChatFab: boolean; setShowAiChatFab: React.Dispatch<React.SetStateAction<boolean>>;
   isAiChatLoading: boolean; setIsAiChatLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  isAiDoubtSolverOpen: boolean; setIsAiDoubtSolverOpen: React.Dispatch<React.SetStateAction<boolean>>;
   isCreateDeckModalOpen: boolean; setCreateDeckModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   isAiFlashcardModalOpen: boolean; setAiFlashcardModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   editingDeck: FlashcardDeck | null; setEditingDeck: React.Dispatch<React.SetStateAction<FlashcardDeck | null>>;
@@ -121,7 +121,6 @@ interface ModalControlProps {
   isAnswerKeyUploadModalOpen: boolean; setAnswerKeyUploadModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   isProfileModalOpen: boolean; setIsProfileModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   isSpecificMistakeAnalysisModalOpen: boolean; setIsSpecificMistakeAnalysisModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  isAiDoubtSolverOpen: boolean; setIsAiDoubtSolverOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 // #endregion Modal State Definition
 
@@ -226,9 +225,18 @@ const App: React.FC = () => {
     modalSettersRef.current.set('ProfileModal', setIsProfileModalOpen);
     modalSettersRef.current.set('SpecificMistakeAnalysisModal', setIsSpecificMistakeAnalysisModalOpen);
     modalSettersRef.current.set('UniversalSearch', setIsSearchOpen);
-  }, []);
+  }, [
+    setIsExamTypeSelectionModalOpen, setIsCreateModalOpen, setisAiParserModalOpen, setIsPracticeModalOpen,
+    setIsSettingsModalOpen, setIsEditWeaknessesModalOpen, setLogResultModalOpen, setEditResultModalOpen, 
+    setIsExamModalOpen, setAiMistakeModalOpen, setViewingReport, setAssistantGuideOpen, setAiGuideModalOpen, 
+    setIsSearchOpen, setMoveModalOpen, setAiChatOpen, setIsAiDoubtSolverOpen, setCreateDeckModalOpen, 
+    setAiFlashcardModalOpen, setEditingDeck, setViewingDeck, setCreateCardModalOpen, setEditingCard, 
+    setReviewingDeck, setViewingFile, setIsMusicLibraryOpen, setDeepLinkAction, setMessagingModalOpen, 
+    setAnswerKeyUploadModalOpen, setIsProfileModalOpen, setIsSpecificMistakeAnalysisModalOpen,
+  ]);
 
   const openModal = useCallback((modalId: string, setter: React.Dispatch<React.SetStateAction<boolean>> | ((val: any) => void), initialValue?: any) => {
+    // Determine if it's a boolean setter (setIsX) or a data setter (setX)
     const isBooleanSetter = typeof initialValue === 'undefined' || typeof initialValue === 'boolean';
 
     if (isBooleanSetter) {
@@ -241,20 +249,24 @@ const App: React.FC = () => {
     modalStackRef.current.push(newModalState);
     currentModalIdRef.current = modalId; 
     
+    // Push a state to browser history, but don't change URL
     window.history.pushState({ modal: newModalState.componentId }, '');
   }, []);
 
   const closeModal = useCallback((modalId: string) => {
     const setter = modalSettersRef.current.get(modalId);
     if (setter) {
-      const isBooleanSetter = String(setter).includes('setIs');
+      // If it's a boolean setter, set to false. If it's a data setter, set to null.
+      // This is a heuristic; more robust would be to store setter type.
+      const isBooleanSetter = String(setter).includes('setIs'); // Simple heuristic
       if (isBooleanSetter) {
         (setter as React.Dispatch<React.SetStateAction<boolean>>)(false);
       } else {
-        (setter as (val: any) => void)(null);
+        (setter as (val: any) => void)(null); // Assuming data setters take null to close
       }
     }
 
+    // Filter out the closed modal from the stack
     modalStackRef.current = modalStackRef.current.filter(m => m.id !== modalId);
     currentModalIdRef.current = modalStackRef.current.length > 0 ? modalStackRef.current[modalStackRef.current.length - 1].id : null;
   }, []);
@@ -263,34 +275,52 @@ const App: React.FC = () => {
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
       const isModalHistoryState = event.state && event.state.modal;
+
       if (isModalHistoryState) {
-        const modalToClose = modalStackRef.current[modalStackRef.current.length - 1];
+        // Find the modal that corresponds to this history state
+        const modalToClose = modalStackRef.current[modalStackRef.current.length - 1]; // Always close the top-most one
         
         if (modalToClose && modalToClose.componentId === event.state.modal) {
+          // It's our modal's history entry, close the modal UI
           const setter = modalSettersRef.current.get(modalToClose.id);
           if (setter) {
             const isBooleanSetter = String(setter).includes('setIs');
-            if (isBooleanSetter) (setter as React.Dispatch<React.SetStateAction<boolean>>)(false); else (setter as (val: any) => void)(null);
+            if (isBooleanSetter) {
+              (setter as React.Dispatch<React.SetStateAction<boolean>>)(false);
+            } else {
+              (setter as (val: any) => void)(null);
+            }
           }
+          // Remove from internal stack
           modalStackRef.current.pop();
           currentModalIdRef.current = modalStackRef.current.length > 0 ? modalStackRef.current[modalStackRef.current.length - 1].id : null;
         } else if (modalStackRef.current.length > 0) {
+          // History navigated past our modal, but our modal is still open. Close it forcefully.
           const topModal = modalStackRef.current[modalStackRef.current.length - 1];
           const setter = modalSettersRef.current.get(topModal.id);
           if (setter) {
             const isBooleanSetter = String(setter).includes('setIs');
-            if (isBooleanSetter) (setter as React.Dispatch<React.SetStateAction<boolean>>)(false); else (setter as (val: any) => void)(null);
+            if (isBooleanSetter) {
+              (setter as React.Dispatch<React.SetStateAction<boolean>>)(false);
+            } else {
+              (setter as (val: any) => void)(null);
+            }
           }
           modalStackRef.current = [];
           currentModalIdRef.current = null;
         }
       } else {
+        // User navigated back past all modal states to a prior, non-modal state. Close all open modals.
         if (modalStackRef.current.length > 0) {
           modalStackRef.current.forEach(m => {
             const setter = modalSettersRef.current.get(m.id);
             if (setter) {
               const isBooleanSetter = String(setter).includes('setIs');
-              if (isBooleanSetter) (setter as React.Dispatch<React.SetStateAction<boolean>>)(false); else (setter as (val: any) => void)(null);
+              if (isBooleanSetter) {
+                (setter as React.Dispatch<React.SetStateAction<boolean>>)(false);
+              } else {
+                (setter as (val: any) => void)(null);
+              }
             }
           });
           modalStackRef.current = [];
@@ -303,6 +333,7 @@ const App: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+
   const checkBackendStatus = useCallback(async () => {
     try {
       const res = await api.getPublicConfig();
@@ -313,29 +344,42 @@ const App: React.FC = () => {
           setGoogleClientId(res.googleClientId);
       }
     } catch (error: any) {
-      if (error.status === 'misconfigured') setBackendStatus('misconfigured'); else setBackendStatus('offline');
+      console.error("Backend status check failed:", error);
+      if (error.status === 'misconfigured') {
+          setBackendStatus('misconfigured');
+      } else {
+          setBackendStatus('offline');
+      }
     }
   }, []);
 
+  // Initial check and periodic heartbeat
   useEffect(() => {
     checkBackendStatus();
+
     const interval = setInterval(async () => {
       if (token) {
         try {
           await api.heartbeat();
         } catch (error) {
+          console.warn('Heartbeat failed, backend may be offline:', error);
           checkBackendStatus();
         }
       } else {
         checkBackendStatus();
       }
     }, 30000);
+
     return () => clearInterval(interval);
   }, [token, checkBackendStatus]);
 
+  // Google API client initialization
   useEffect(() => {
     if (!googleClientId || backendStatus !== 'online') return;
-    if (!window.gapi || !window.google) return;
+    if (!window.gapi || !window.google) {
+      console.warn("Google API scripts not yet loaded.");
+      return;
+    }
 
     const initGoogleClient = async () => {
       try {
@@ -357,14 +401,15 @@ const App: React.FC = () => {
     }
   }, [googleClientId, backendStatus, setGoogleAuthStatus]);
 
+  // Deep Link Handling
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const action = params.get('action');
     const dataStr = params.get('data');
-    const resetTokenParam = params.get('reset-token');
+    const resetToken = params.get('reset-token');
 
-    if (resetTokenParam) {
-      setResetToken(resetTokenParam);
+    if (resetToken) {
+      setResetToken(resetToken);
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.delete('reset-token');
       window.history.replaceState({}, document.title, newUrl.toString());
@@ -385,6 +430,7 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Handle deep link actions
   useEffect(() => {
     if (!deepLinkAction || !currentUser) return;
 
@@ -393,7 +439,7 @@ const App: React.FC = () => {
       setDeepLinkAction(null);
 
       if (action === 'new_schedule' || action === 'import_data' || action === 'import_exam') {
-        openModal('DeepLinkConfirmationModal', setDeepLinkAction, data);
+        openModal('DeepLinkConfirmationModal', setDeepLinkAction, deepLinkAction.data);
       } else if (action === 'start_practice' && data?.id) {
         const homework = currentUser.SCHEDULE_ITEMS.find(item => item.ID === data.id && item.type === 'HOMEWORK') as HomeworkData;
         if (homework) {
@@ -415,25 +461,34 @@ const App: React.FC = () => {
         openModal('UniversalSearch', setIsSearchOpen);
       }
     };
-    handleDeepLink();
-  }, [deepLinkAction, currentUser]);
 
+    handleDeepLink();
+  }, [deepLinkAction, currentUser, openModal, setDeepLinkAction, setPracticeTask, setIsPracticeModalOpen, setViewingTask, setIsCreateModalOpen, setSearchInitialQuery, setIsSearchOpen]);
+
+
+  // Handlers for specific student data actions
   const handleSaveTask = useCallback(async (task: ScheduleItem) => {
     if (!currentUser) return;
     setIsSyncing(true);
     try {
       await api.saveTask(task);
+      await refreshUser();
       if (currentUser.CONFIG.isCalendarSyncEnabled && googleAuthStatus === 'signed_in') {
         if ('googleEventId' in task && task.googleEventId) {
           await gcal.updateEvent(task.googleEventId, task);
         } else {
           const eventId = await gcal.createEvent(task);
-          await api.saveTask({ ...task, googleEventId: eventId });
+          const updatedTask = { ...task, googleEventId: eventId };
+          await api.saveTask(updatedTask); 
+          await refreshUser();
         }
       }
-      await refreshUser();
-    } catch (error) { console.error("Failed to save task:", error); } 
-    finally { setIsSyncing(false); }
+    } catch (error) {
+      console.error("Failed to save task:", error);
+      alert("Failed to save task. Please try again or check backend connection.");
+    } finally {
+      setIsSyncing(false);
+    }
   }, [currentUser, refreshUser, googleAuthStatus]);
 
   const handleSaveBatchTasks = useCallback(async (tasks: ScheduleItem[]) => {
@@ -442,13 +497,34 @@ const App: React.FC = () => {
     try {
       await api.saveBatchTasks(tasks);
       await refreshUser();
-    } catch (error) { console.error("Failed to save batch tasks:", error); } 
-    finally { setIsSyncing(false); }
+    } catch (error) {
+      console.error("Failed to save batch tasks:", error);
+      alert("Failed to save batch tasks. Please try again or check backend connection.");
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [currentUser, refreshUser]);
+  
+  // FIX: handleClearAllSchedule
+  const handleClearAllSchedule = useCallback(async () => {
+    if (!currentUser) return;
+    if (!window.confirm("Are you sure you want to clear all your schedule items? This cannot be undone.")) return;
+    setIsSyncing(true);
+    try {
+        await api.clearAllSchedule();
+        await refreshUser();
+        alert("All schedule items cleared.");
+    } catch (error) {
+        console.error("Failed to clear schedule:", error);
+        alert(`Failed to clear schedule: ${error.message}`);
+    } finally {
+        setIsSyncing(false);
+    }
   }, [currentUser, refreshUser]);
 
   const handleDeleteTask = useCallback(async (taskId: string) => {
     if (!currentUser) return;
-    if (!window.confirm("Are you sure?")) return;
+    if (!window.confirm("Are you sure you want to delete this task?")) return;
     setIsSyncing(true);
     try {
       const taskToDelete = currentUser.SCHEDULE_ITEMS.find(item => item.ID === taskId);
@@ -457,8 +533,12 @@ const App: React.FC = () => {
       }
       await api.deleteTask(taskId);
       await refreshUser();
-    } catch (error) { console.error("Failed to delete task:", error); } 
-    finally { setIsSyncing(false); }
+    } catch (error) {
+      console.error("Failed to delete task:", error);
+      alert("Failed to delete task. Please try again or check backend connection.");
+    } finally {
+      setIsSyncing(false);
+    }
   }, [currentUser, refreshUser, googleAuthStatus]);
 
   const handleToggleMistakeFixed = useCallback(async (resultId: string, mistake: string) => {
@@ -467,12 +547,21 @@ const App: React.FC = () => {
     try {
       const result = currentUser.RESULTS.find(r => r.ID === resultId);
       if (!result) throw new Error("Result not found");
+
       const isFixed = result.FIXED_MISTAKES?.includes(mistake);
-      const updatedFixedMistakes = isFixed ? result.FIXED_MISTAKES.filter(m => m !== mistake) : [...(result.FIXED_MISTAKES || []), mistake];
-      await api.updateResult({ ...result, FIXED_MISTAKES: updatedFixedMistakes });
+      const updatedFixedMistakes = isFixed
+          ? result.FIXED_MISTAKES.filter(m => m !== mistake)
+          : [...(result.FIXED_MISTAKES || []), mistake];
+      
+      const updatedResult = { ...result, FIXED_MISTAKES: updatedFixedMistakes };
+      await api.updateResult(updatedResult);
       await refreshUser();
-    } catch (error) { console.error("Failed to update mistake status:", error); } 
-    finally { setIsSyncing(false); }
+    } catch (error) {
+      console.error("Failed to update mistake status:", error);
+      alert("Failed to update mistake status. Please try again.");
+    } finally {
+      setIsSyncing(false);
+    }
   }, [currentUser, refreshUser]);
 
   const handleUpdateConfig = useCallback(async (config: Partial<Config>) => {
@@ -481,18 +570,28 @@ const App: React.FC = () => {
     try {
       await api.updateConfig(config);
       await refreshUser();
-    } catch (error) { console.error("Failed to update config:", error); } 
-    finally { setIsSyncing(false); }
+      alert("Settings saved!");
+    } catch (error) {
+      console.error("Failed to update config:", error);
+      alert("Failed to save settings. Please try again or check backend connection.");
+    } finally {
+      setIsSyncing(false);
+    }
   }, [currentUser, refreshUser]);
 
   const handleLogStudySession = useCallback(async (session: Omit<StudySession, 'date'>) => {
     if (!currentUser) return;
     setIsSyncing(true);
     try {
-        await api.saveStudySession({ ...session, date: new Date().toISOString().split('T')[0] });
+        const fullSession = { ...session, date: new Date().toISOString().split('T')[0] };
+        await api.saveStudySession(fullSession);
         await refreshUser();
-    } catch (error) { console.error("Failed to log study session:", error); } 
-    finally { setIsSyncing(false); }
+    } catch (error) {
+        console.error("Failed to log study session:", error);
+        alert("Failed to log study session. Please try again.");
+    } finally {
+        setIsSyncing(false);
+    }
   }, [currentUser, refreshUser]);
 
   const handleUpdateWeaknesses = useCallback(async (weaknesses: string[]) => {
@@ -501,8 +600,12 @@ const App: React.FC = () => {
     try {
         await api.updateConfig({ WEAK: weaknesses });
         await refreshUser();
-    } catch (error) { console.error("Failed to update weaknesses:", error); } 
-    finally { setIsSyncing(false); }
+    } catch (error) {
+        console.error("Failed to update weaknesses:", error);
+        alert("Failed to update weaknesses. Please try again.");
+    } finally {
+        setIsSyncing(false);
+    }
   }, [currentUser, refreshUser]);
 
   const handleLogResult = useCallback(async (result: ResultData) => {
@@ -511,8 +614,13 @@ const App: React.FC = () => {
     try {
         await api.updateResult(result);
         await refreshUser();
-    } catch (error) { console.error("Failed to log result:", error); } 
-    finally { setIsSyncing(false); }
+        alert("Test result logged successfully!");
+    } catch (error) {
+        console.error("Failed to log result:", error);
+        alert("Failed to log test result. Please try again.");
+    } finally {
+        setIsSyncing(false);
+    }
   }, [currentUser, refreshUser]);
 
   const handleAddExam = useCallback(async (exam: ExamData) => {
@@ -521,8 +629,13 @@ const App: React.FC = () => {
     try {
         await api.addExam(exam);
         await refreshUser();
-    } catch (error) { console.error("Failed to add exam:", error); } 
-    finally { setIsSyncing(false); }
+        alert("Exam added successfully!");
+    } catch (error) {
+        console.error("Failed to add exam:", error);
+        alert("Failed to add exam. Please try again.");
+    } finally {
+        setIsSyncing(false);
+    }
   }, [currentUser, refreshUser]);
 
   const handleUpdateExam = useCallback(async (exam: ExamData) => {
@@ -531,19 +644,29 @@ const App: React.FC = () => {
     try {
         await api.updateExam(exam);
         await refreshUser();
-    } catch (error) { console.error("Failed to update exam:", error); } 
-    finally { setIsSyncing(false); }
+        alert("Exam updated successfully!");
+    } catch (error) {
+        console.error("Failed to update exam:", error);
+        alert("Failed to update exam. Please try again.");
+    } finally {
+        setIsSyncing(false);
+    }
   }, [currentUser, refreshUser]);
 
   const handleDeleteExam = useCallback(async (examId: string) => {
     if (!currentUser) return;
-    if (!window.confirm("Are you sure?")) return;
+    if (!window.confirm("Are you sure you want to delete this exam?")) return;
     setIsSyncing(true);
     try {
         await api.deleteExam(examId);
         await refreshUser();
-    } catch (error) { console.error("Failed to delete exam:", error); } 
-    finally { setIsSyncing(false); }
+        alert("Exam deleted successfully.");
+    } catch (error) {
+        console.error("Failed to delete exam:", error);
+        alert("Failed to delete exam. Please try again.");
+    } finally {
+        setIsSyncing(false);
+    }
   }, [currentUser, refreshUser]);
 
   const handleExportToIcs = useCallback(() => {
@@ -551,27 +674,49 @@ const App: React.FC = () => {
     exportCalendar(currentUser.SCHEDULE_ITEMS, currentUser.EXAMS, currentUser.fullName);
   }, [currentUser]);
 
-  const handleBatchImport = useCallback(async (data: { schedules: ScheduleItem[], exams: ExamData[], results: ResultData[], weaknesses: string[] }) => {
+  const handleBatchImport = useCallback(async (data: { schedules: ScheduleItem[]; exams: ExamData[]; results: ResultData[]; weaknesses: string[]; }) => {
     if (!currentUser) return;
     setIsSyncing(true);
     try {
         if (data.schedules.length > 0) await api.saveBatchTasks(data.schedules);
-        if (data.exams.length > 0) for(const exam of data.exams) await api.addExam(exam);
-        if (data.results.length > 0) for(const result of data.results) await api.updateResult(result);
-        if (data.weaknesses.length > 0) await api.updateConfig({ WEAK: [...new Set([...currentUser.CONFIG.WEAK, ...data.weaknesses])] });
+        if (data.exams.length > 0) {
+            for(const exam of data.exams) {
+                await api.addExam(exam);
+            }
+        }
+        if (data.results.length > 0) {
+             for(const result of data.results) {
+                await api.updateResult(result);
+            }
+        }
+        if (data.weaknesses.length > 0) {
+            const newWeaknesses = [...new Set([...currentUser.CONFIG.WEAK, ...data.weaknesses])];
+            await api.updateConfig({ WEAK: newWeaknesses });
+        }
         await refreshUser();
-    } catch (error) { console.error("Failed to batch import data:", error); } 
-    finally { setIsSyncing(false); }
+        alert("Data imported successfully!");
+    } catch (error) {
+        console.error("Failed to batch import data:", error);
+        alert("Failed to import data. Please try again.");
+    } finally {
+        setIsSyncing(false);
+    }
   }, [currentUser, refreshUser]);
 
   const handleGoogleSignIn = useCallback(async () => {
-    if (!gapiLoaded) return;
+    if (!gapiLoaded) {
+      alert("Google API not fully loaded. Please try again in a moment.");
+      return;
+    }
     auth.handleSignIn();
   }, [gapiLoaded]);
 
   const handleGoogleSignOut = useCallback(() => {
     if (googleAuthStatus !== 'signed_in') return;
-    auth.handleSignOut(() => setGoogleAuthStatus('signed_out'));
+    auth.handleSignOut((isSignedIn: boolean) => {
+      setGoogleAuthStatus(isSignedIn ? 'signed_in' : 'signed_out');
+      alert("Disconnected from Google services.");
+    });
   }, [googleAuthStatus, setGoogleAuthStatus]);
 
   const handleFullCalendarSync = useCallback(async () => {
@@ -579,9 +724,13 @@ const App: React.FC = () => {
     setIsSyncing(true);
     try {
         const events = await gcal.listEvents();
-        alert("Full calendar sync not fully implemented.");
-    } catch (error) { console.error("Full calendar sync failed:", error); } 
-    finally { setIsSyncing(false); }
+        alert(`Fetched ${events.length} events from Google Calendar.`);
+    } catch (error) {
+        console.error("Full calendar sync failed:", error);
+        alert("Failed to sync calendar. Ensure permissions are granted and try again.");
+    } finally {
+        setIsSyncing(false);
+    }
   }, [currentUser, googleAuthStatus]);
 
   const handleBackupToDrive = useCallback(async () => {
@@ -593,71 +742,110 @@ const App: React.FC = () => {
         const fileId = await gdrive.uploadData(dataToSave, currentUser.CONFIG.googleDriveFileId);
         await api.updateConfig({ googleDriveFileId: fileId, driveLastSync: new Date().toISOString() });
         await refreshUser();
-    } catch (error) { console.error("Drive backup failed:", error); } 
-    finally { setIsSyncing(false); }
+        alert("Data backed up to Google Drive!");
+    } catch (error) {
+        console.error("Drive backup failed:", error);
+        alert("Failed to backup to Drive. Ensure permissions are granted and try again.");
+    } finally {
+        setIsSyncing(false);
+    }
   }, [currentUser, googleAuthStatus, refreshUser]);
 
   const handleRestoreFromDrive = useCallback(async () => {
     if (!currentUser || googleAuthStatus !== 'signed_in' || !currentUser.CONFIG.googleDriveFileId) return;
-    if (!window.confirm("Restore from Google Drive?")) return;
+    if (!window.confirm("Are you sure you want to restore data from Google Drive? This will overwrite your current app data.")) return;
     setIsSyncing(true);
     try {
         const data = await gdrive.downloadData(currentUser.CONFIG.googleDriveFileId);
         const restoredUserData = JSON.parse(data);
         await api.fullSync(restoredUserData);
         await refreshUser();
-    } catch (error) { console.error("Drive restore failed:", error); } 
-    finally { setIsSyncing(false); }
+        alert("Data restored from Google Drive!");
+    } catch (error) {
+        console.error("Drive restore failed:", error);
+        alert("Failed to restore from Drive. The backup file might be missing or an error occurred.");
+    } finally {
+        setIsSyncing(false);
+    }
   }, [currentUser, googleAuthStatus, refreshUser]);
 
+  // Handler for posting doubts to community
   const handlePostDoubt = useCallback(async (question: string, image?: string) => {
     if (!currentUser) return;
     try {
       await api.postDoubt(question, image);
       await refreshUser();
-    } catch (error) { alert("Failed to post doubt."); }
+    } catch (error) {
+      alert("Failed to post doubt.");
+    }
   }, [currentUser, refreshUser]);
 
+  // Handler for posting solutions to doubts
   const handlePostSolution = useCallback(async (doubtId: string, solution: string, image?: string) => {
     if (!currentUser) return;
     try {
       await api.postSolution(doubtId, solution, image);
       await refreshUser();
-    } catch (error) { alert("Failed to post solution."); }
+    } catch (error) {
+      alert("Failed to post solution.");
+    }
   }, [currentUser, refreshUser]);
 
+  // Handler for moving selected tasks to a new date
   const handleMoveSelectedTasks = useCallback(async (taskIds: string[], newDate: string) => {
     if (!currentUser) return;
     setIsSyncing(true);
     try {
         await api.batchMoveTasks(taskIds, newDate);
         await refreshUser();
-    } catch (error) { console.error("Failed to move tasks:", error); } 
-    finally { setIsSyncing(false); }
+        alert(`Moved ${taskIds.length} tasks to ${newDate}.`);
+    } catch (error) {
+        console.error("Failed to move tasks:", error);
+        alert("Failed to move tasks. Please try again.");
+    } finally {
+        setIsSyncing(false);
+    }
   }, [currentUser, refreshUser]);
   
+  // Handlers for Flashcard Decks (passed to StudentDashboard)
   const handleSaveDeck = useCallback(async (deck: FlashcardDeck) => {
     if (!currentUser) return;
     setIsSyncing(true);
     try {
         const currentDecks = currentUser.CONFIG.flashcardDecks || [];
         const existingIndex = currentDecks.findIndex(d => d.id === deck.id);
-        const newDecks = existingIndex >= 0 ? currentDecks.map(d => d.id === deck.id ? deck : d) : [...currentDecks, deck];
+        let newDecks;
+        if (existingIndex >= 0) {
+            newDecks = [...currentDecks];
+            newDecks[existingIndex] = deck;
+        } else {
+            newDecks = [...currentDecks, deck];
+        }
         await api.updateConfig({ flashcardDecks: newDecks });
         await refreshUser();
-    } catch (error) { console.error("Failed to save deck:", error); } 
-    finally { setIsSyncing(false); }
+    } catch (error) {
+        console.error("Failed to save deck:", error);
+        alert("Failed to save flashcard deck.");
+    } finally {
+        setIsSyncing(false);
+    }
   }, [currentUser, refreshUser]);
 
   const handleDeleteDeck = useCallback(async (deckId: string) => {
-    if (!currentUser || !window.confirm("Delete this deck?")) return;
+    if (!currentUser) return;
+    if (!window.confirm("Are you sure you want to delete this deck and all its cards?")) return;
     setIsSyncing(true);
     try {
         const newDecks = currentUser.CONFIG.flashcardDecks?.filter(d => d.id !== deckId) || [];
         await api.updateConfig({ flashcardDecks: newDecks });
         await refreshUser();
-    } catch (error) { console.error("Failed to delete deck:", error); } 
-    finally { setIsSyncing(false); }
+        alert("Deck deleted.");
+    } catch (error) {
+        console.error("Failed to delete deck:", error);
+        alert("Failed to delete flashcard deck.");
+    } finally {
+        setIsSyncing(false);
+    }
   }, [currentUser, refreshUser]);
 
   const handleSaveCard = useCallback(async (deckId: string, card: Flashcard) => {
@@ -665,83 +853,177 @@ const App: React.FC = () => {
     setIsSyncing(true);
     try {
         const currentDecks = currentUser.CONFIG.flashcardDecks || [];
-        const newDecks = currentDecks.map(deck => {
-            if (deck.id === deckId) {
-                const cardIndex = deck.cards.findIndex(c => c.id === card.id);
-                const newCards = cardIndex >= 0 ? deck.cards.map(c => c.id === card.id ? card : c) : [...deck.cards, card];
-                return { ...deck, cards: newCards };
-            }
-            return deck;
-        });
+        const targetDeckIndex = currentDecks.findIndex(d => d.id === deckId);
+        if (targetDeckIndex === -1) throw new Error("Deck not found");
+
+        const newDecks = [...currentDecks];
+        const targetDeck = { ...newDecks[targetDeckIndex] };
+        
+        const existingCardIndex = targetDeck.cards.findIndex(c => c.id === card.id);
+        if (existingCardIndex >= 0) {
+            targetDeck.cards[existingCardIndex] = card;
+        } else {
+            targetDeck.cards.push(card);
+        }
+        newDecks[targetDeckIndex] = targetDeck;
+        
         await api.updateConfig({ flashcardDecks: newDecks });
         await refreshUser();
-    } catch (error) { console.error("Failed to save card:", error); } 
-    finally { setIsSyncing(false); }
+    } catch (error) {
+        console.error("Failed to save card:", error);
+        alert("Failed to save flashcard.");
+    } finally {
+        setIsSyncing(false);
+    }
   }, [currentUser, refreshUser]);
 
   const handleDeleteCard = useCallback(async (deckId: string, cardId: string) => {
-    if (!currentUser || !window.confirm("Delete this card?")) return;
+    if (!currentUser) return;
+    if (!window.confirm("Are you sure you want to delete this card?")) return;
     setIsSyncing(true);
     try {
-        const newDecks = currentUser.CONFIG.flashcardDecks?.map(deck => 
+        const currentDecks = currentUser.CONFIG.flashcardDecks || [];
+        const newDecks = currentDecks.map(deck => 
             deck.id === deckId ? { ...deck, cards: deck.cards.filter(c => c.id !== cardId) } : deck
-        ) || [];
+        );
         await api.updateConfig({ flashcardDecks: newDecks });
         await refreshUser();
-    } catch (error) { console.error("Failed to delete card:", error); } 
-    finally { setIsSyncing(false); }
+    } catch (error) {
+        console.error("Failed to delete card:", error);
+        alert("Failed to delete flashcard.");
+    } finally {
+        setIsSyncing(false);
+    }
   }, [currentUser, refreshUser]);
 
+  // For Admin broadcasting tasks
   const handleBroadcastTask = useCallback(async (task: ScheduleItem, examType: 'ALL' | 'JEE' | 'NEET') => {
     if (!currentUser || userRole !== 'admin') return;
     setIsSyncing(true);
     try {
         await api.broadcastTask(task, examType);
-    } catch (error) { console.error("Failed to broadcast task:", error); } 
-    finally { setIsSyncing(false); }
+        alert("Task broadcasted successfully!");
+    } catch (error) {
+        console.error("Failed to broadcast task:", error);
+        alert("Failed to broadcast task. Please try again.");
+    } finally {
+        setIsSyncing(false);
+    }
   }, [currentUser, userRole]);
 
+  // For Admin to clear all schedule data for a student
   const handleClearStudentData = useCallback(async (sid: string) => {
     if (userRole !== 'admin') return;
     setIsSyncing(true);
     try {
       await api.clearStudentData(sid);
+      alert(`All data for student ${sid} cleared.`);
       await refreshUser();
-    } catch (error) { console.error("Failed to clear student data:", error); } 
-    finally { setIsSyncing(false); }
+    } catch (error) {
+      console.error("Failed to clear student data:", error);
+      alert("Failed to clear student data.");
+    } finally {
+      setIsSyncing(false);
+    }
   }, [userRole, refreshUser]);
   
+  // For Admin to delete a student account
   const handleDeleteStudent = useCallback(async (sid: string) => {
-    if (userRole !== 'admin' || !window.confirm(`Delete student ${sid}?`)) return;
+    if (userRole !== 'admin') return;
+    if (!window.confirm(`Are you sure you want to delete student ${sid}? This is irreversible.`)) return;
     setIsSyncing(true);
     try {
       await api.deleteStudent(sid);
+      alert(`Student ${sid} deleted.`);
       await refreshUser();
-    } catch (error) { console.error("Failed to delete student:", error); } 
-    finally { setIsSyncing(false); }
+    } catch (error) {
+      console.error("Failed to delete student:", error);
+      alert("Failed to delete student.");
+    } finally {
+      setIsSyncing(false);
+    }
   }, [userRole, refreshUser]);
 
+  // For Admin to toggle Unacademy subscription (placeholder)
   const handleToggleUnacademySub = useCallback(async (sid: string) => {
       alert(`Toggle Unacademy sub for ${sid} - not yet fully implemented.`);
   }, []);
 
+  // For Admin to impersonate a student
   const handleImpersonateStudent = useCallback(async (sid: string) => {
     if (userRole !== 'admin') return;
     try {
       const { token } = await api.impersonateStudent(sid);
       loginWithToken(token);
-    } catch (error) { console.error("Impersonation failed:", error); }
+    } catch (error) {
+      console.error("Impersonation failed:", error);
+      alert("Failed to impersonate student.");
+    }
   }, [userRole, loginWithToken]);
 
+  // Group all modal control props for easier passing
   const modalControlProps: ModalControlProps = useMemo(() => ({
+    openModal, closeModal,
+    isExamTypeSelectionModalOpen, setIsExamTypeSelectionModalOpen,
+    isCreateModalOpen, setIsCreateModalOpen,
+    isAiParserModalOpen, setisAiParserModalOpen,
+    isPracticeModalOpen, setIsPracticeModalOpen,
+    isSettingsModalOpen, setIsSettingsModalOpen,
+    editingTask, setEditingTask,
+    viewingTask, setViewingTask,
+    practiceTask, setPracticeTask,
+    aiPracticeTest, setAiPracticeTest,
+    isEditWeaknessesModalOpen, setIsEditWeaknessesModalOpen,
+    isLogResultModalOpen, setLogResultModalOpen,
+    initialScoreForModal, setInitialScoreForModal,
+    initialMistakesForModal, setInitialMistakesForModal,
+    isEditResultModalOpen, setEditResultModalOpen,
+    editingResult, setEditingResult,
+    isExamModalOpen, setIsExamModalOpen,
+    editingExam, setEditingExam,
+    isAiMistakeModalOpen, setAiMistakeModalOpen,
+    viewingReport, setViewingReport,
+    isAssistantGuideOpen, setAssistantGuideOpen,
+    isAiGuideModalOpen, setAiGuideModalOpen,
+    isSearchOpen, setIsSearchOpen,
+    searchInitialQuery, setSearchInitialQuery,
+    isSelectMode, setIsSelectMode,
+    selectedTaskIds, setSelectedTaskIds,
+    isMoveModalOpen, setMoveModalOpen,
+    isAiChatOpen, setAiChatOpen,
+    aiChatHistory, setAiChatHistory,
+    showAiChatFab, setShowAiChatFab,
+    isAiChatLoading, setIsAiChatLoading,
+    isAiDoubtSolverOpen, setIsAiDoubtSolverOpen, 
+    isCreateDeckModalOpen, setCreateDeckModalOpen,
+    isAiFlashcardModalOpen, setAiFlashcardModalOpen,
+    editingDeck, setEditingDeck,
+    viewingDeck, setViewingDeck,
+    isCreateCardModalOpen, setCreateCardModalOpen, 
+    editingCard, setEditingCard,
+    reviewingDeck, setReviewingDeck,
+    viewingFile, setViewingFile,
+    isMusicLibraryOpen, setIsMusicLibraryOpen,
+    analyzingMistake, setAnalyzingMistake,
+    handleMoveSelected: handleMoveSelectedTasks,
+    handleSaveDeck, 
+    handleDeleteCard, 
+    handleSaveCard,
+    setDeepLinkAction,
+    isMessagingModalOpen, setMessagingModalOpen,
+    messagingStudent, setMessagingStudent,
+    isAnswerKeyUploadModalOpen, setAnswerKeyUploadModalOpen,
+    isProfileModalOpen, setIsProfileModalOpen,
+    isSpecificMistakeAnalysisModalOpen, setIsSpecificMistakeAnalysisModalOpen
+  ]), [
     openModal, closeModal, isExamTypeSelectionModalOpen, setIsExamTypeSelectionModalOpen,
-    isCreateModalOpen, setIsCreateModalOpen, isAiParserModalOpen, setisAiParserModalOpen,
-    isPracticeModalOpen, setIsPracticeModalOpen, isSettingsModalOpen, setIsSettingsModalOpen,
-    editingTask, setEditingTask, viewingTask, setViewingTask, practiceTask, setPracticeTask,
-    aiPracticeTest, setAiPracticeTest, isEditWeaknessesModalOpen, setIsEditWeaknessesModalOpen,
-    isLogResultModalOpen, setLogResultModalOpen, initialScoreForModal, setInitialScoreForModal,
-    initialMistakesForModal, setInitialMistakesForModal, isEditResultModalOpen, setEditResultModalOpen,
-    editingResult, setEditingResult, isExamModalOpen, setIsExamModalOpen, editingExam, setEditingExam,
+    isCreateModalOpen, setIsCreateModalOpen, setisAiParserModalOpen, setIsPracticeModalOpen,
+    isSettingsModalOpen, setIsSettingsModalOpen, editingTask, setEditingTask,
+    viewingTask, setViewingTask, practiceTask, setPracticeTask, aiPracticeTest, setAiPracticeTest,
+    isEditWeaknessesModalOpen, setIsEditWeaknessesModalOpen, isLogResultModalOpen, setLogResultModalOpen,
+    initialScoreForModal, setInitialScoreForModal, initialMistakesForModal, setInitialMistakesForModal,
+    isEditResultModalOpen, setEditResultModalOpen, editingResult, setEditingResult,
+    isExamModalOpen, setIsExamModalOpen, editingExam, setEditingExam,
     isAiMistakeModalOpen, setAiMistakeModalOpen, viewingReport, setViewingReport,
     isAssistantGuideOpen, setAssistantGuideOpen, isAiGuideModalOpen, setAiGuideModalOpen,
     isSearchOpen, setIsSearchOpen, searchInitialQuery, setSearchInitialQuery,
@@ -754,88 +1036,137 @@ const App: React.FC = () => {
     isCreateCardModalOpen, setCreateCardModalOpen, editingCard, setEditingCard,
     reviewingDeck, setReviewingDeck, viewingFile, setViewingFile,
     isMusicLibraryOpen, setIsMusicLibraryOpen, analyzingMistake, setAnalyzingMistake,
-    handleMoveSelected: handleMoveSelectedTasks, handleSaveDeck, handleDeleteCard, handleSaveCard,
+    handleMoveSelectedTasks, handleSaveDeck, handleDeleteCard, handleSaveCard,
     setDeepLinkAction, isMessagingModalOpen, setMessagingModalOpen, messagingStudent, setMessagingStudent,
     isAnswerKeyUploadModalOpen, setAnswerKeyUploadModalOpen, isProfileModalOpen, setIsProfileModalOpen,
-    isSpecificMistakeAnalysisModalOpen, setIsSpecificMistakeAnalysisModalOpen,
-  }), [
-    openModal, closeModal, isExamTypeSelectionModalOpen,
-    isCreateModalOpen, isAiParserModalOpen, isPracticeModalOpen,
-    isSettingsModalOpen, editingTask, viewingTask, practiceTask, aiPracticeTest,
-    isEditWeaknessesModalOpen, isLogResultModalOpen,
-    initialScoreForModal, initialMistakesForModal,
-    isEditResultModalOpen, editingResult, isExamModalOpen, editingExam,
-    isAiMistakeModalOpen, viewingReport,
-    isAssistantGuideOpen, isAiGuideModalOpen,
-    isSearchOpen, searchInitialQuery,
-    isSelectMode, selectedTaskIds, isMoveModalOpen, isAiChatOpen,
-    aiChatHistory, showAiChatFab, isAiChatLoading, isAiDoubtSolverOpen, 
-    isCreateDeckModalOpen, isAiFlashcardModalOpen,
-    editingDeck, viewingDeck, isCreateCardModalOpen, editingCard,
-    reviewingDeck, viewingFile, isMusicLibraryOpen, analyzingMistake,
-    handleMoveSelectedTasks, handleSaveDeck, handleDeleteCard, handleSaveCard,
-    setDeepLinkAction, isMessagingModalOpen, messagingStudent,
-    isAnswerKeyUploadModalOpen, isProfileModalOpen,
-    isSpecificMistakeAnalysisModalOpen
+    isSpecificMistakeAnalysisModalOpen, setIsSpecificMistakeAnalysisModalOpen
   ]);
 
+
+  // Determine main content based on auth state and backend status
   const renderMainContent = () => {
-    if (isLoading) return <div className="min-h-screen flex items-center justify-center text-white"><div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div></div>;
-    if (backendStatus === 'offline') return <BackendOfflineScreen onSelectDemoUser={enterDemoMode} onRetryConnection={checkBackendStatus} backendStatus={backendStatus} />;
-    if (backendStatus === 'misconfigured') return <ConfigurationErrorScreen onRetryConnection={checkBackendStatus} backendStatus={backendStatus} />;
-    if (!currentUser && !isDemoMode) return <AuthScreen backendStatus={backendStatus} googleClientId={googleClientId} resetToken={resetToken} />;
-    if (currentUser && currentUser.CONFIG.settings.examType === undefined) return <ExamTypeSelectionModal onSelect={(type) => handleUpdateConfig({ settings: { ...currentUser.CONFIG.settings, examType: type } })} />;
+    if (isLoading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center text-white text-xl">
+          <div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mr-4"></div>
+          Loading app...
+        </div>
+      );
+    }
+
+    if (backendStatus === 'offline') {
+      return <BackendOfflineScreen onSelectDemoUser={enterDemoMode} onRetryConnection={checkBackendStatus} backendStatus={backendStatus} />;
+    }
+
+    if (backendStatus === 'misconfigured') {
+      return <ConfigurationErrorScreen onRetryConnection={checkBackendStatus} backendStatus={backendStatus} />;
+    }
+
+    if (!currentUser && !isDemoMode) {
+      return <AuthScreen backendStatus={backendStatus} googleClientId={googleClientId} resetToken={resetToken} />;
+    }
+
+    if (currentUser && currentUser.CONFIG.settings.examType === undefined) {
+      return <ExamTypeSelectionModal onSelect={(type) => handleUpdateConfig({ settings: { ...currentUser.CONFIG.settings, examType: type } })} />;
+    }
     
+    // Main App Layout
     return (
       <div className={`min-h-screen ${currentUser?.CONFIG.settings.theme === 'liquid-glass' ? 'theme-liquid-glass' : currentUser?.CONFIG.settings.theme === 'midnight' ? 'theme-midnight' : ''}`} >
         <div className="container mx-auto px-4 pt-4 sm:pt-6">
-          <Header user={{ name: currentUser.fullName, id: currentUser.sid, profilePhoto: currentUser.profilePhoto }} onLogout={logout} backendStatus={backendStatus} isSyncing={isSyncing} onOpenProfile={() => openModal('ProfileModal', setIsProfileModalOpen)} />
+          <Header
+            user={{ name: currentUser.fullName, id: currentUser.sid, profilePhoto: currentUser.profilePhoto }}
+            onLogout={logout}
+            backendStatus={backendStatus}
+            isSyncing={isSyncing}
+            onOpenProfile={() => openModal('ProfileModal', setIsProfileModalOpen)}
+          />
           
           {userRole === 'student' && currentUser ? (
-            <StudentDashboard student={currentUser} onSaveTask={handleSaveTask} onSaveBatchTasks={handleSaveBatchTasks} onDeleteTask={handleDeleteTask} onToggleMistakeFixed={handleToggleMistakeFixed} onUpdateConfig={handleUpdateConfig} onLogStudySession={handleLogStudySession} onUpdateWeaknesses={handleUpdateWeaknesses} onLogResult={handleLogResult} onAddExam={handleAddExam} onUpdateExam={handleUpdateExam} onDeleteExam={handleDeleteExam} onExportToIcs={handleExportToIcs} onBatchImport={handleBatchImport} googleAuthStatus={googleAuthStatus} onGoogleSignIn={handleGoogleSignIn} onGoogleSignOut={handleGoogleSignOut} onBackupToDrive={handleBackupToDrive} onRestoreFromDrive={handleRestoreFromDrive} allDoubts={allDoubts} onPostDoubt={handlePostDoubt} onPostSolution={handlePostSolution} deepLinkAction={deepLinkAction} {...modalControlProps} />
+            <StudentDashboard
+              student={currentUser}
+              onSaveTask={handleSaveTask}
+              onSaveBatchTasks={handleSaveBatchTasks}
+              onDeleteTask={handleDeleteTask}
+              onToggleMistakeFixed={handleToggleMistakeFixed}
+              onUpdateConfig={handleUpdateConfig}
+              onLogStudySession={handleLogStudySession}
+              onUpdateWeaknesses={handleUpdateWeaknesses}
+              onLogResult={handleLogResult}
+              onAddExam={handleAddExam}
+              onUpdateExam={handleUpdateExam}
+              onDeleteExam={handleDeleteExam}
+              onExportToIcs={handleExportToIcs}
+              onBatchImport={handleBatchImport}
+              googleAuthStatus={googleAuthStatus}
+              onGoogleSignIn={handleGoogleSignIn}
+              onGoogleSignOut={handleGoogleSignOut}
+              onBackupToDrive={handleBackupToDrive}
+              onRestoreFromDrive={handleRestoreFromDrive}
+              allDoubts={allDoubts}
+              onPostDoubt={handlePostDoubt}
+              onPostSolution={handlePostSolution}
+              deepLinkAction={deepLinkAction}
+              {...modalControlProps}
+            />
           ) : userRole === 'admin' && allStudents ? (
-            <TeacherDashboard students={allStudents} onToggleUnacademySub={handleToggleUnacademySub} onDeleteUser={handleDeleteStudent} onBroadcastTask={handleBroadcastTask} {...modalControlProps} />
-          ) : <div className="text-center text-gray-500 py-10">Initializing...</div>}
+            <TeacherDashboard
+              students={allStudents}
+              onToggleUnacademySub={handleToggleUnacademySub}
+              onDeleteUser={handleDeleteStudent}
+              onBroadcastTask={handleBroadcastTask}
+              onClearData={handleClearStudentData}
+              onImpersonate={handleImpersonateStudent}
+              {...modalControlProps}
+            />
+          ) : (
+            <div className="text-center text-gray-500 py-10">Initializing dashboard...</div>
+          )}
         </div>
         
         {isFullScreenPlayerOpen && <FullScreenMusicPlayer />}
         {currentTrack && <GlobalMusicVisualizer />}
         {currentTrack && !isFullScreenPlayerOpen && (window.innerWidth < 768) && <PersistentMusicPlayer />}
         
-        {isExamTypeSelectionModalOpen && <ExamTypeSelectionModal onSelect={(type) => { handleUpdateConfig({ settings: { ...currentUser.CONFIG.settings, examType: type } }); closeModal('ExamTypeSelectionModal'); }} />}
+        {/* Modals - All rendered at the App level, managed by modalControlProps */}
+        {isExamTypeSelectionModalOpen && <ExamTypeSelectionModal onClose={() => closeModal('ExamTypeSelectionModal')} onSelect={(type) => { handleUpdateConfig({ settings: { ...currentUser?.CONFIG.settings, examType: type } }); closeModal('ExamTypeSelectionModal'); }} />}
         {isCreateModalOpen && <CreateEditTaskModal task={editingTask || viewingTask} viewOnly={!!viewingTask} onClose={() => closeModal('CreateEditTaskModal')} onSave={handleSaveTask} decks={currentUser?.CONFIG.flashcardDecks || []} />}
         {isAiParserModalOpen && <AIParserModal onClose={() => closeModal('AIParserModal')} onDataReady={setDeepLinkAction} onPracticeTestReady={setAiPracticeTest} onOpenGuide={() => openModal('AIGuideModal', setAiGuideModalOpen)} examType={currentUser?.CONFIG.settings.examType} />}
-        {isPracticeModalOpen && <CustomPracticeModal initialTask={practiceTask} aiPracticeTest={aiPracticeTest} onClose={() => closeModal('CustomPracticeModal')} onSessionComplete={(duration, solved, skipped) => handleLogStudySession({ duration, questions_solved: solved, questions_skipped: skipped })} defaultPerQuestionTime={currentUser?.CONFIG.settings.perQuestionTime || 180} onLogResult={handleLogResult} student={currentUser} onUpdateWeaknesses={handleUpdateWeaknesses} onSaveTask={handleSaveTask} />}
-        {isSettingsModalOpen && <SettingsModal settings={currentUser?.CONFIG.settings} decks={currentUser?.CONFIG.flashcardDecks || []} onClose={() => closeModal('SettingsModal')} onSave={handleUpdateConfig} onExportToIcs={handleExportToIcs} googleAuthStatus={googleAuthStatus} onGoogleSignIn={handleGoogleSignIn} onGoogleSignOut={handleGoogleSignOut} onBackupToDrive={handleBackupToDrive} onRestoreFromDrive={handleRestoreFromDrive} onApiKeySet={() => setShowAiChatFab(true)} onOpenAssistantGuide={() => openModal('GoogleAssistantGuideModal', setAssistantGuideOpen)} onOpenAiGuide={() => openModal('AIGuideModal', setAiGuideModalOpen)} onClearAllSchedule={() => { if(window.confirm("Are you sure?")) api.clearAllSchedule().then(refreshUser); }} onToggleEditLayout={() => handleUpdateConfig({ settings: { ...currentUser?.CONFIG.settings, dashboardLayout: currentUser?.CONFIG.settings.dashboardLayout || [] } })} />}
+        {isPracticeModalOpen && <CustomPracticeModal initialTask={practiceTask} aiPracticeTest={aiPracticeTest} onClose={() => closeModal('CustomPracticeModal')} onSessionComplete={handleLogStudySession} defaultPerQuestionTime={currentUser?.CONFIG.settings.perQuestionTime || 180} onLogResult={handleLogResult} student={currentUser} onUpdateWeaknesses={handleUpdateWeaknesses} onSaveTask={handleSaveTask} />}
+        {isSettingsModalOpen && <SettingsModal settings={currentUser?.CONFIG.settings} decks={currentUser?.CONFIG.flashcardDecks || []} onClose={() => closeModal('SettingsModal')} onSave={handleUpdateConfig} onExportToIcs={handleExportToIcs} googleAuthStatus={googleAuthStatus} onGoogleSignIn={handleGoogleSignIn} onGoogleSignOut={handleGoogleSignOut} onBackupToDrive={handleBackupToDrive} onRestoreFromDrive={handleRestoreFromDrive} onApiKeySet={() => setShowAiChatFab(true)} onOpenAssistantGuide={() => openModal('GoogleAssistantGuideModal', setAssistantGuideOpen)} onOpenAiGuide={() => openModal('AIGuideModal', setAiGuideModalOpen)} onClearAllSchedule={handleClearAllSchedule} onToggleEditLayout={() => handleUpdateConfig({ settings: { ...currentUser?.CONFIG.settings, dashboardLayout: currentUser?.CONFIG.settings.dashboardLayout || [] } })} />}
         {isEditWeaknessesModalOpen && <EditWeaknessesModal currentWeaknesses={currentUser?.CONFIG.WEAK || []} onClose={() => closeModal('EditWeaknessesModal')} onSave={handleUpdateWeaknesses} />}
         {isLogResultModalOpen && <LogResultModal onClose={() => closeModal('LogResultModal')} onSave={handleLogResult} initialScore={initialScoreForModal} initialMistakes={initialMistakesForModal} />}
         {isEditResultModalOpen && editingResult && <EditResultModal result={editingResult} onClose={() => closeModal('EditResultModal')} onSave={handleLogResult} />}
         {isExamModalOpen && <CreateEditExamModal exam={editingExam} onClose={() => closeModal('CreateEditExamModal')} onSave={(exam) => editingExam ? handleUpdateExam(exam) : handleAddExam(exam)} />}
-        {isAiMistakeModalOpen && <AIMistakeAnalysisModal onClose={() => closeModal('AIMistakeAnalysisModal')} onSaveWeakness={(newWeakness) => handleUpdateWeaknesses([...new Set([...(currentUser?.CONFIG.WEAK || []), newWeakness])])} />}
-        {isAiDoubtSolverOpen && <AIDoubtSolverModal onClose={() => closeModal('AIDoubtSolverOpen')} />}
+        {isAiMistakeModalOpen && <AIMistakeAnalysisModal onClose={() => closeModal('AIMistakeAnalysisModal')} onSaveWeakness={handleUpdateWeaknesses} />}
+        {isAiDoubtSolverOpen && <AIDoubtSolverModal onClose={() => closeModal('AIDoubtSolverModal')} />}
         {isAiChatOpen && <AIChatPopup history={aiChatHistory} onSendMessage={(p, img) => api.aiChat({ history: aiChatHistory, prompt: p, imageBase64: img, domain: window.location.origin }).then(res => setAiChatHistory(prev => [...prev, res])).catch(e => setAiChatHistory(prev => [...prev, { role: 'model', parts: [{ text: `Error: ${e.message}` }] }]))} onClose={() => closeModal('AIChatPopup')} isLoading={isAiChatLoading} />}
         {viewingReport && <TestReportModal result={viewingReport} onClose={() => closeModal('TestReportModal')} onUpdateWeaknesses={handleUpdateWeaknesses} student={currentUser} onSaveDeck={handleSaveDeck} />}
-        {isMoveModalOpen && <MoveTasksModal onClose={() => closeModal('MoveTasksModal')} onConfirm={(newDate) => handleMoveSelectedTasks(selectedTaskIds, newDate)} selectedCount={selectedTaskIds.length} />}
+        {isMoveModalOpen && <MoveTasksModal onClose={() => closeModal('MoveTasksModal')} onConfirm={handleMoveSelectedTasks} selectedCount={selectedTaskIds.length} />}
         {isMusicLibraryOpen && <MusicLibraryModal onClose={() => closeModal('MusicLibraryModal')} />}
         {deepLinkAction && <DeepLinkConfirmationModal data={deepLinkAction.data} onClose={() => closeModal('DeepLinkConfirmationModal')} onConfirm={() => handleBatchImport(deepLinkAction.data)} />}
+
+        {/* Flashcard Modals */}
         {isCreateDeckModalOpen && <CreateEditDeckModal deck={editingDeck} onClose={() => closeModal('CreateEditDeckModal')} onSave={handleSaveDeck} />}
         {isAiFlashcardModalOpen && <AIGenerateFlashcardsModal student={currentUser} onClose={() => closeModal('AIGenerateFlashcardsModal')} onSaveDeck={handleSaveDeck} />}
-        {viewingDeck && <DeckViewModal deck={viewingDeck} onClose={() => closeModal('DeckViewModal')} onAddCard={() => openModal('CreateEditFlashcardModal', setCreateCardModalOpen)} onEditCard={(card) => { setEditingCard(card); openModal('CreateEditFlashcardModal', setCreateCardModalOpen); }} onDeleteCard={(cardId) => handleDeleteCard(viewingDeck.id, cardId)} onStartReview={() => openModal('FlashcardReviewModal', setReviewingDeck, viewingDeck)} />}
+        {viewingDeck && <DeckViewModal deck={viewingDeck} onClose={() => closeModal('DeckViewModal')} onAddCard={() => openModal('CreateEditFlashcardModal', setCreateCardModalOpen)} onEditCard={(card) => { setEditingCard(card); openModal('CreateEditFlashcardModal', setCreateCardModalOpen); }} onDeleteCard={handleDeleteCard} onStartReview={() => openModal('FlashcardReviewModal', setReviewingDeck, viewingDeck)} />}
         {isCreateCardModalOpen && viewingDeck && <CreateEditFlashcardModal card={editingCard} deckId={viewingDeck.id} onClose={() => closeModal('CreateEditFlashcardModal')} onSave={handleSaveCard} />}
         {reviewingDeck && <FlashcardReviewModal deck={reviewingDeck} onClose={() => closeModal('FlashcardReviewModal')} />}
+        
+        {/* Study Material Modal */}
         {viewingFile && <FileViewerModal file={viewingFile} onClose={() => closeModal('FileViewerModal')} />}
+
+        {/* Assistant & AI Guide Modals */}
         {isAssistantGuideOpen && <GoogleAssistantGuideModal onClose={() => closeModal('GoogleAssistantGuideModal')} />}
         {isAiGuideModalOpen && <AIGuideModal onClose={() => closeModal('AIGuideModal')} examType={currentUser?.CONFIG.settings.examType} />}
         {isMessagingModalOpen && messagingStudent && <MessagingModal student={messagingStudent} onClose={() => closeModal('MessagingModal')} isDemoMode={isDemoMode} />}
-        {isAnswerKeyUploadModalOpen && <AnswerKeyUploadModal onClose={() => closeModal('AnswerKeyUploadModal')} onGrade={() => {}} />}
+        {isAnswerKeyUploadModalOpen && <AnswerKeyUploadModal onClose={() => closeModal('AnswerKeyUploadModal')} onGrade={() => { /* Graded in McqTimer, this modal is only for input */ }} />}
         {isProfileModalOpen && <ProfileModal user={currentUser} onClose={() => closeModal('ProfileModal')} />}
-        {isSpecificMistakeAnalysisModalOpen && analyzingMistake !== null && <SpecificMistakeAnalysisModal questionNumber={analyzingMistake} onClose={() => closeModal('SpecificMistakeAnalysisModal')} onSaveWeakness={(newWeakness) => handleUpdateWeaknesses([...new Set([...(currentUser?.CONFIG.WEAK || []), newWeakness])])} />}
-        {isSearchOpen && <UniversalSearch isOpen={isSearchOpen} onClose={() => closeModal('UniversalSearch')} onNavigate={(tab) => {}} onAction={() => {}} scheduleItems={currentUser?.SCHEDULE_ITEMS || []} exams={currentUser?.EXAMS || []} decks={currentUser?.CONFIG.flashcardDecks || []} initialQuery={searchInitialQuery || undefined} />}
+        {isSpecificMistakeAnalysisModalOpen && analyzingMistake !== null && <SpecificMistakeAnalysisModal questionNumber={analyzingMistake} onClose={() => closeModal('SpecificMistakeAnalysisModal')} onSaveWeakness={handleUpdateWeaknesses} />}
+        {isSearchOpen && <UniversalSearch isOpen={isSearchOpen} onClose={() => closeModal('UniversalSearch')} onNavigate={(tab) => { /* Logic to navigate tabs in StudentDashboard */}} onAction={() => { /* Logic to perform actions */}} scheduleItems={currentUser?.SCHEDULE_ITEMS || []} exams={currentUser?.EXAMS || []} decks={currentUser?.CONFIG.flashcardDecks || []} initialQuery={searchInitialQuery || undefined} />}
+
       </div>
     );
   };
-  
-  return renderMainContent();
-};
 
 export default App;

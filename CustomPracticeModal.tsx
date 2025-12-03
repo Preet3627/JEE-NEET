@@ -1,15 +1,14 @@
 
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import McqTimer from './components/McqTimer';
-import Icon from './components/Icon';
-import { getQuestionNumbersFromRanges } from './utils/qRangesParser';
-import { HomeworkData, ResultData, StudentData, ScheduleItem, PracticeQuestion } from './types';
-import AIGenerateAnswerKeyModal from './components/AIGenerateAnswerKeyModal';
-import AIParserModal from './components/AIParserModal';
-import { api } from './api/apiService';
-import { useAuth } from './context/AuthContext';
-import { knowledgeBase } from './data/knowledgeBase'; // Import knowledgeBase for chapters
+import McqTimer from './McqTimer';
+import Icon from './Icon';
+import { getQuestionNumbersFromRanges } from '../utils/qRangesParser';
+import { HomeworkData, ResultData, StudentData, ScheduleItem, PracticeQuestion } from '../types';
+import AIGenerateAnswerKeyModal from './AIGenerateAnswerKeyModal';
+import AIParserModal from './AIParserModal';
+import { api } from '../api/apiService';
+import { useAuth } from '../context/AuthContext';
+import { knowledgeBase } from '../data/knowledgeBase'; // Import knowledgeBase for chapters
 
 interface CustomPracticeModalProps {
   onClose: () => void;
@@ -94,7 +93,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
   const [category, setCategory] = useState(initialTask ? 'Homework Practice' : 'AI Generated');
   const [perQuestionTime, setPerQuestionTime] = useState(defaultPerQuestionTime);
   const [syllabus, setSyllabus] = useState('');
-  const [correctAnswersText, setCorrectAnswersText] = useState('');
+  const [correctAnswersText, setCorrectAnswersText] = useState(formatAnswers(initialTask?.answers));
   const [jeeMainsCorrectAnswersText, setJeeMainsCorrectAnswersText] = useState('');
 
   // AI state

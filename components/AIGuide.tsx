@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Icon from './Icon';
 
@@ -174,8 +175,7 @@ Provide a topic, and the AI will generate cards. Or provide the cards directly i
   }
 }
 \`\`\`
-`; // Added missing backtick here
-
+`;
 const neetGuide = `
 # AI Data Import Guide (NEET)
 
