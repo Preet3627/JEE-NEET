@@ -1,5 +1,6 @@
 
 
+
 import React from 'react';
 import { useLocalization } from '../context/LocalizationContext';
 import ScheduleCard from './ScheduleCard';

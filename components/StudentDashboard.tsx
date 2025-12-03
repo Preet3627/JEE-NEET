@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { StudentData, ScheduleItem, ActivityData, Config, StudySession, HomeworkData, ExamData, ResultData, DoubtData, FlashcardDeck, Flashcard, StudyMaterialItem, ScheduleCardData, PracticeQuestion, ActiveTab, DashboardWidgetItem } from '../types';
 import ScheduleList from './ScheduleList';
@@ -377,7 +378,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                     if(deck) {
                         setViewingDeck(deck);
                         setEditingCard(null);
-                        openModal('CreateEditFlashcardModal', setCreateCardModalOpen); // Use openModal
+                        // FIX: Use openModal pattern for creating new card from widget
+                        openModal('CreateEditFlashcardModal', setCreateCardModalOpen); 
                     } else {
                         alert("Please create a deck first.");
                     }
@@ -545,7 +547,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                             onDeleteDeck={handleDeleteDeck}
                             onViewDeck={viewingDeck => openModal('DeckViewModal', setViewingDeck, viewingDeck)}
                             onStartReview={handleStartReviewSession}
-                            onGenerateWithAI={() => openModal('AIGenerateFlashcardsModal', setAiFlashcardModalOpen, true)}
+                            onGenerateWithAI={() => openModal('AIGenerateFlashcardsModal', setIsAiFlashcardModalOpen, true)}
                         />;
             case 'exams':
                 return <ExamsView exams={student.EXAMS} onAdd={() => { setEditingExam(null); openModal('CreateEditExamModal', setIsExamModalOpen, true); }} onEdit={(exam) => { setEditingExam(exam); openModal('CreateEditExamModal', setIsExamModalOpen, true); }} onDelete={onDeleteExam} />;
