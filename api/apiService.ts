@@ -1,4 +1,3 @@
-
 import { StudentData, ScheduleItem, Config, ResultData, ExamData } from '../types';
 
 const API_URL = '/api';
@@ -148,9 +147,18 @@ export const api = {
     solveDoubt: (data: { prompt: string; imageBase64?: string; }) => authFetch('/ai/solve-doubt', { method: 'POST', body: JSON.stringify(data) }),
     parseText: (text: string, domain: string) => authFetch('/ai/parse-text', { method: 'POST', body: JSON.stringify({ text, domain }) }),
     correctJson: (brokenJson: string) => authFetch('/ai/correct-json', { method: 'POST', body: JSON.stringify({ brokenJson }) }),
-    analyzeTestResults: (data: { imageBase64: string; userAnswers: Record<string, string>; timings: Record<string, number>, syllabus: string }) => authFetch('/ai/analyze-test-results', { method: 'POST', body: JSON.stringify(data) }),
+    // FIX: Updated analyzeTestResults userAnswers type
+    analyzeTestResults: (data: { imageBase64: string; userAnswers: Record<string, string | string[]>; timings: Record<string, number>, syllabus: string }) => authFetch('/ai/analyze-test-results', { method: 'POST', body: JSON.stringify(data) }),
     analyzeSpecificMistake: (data: { imageBase64: string; prompt: string; }) => authFetch('/ai/analyze-specific-mistake', { method: 'POST', body: JSON.stringify(data) }),
     generateFlashcards: (data: { topic: string; syllabus?: string; }) => authFetch('/ai/generate-flashcards', { method: 'POST', body: JSON.stringify(data) }),
     generateAnswerKey: (prompt: string) => authFetch('/ai/generate-answer-key', { method: 'POST', body: JSON.stringify({ prompt }) }),
-    generatePracticeTest: (data: { topic: string; numQuestions: number; difficulty: string; }) => authFetch('/ai/generate-practice-test', { method: 'POST', body: JSON.stringify(data) }),
+    // FIX: Updated generatePracticeTest signature to include new parameters
+    generatePracticeTest: (data: { 
+        topic: string; 
+        numQuestions: number; 
+        difficulty: string; 
+        questionTypes?: ('MCQ' | 'NUM' | 'MULTI_CHOICE')[];
+        isPYQ?: boolean;
+        chapters?: string[];
+    }) => authFetch('/ai/generate-practice-test', { method: 'POST', body: JSON.stringify(data) }),
 };

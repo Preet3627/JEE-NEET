@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './context/AuthContext';
 import { StudentData, ScheduleItem, StudySession, Config, ResultData, ExamData, DoubtData } from './types';
 import { studentDatabase } from './data/mockData';
@@ -30,9 +30,15 @@ declare global {
 
 const API_URL = '/api';
 
+interface ModalState {
+    id: string;
+    onClose: () => void;
+    historyStateId: string;
+}
+
 const App: React.FC = () => {
     const { currentUser, userRole, isLoading, isDemoMode, enterDemoMode, logout, refreshUser } = useAuth();
-    const { isFullScreenPlayerOpen, currentTrack } = useMusicPlayer();
+    const { isFullScreenPlayerOpen, currentTrack, toggleLibrary, isLibraryOpen: isMusicLibraryOpen } = useMusicPlayer();
     
     const [allStudents, setAllStudents] = useState<StudentData[]>([]);
     const [allDoubts, setAllDoubts] = useState<DoubtData[]>([]);
@@ -44,6 +50,100 @@ const App: React.FC = () => {
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [deepLinkAction, setDeepLinkAction] = useState<any>(null);
     const [isExamTypeModalOpen, setIsExamTypeModalOpen] = useState(false);
+
+    // --- Modal Navigation State ---
+    const modalStack = useRef<ModalState[]>([]);
+    const [currentModalId, setCurrentModalId] = useState<string | null>(null);
+
+    const openModal = useCallback((modalId: string, onCloseCallback: () => void) => {
+        if (modalStack.current.some(m => m.id === modalId)) {
+            // Modal already in stack, prevent opening twice or pushing duplicate history
+            return;
+        }
+
+        const historyStateId = `modal-${Date.now()}`;
+        window.history.pushState({ modalId: historyStateId }, ''); // Push a new state to browser history
+
+        const modalState: ModalState = {
+            id: modalId,
+            onClose: () => {
+                // This onClose is called when the modal wants to close itself normally
+                // It should trigger a browser back to pop its history state
+                if (modalStack.current.length > 0 && modalStack.current[modalStack.current.length - 1].historyStateId === historyStateId) {
+                    window.history.back(); // Trigger popstate
+                } else {
+                    // Fallback for unexpected state (e.g. modal closed out of sync)
+                    modalStack.current = modalStack.current.filter(m => m.historyStateId !== historyStateId);
+                    setCurrentModalId(modalStack.current.length > 0 ? modalStack.current[modalStack.current.length - 1].id : null);
+                    onCloseCallback(); // Directly call the original callback
+                }
+            },
+            historyStateId: historyStateId,
+        };
+        modalStack.current.push(modalState);
+        setCurrentModalId(modalId);
+    }, []);
+
+    const closeTopModal = useCallback(() => {
+        // This is called by the popstate listener when browser back is hit
+        const topModal = modalStack.current.pop();
+        if (topModal) {
+            topModal.onClose(); // Call the modal's original onClose logic
+            setCurrentModalId(modalStack.current.length > 0 ? modalStack.current[modalStack.current.length - 1].id : null);
+        }
+    }, []);
+
+    const genericOnClose = useCallback((modalId: string, setStateFalse: React.Dispatch<React.SetStateAction<boolean>>) => {
+        const modalToClose = modalStack.current.find(m => m.id === modalId);
+        if (modalToClose) {
+            // This will trigger window.history.back(), which in turn calls popstate,
+            // and the popstate listener then calls closeTopModal, handling actual state updates.
+            modalToClose.onClose();
+        } else {
+            // If modal not found in stack, just close its state directly.
+            setStateFalse(false);
+            setCurrentModalId(modalStack.current.length > 0 ? modalStack.current[modalStack.current.length - 1].id : null);
+        }
+    }, []);
+
+
+    // --- Global popstate listener for browser back button ---
+    useEffect(() => {
+        const handlePopState = (event: PopStateEvent) => {
+            // Check if it's a modal history state
+            if (event.state && event.state.modalId) {
+                // This means we are navigating back WITHIN the modal stack
+                if (modalStack.current.length > 0 && modalStack.current[modalStack.current.length - 1].historyStateId === event.state.modalId) {
+                    // It's the same modal state we just pushed, so let it pop naturally
+                    // (This should ideally not be called here if the modal handles its own history.back())
+                } else {
+                    // Browser navigated to a state NOT managed by a modal, or modal stack is out of sync
+                    // Force-close the topmost modal if one exists
+                    const topModal = modalStack.current[modalStack.current.length - 1];
+                    if (topModal) {
+                         modalStack.current.pop(); // Remove it from our internal stack
+                         setCurrentModalId(modalStack.current.length > 0 ? modalStack.current[modalStack.current.length - 1].id : null);
+                         topModal.onClose(); // This should trigger its actual close effect
+                    }
+                }
+            } else if (modalStack.current.length > 0) {
+                 // Browser back was pressed and there's a modal open, but it's not a modal-specific state being popped.
+                 // This means the user is trying to go back past the modal's entry point.
+                 // Prevent default and close the modal.
+                 const topModal = modalStack.current.pop();
+                 if (topModal) {
+                     topModal.onClose(); // Trigger its specific onClose logic
+                     setCurrentModalId(modalStack.current.length > 0 ? modalStack.current[modalStack.current.length - 1].id : null);
+                     // If we preventDefault here, it stops the browser navigation completely.
+                     // Instead, the modal's onClose should be designed to handle the history pop.
+                     // The modal's onClose() is expected to call window.history.back() or similar.
+                 }
+            }
+        };
+        
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [closeTopModal]);
 
 
     useEffect(() => {
@@ -84,7 +184,7 @@ const App: React.FC = () => {
                         const correctedData = JSON.parse(correctionResult.correctedJson);
                         setDeepLinkAction({ action, data: correctedData });
                     } catch (correctionError) {
-                        alert("The data from the link is malformed.");
+                        alert("The data from the link is malformed and could not be corrected.");
                     }
                 } finally {
                     window.history.replaceState({}, document.title, window.location.pathname);
@@ -450,13 +550,101 @@ const App: React.FC = () => {
         setIsExamTypeModalOpen(false);
     };
 
+    // --- Modal Control Functions for Children ---
+    const [isCreateModalOpen, setCreateModalOpen] = useState(false);
+    const [isAiParserModalOpen, setAiParserModalOpen] = useState(false);
+    const [isPracticeModalOpen, setPracticeModalOpen] = useState(false);
+    const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
+    const [isEditWeaknessesModalOpen, setEditWeaknessesModalOpen] = useState(false);
+    const [isLogResultModalOpen, setLogResultModalOpen] = useState(false);
+    const [isEditResultModalOpen, setEditResultModalOpen] = useState(false);
+    const [isExamModalOpen, setExamModalOpen] = useState(false);
+    const [isAiMistakeModalOpen, setAiMistakeModalOpen] = useState(false);
+    const [isAssistantGuideOpen, setAssistantGuideOpen] = useState(false);
+    const [isAiGuideModalOpen, setAiGuideModalOpen] = useState(false);
+    const [isSelectMode, setSelectMode] = useState(false);
+    const [isMoveModalOpen, setMoveModalOpen] = useState(false);
+    const [isAiChatOpen, setAiChatOpen] = useState(false);
+    const [isAiDoubtSolverOpen, setAiDoubtSolverOpen] = useState(false);
+    const [isCreateDeckModalOpen, setCreateDeckModalOpen] = useState(false);
+    const [isAiFlashcardModalOpen, setAiFlashcardModalOpen] = useState(false);
+    const [isCreateCardModalOpen, setCreateCardModalOpen] = useState(false);
+    const [isMessagingModalOpen, setMessagingModalOpen] = useState(false); // For teacher dashboard
+    const [isUniversalSearchOpen, setUniversalSearchOpen] = useState(false);
+    const [isFileViewerModalOpen, setFileViewerModalOpen] = useState(false);
+    const [isAnswerKeyUploadModalOpen, setAnswerKeyUploadModalOpen] = useState(false);
+
+
+    const modalMap = useRef<{[key: string]: React.Dispatch<React.SetStateAction<boolean>>}>({
+        'CreateEditTaskModal': setCreateModalOpen,
+        'AIParserModal': setAiParserModalOpen,
+        'CustomPracticeModal': setPracticeModalOpen,
+        'SettingsModal': setSettingsModalOpen,
+        'EditWeaknessesModal': setEditWeaknessesModalOpen,
+        'LogResultModal': setLogResultModalOpen,
+        'EditResultModal': setEditResultModalOpen,
+        'CreateEditExamModal': setExamModalOpen,
+        'AIMistakeAnalysisModal': setAiMistakeModalOpen,
+        'GoogleAssistantGuideModal': setAssistantGuideOpen,
+        'AIGuideModal': setAiGuideModalOpen,
+        'MoveTasksModal': setMoveModalOpen,
+        'AIChatPopup': setAiChatOpen,
+        'AIDoubtSolverModal': setAiDoubtSolverOpen,
+        'CreateEditDeckModal': setCreateDeckModalOpen,
+        'AIGenerateFlashcardsModal': setAiFlashcardModalOpen,
+        'CreateEditFlashcardModal': setCreateCardModalOpen,
+        'MusicLibraryModal': toggleLibrary, // Special case for MusicLibraryModal
+        'MessagingModal': setMessagingModalOpen,
+        'UniversalSearch': setUniversalSearchOpen,
+        'FileViewerModal': setFileViewerModalOpen,
+        'AnswerKeyUploadModal': setAnswerKeyUploadModalOpen,
+    });
+
+    const openModalHandler = useCallback((modalId: string, customOnClose?: () => void) => {
+        const setStateTrue = modalMap.current[modalId];
+        if (setStateTrue) {
+            // Special handling for MusicLibraryModal which uses a context toggle
+            if (modalId === 'MusicLibraryModal') {
+                toggleLibrary(); // Directly toggle the music library
+                // We still want it in the history stack if needed for navigation
+                openModal(modalId, () => toggleLibrary());
+            } else {
+                setStateTrue(true);
+                openModal(modalId, () => setStateTrue(false)); // Pass actual setter for history handling
+            }
+        } else {
+            console.warn(`Attempted to open unknown modal: ${modalId}`);
+        }
+    }, [openModal, toggleLibrary]);
+
+    const closeModalHandler = useCallback((modalId: string) => {
+        const setStateFalse = modalMap.current[modalId];
+        if (setStateFalse) {
+            // Special handling for MusicLibraryModal
+            if (modalId === 'MusicLibraryModal') {
+                if (isMusicLibraryOpen) toggleLibrary(); // Only toggle if it's open
+            } else {
+                setStateFalse(false);
+            }
+            // Remove from modalStack if found (should be handled by history.back())
+            const index = modalStack.current.findIndex(m => m.id === modalId);
+            if (index !== -1) {
+                modalStack.current.splice(index, 1);
+                setCurrentModalId(modalStack.current.length > 0 ? modalStack.current[modalStack.current.length - 1].id : null);
+            }
+        } else {
+            console.warn(`Attempted to close unknown modal: ${modalId}`);
+        }
+    }, [toggleLibrary, isMusicLibraryOpen]);
+
+
     const renderContent = () => {
         if (isLoading) {
             return <div className="flex items-center justify-center min-h-screen"><div className="text-xl animate-pulse">Loading...</div></div>;
         }
 
         if (isExamTypeModalOpen) {
-            return <ExamTypeSelectionModal onSelect={handleSelectExamType} />;
+            return <ExamTypeSelectionModal onClose={() => genericOnClose('ExamTypeSelectionModal', setIsExamTypeModalOpen)} onSelect={handleSelectExamType} />;
         }
 
         if (backendStatus === 'misconfigured') {
@@ -474,9 +662,42 @@ const App: React.FC = () => {
                     <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 ${useToolbarLayout || currentTrack ? 'pb-24' : ''}`}>
                         <Header user={{ name: dashboardUser.fullName, id: dashboardUser.sid, profilePhoto: dashboardUser.profilePhoto }} onLogout={logout} backendStatus={backendStatus} isSyncing={isSyncing} />
                         {userRole === 'admin' ? (
-                            <TeacherDashboard students={allStudents} onToggleUnacademySub={()=>{}} onDeleteUser={onDeleteUser} onBroadcastTask={api.broadcastTask} />
+                            <TeacherDashboard 
+                                students={allStudents} 
+                                onToggleUnacademySub={()=>{}} 
+                                onDeleteUser={onDeleteUser} 
+                                onBroadcastTask={api.broadcastTask} 
+                                openModal={openModalHandler}
+                                closeModal={closeModalHandler}
+                            />
                         ) : (
-                            <StudentDashboard student={currentUser} onSaveTask={handleSaveTask} onSaveBatchTasks={handleSaveBatchTasks} onDeleteTask={handleDeleteTask} onToggleMistakeFixed={()=>{}} onUpdateConfig={handleUpdateConfig} onLogStudySession={onLogStudySession} onUpdateWeaknesses={onUpdateWeaknesses} onLogResult={onLogResult} onAddExam={onAddExam} onUpdateExam={onUpdateExam} onDeleteExam={onDeleteExam} onExportToIcs={() => exportCalendar(currentUser.SCHEDULE_ITEMS, currentUser.EXAMS, currentUser.fullName)} onBatchImport={handleBatchImport} googleAuthStatus={googleAuthStatus} onGoogleSignIn={auth.handleSignIn} onGoogleSignOut={handleGoogleSignOut} onBackupToDrive={onBackupToDrive} onRestoreFromDrive={onRestoreFromDrive} allDoubts={allDoubts} onPostDoubt={onPostDoubt} onPostSolution={onPostSolution} deepLinkAction={deepLinkAction} />
+                            <StudentDashboard 
+                                student={currentUser} 
+                                onSaveTask={handleSaveTask} 
+                                onSaveBatchTasks={handleSaveBatchTasks} 
+                                onDeleteTask={handleDeleteTask} 
+                                onToggleMistakeFixed={()=>{}} 
+                                onUpdateConfig={handleUpdateConfig} 
+                                onLogStudySession={onLogStudySession} 
+                                onUpdateWeaknesses={onUpdateWeaknesses} 
+                                onLogResult={onLogResult} 
+                                onAddExam={onAddExam} 
+                                onUpdateExam={onUpdateExam} 
+                                onDeleteExam={onDeleteExam} 
+                                onExportToIcs={() => exportCalendar(currentUser.SCHEDULE_ITEMS, currentUser.EXAMS, currentUser.fullName)} 
+                                onBatchImport={handleBatchImport} 
+                                googleAuthStatus={googleAuthStatus} 
+                                onGoogleSignIn={auth.handleSignIn} 
+                                onGoogleSignOut={handleGoogleSignOut} 
+                                onBackupToDrive={onBackupToDrive} 
+                                onRestoreFromDrive={onRestoreFromDrive} 
+                                allDoubts={allDoubts} 
+                                onPostDoubt={onPostDoubt} 
+                                onPostSolution={onPostSolution} 
+                                deepLinkAction={deepLinkAction}
+                                openModal={openModalHandler}
+                                closeModal={closeModalHandler}
+                            />
                         )}
                     </div>
                     {currentTrack && !isFullScreenPlayerOpen && <PersistentMusicPlayer />}
@@ -489,7 +710,14 @@ const App: React.FC = () => {
                  <div style={{'--accent-color': '#0891b2'} as React.CSSProperties} className="safe-padding-left safe-padding-right safe-padding-top safe-padding-bottom">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                         <Header user={{ name: 'Admin', id: 'ADMIN_DEMO', profilePhoto: currentUser?.profilePhoto }} onLogout={logout} backendStatus={backendStatus} isSyncing={isSyncing} />
-                        <TeacherDashboard students={allStudents} onToggleUnacademySub={()=>{}} onDeleteUser={() => alert("Disabled in demo mode")} onBroadcastTask={() => alert("Disabled in demo mode")} />
+                        <TeacherDashboard 
+                            students={allStudents} 
+                            onToggleUnacademySub={()=>{}} 
+                            onDeleteUser={() => alert("Disabled in demo mode")} 
+                            onBroadcastTask={() => alert("Disabled in demo mode")}
+                            openModal={openModalHandler}
+                            closeModal={closeModalHandler}
+                        />
                     </div>
                 </div>
             );

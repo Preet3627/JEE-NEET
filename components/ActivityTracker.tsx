@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { ActivityData } from '../types';
 import { useLocalization } from '../context/LocalizationContext';

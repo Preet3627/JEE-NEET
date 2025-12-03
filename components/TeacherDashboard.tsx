@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { StudentData, ScheduleItem, HomeworkData, ScheduleCardData } from '../types';
 import Icon from './Icon';
@@ -14,9 +15,11 @@ interface TeacherDashboardProps {
     onDeleteUser: (sid: string) => void;
     onAddTeacher?: (teacherData: any) => void;
     onBroadcastTask: (task: ScheduleItem, examType: 'JEE' | 'NEET' | 'ALL') => void;
+    openModal: (modalId: string, onCloseCallback: () => void) => void; // New prop
+    closeModal: (modalId: string) => void; // New prop
 }
 
-const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleUnacademySub, onDeleteUser, onAddTeacher, onBroadcastTask }) => {
+const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleUnacademySub, onDeleteUser, onAddTeacher, onBroadcastTask, openModal, closeModal }) => {
     const { loginWithToken } = useAuth();
     const [activeTab, setActiveTab] = useState<'grid' | 'broadcast' | 'guide'>('grid');
     const [messagingStudent, setMessagingStudent] = useState<StudentData | null>(null);
@@ -37,6 +40,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleU
         const taskWithUniqueId = { ...task, ID: `${task.type.charAt(0)}${Date.now()}` };
         if (window.confirm(`Are you sure you want to send this task to all ${broadcastTarget} students?`)) {
             onBroadcastTask(taskWithUniqueId, broadcastTarget);
+            closeModal('CreateEditTaskModal'); // Use closeModal
             setIsBroadcastModalOpen(false);
         }
     };
@@ -103,6 +107,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleU
 
             if(window.confirm(`Broadcast ${tasksToBroadcast.length} tasks to ${broadcastTarget} students?`)) {
                 tasksToBroadcast.forEach(task => onBroadcastTask(task, broadcastTarget));
+                closeModal('AIParserModal'); // Use closeModal
                 setIsAIBroadcastModalOpen(false);
                 alert("Broadcast queued successfully.");
             }
@@ -144,14 +149,14 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleU
                 </nav>
             </div>
             <div className="mt-6">
-                {activeTab === 'grid' && <StudentGrid students={students} onToggleSub={onToggleUnacademySub} onDeleteUser={onDeleteUser} onStartMessage={setMessagingStudent} onClearData={handleClearData} onImpersonate={handleImpersonate} />}
-                {activeTab === 'broadcast' && <BroadcastManager onOpenModal={() => setIsBroadcastModalOpen(true)} onOpenAIModal={() => setIsAIBroadcastModalOpen(true)} target={broadcastTarget} setTarget={setBroadcastTarget} />}
+                {activeTab === 'grid' && <StudentGrid students={students} onToggleSub={onToggleUnacademySub} onDeleteUser={onDeleteUser} onStartMessage={(student) => { setMessagingStudent(student); openModal('MessagingModal', () => setMessagingStudent(null)); }} onClearData={handleClearData} onImpersonate={handleImpersonate} />}
+                {activeTab === 'broadcast' && <BroadcastManager onOpenModal={() => openModal('CreateEditTaskModal', () => setIsBroadcastModalOpen(false))} onOpenAIModal={() => openModal('AIParserModal', () => setIsAIBroadcastModalOpen(false))} target={broadcastTarget} setTarget={setBroadcastTarget} />}
                 {activeTab === 'guide' && <AIGuide />}
             </div>
 
-            {messagingStudent && <MessagingModal student={messagingStudent} onClose={() => setMessagingStudent(null)} isDemoMode={false} />}
-            {isBroadcastModalOpen && <CreateEditTaskModal task={null} onClose={() => setIsBroadcastModalOpen(false)} onSave={handleBroadcastSave} decks={[]} />}
-            {isAIBroadcastModalOpen && <AIParserModal onClose={() => setIsAIBroadcastModalOpen(false)} onDataReady={handleAIBroadcastSave} onPracticeTestReady={()=>{}} onOpenGuide={()=>{}} />}
+            {messagingStudent && <MessagingModal student={messagingStudent} onClose={() => closeModal('MessagingModal')} isDemoMode={false} />}
+            {isBroadcastModalOpen && <CreateEditTaskModal task={null} onClose={() => closeModal('CreateEditTaskModal')} onSave={handleBroadcastSave} decks={[]} />}
+            {isAIBroadcastModalOpen && <AIParserModal onClose={() => closeModal('AIParserModal')} onDataReady={handleAIBroadcastSave} onPracticeTestReady={()=>{}} onOpenGuide={()=>{}} />}
         </main>
     );
 };

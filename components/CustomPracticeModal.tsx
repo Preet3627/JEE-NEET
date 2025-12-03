@@ -7,12 +7,13 @@ import AIGenerateAnswerKeyModal from './AIGenerateAnswerKeyModal';
 import AIParserModal from './AIParserModal';
 import { api } from '../api/apiService';
 import { useAuth } from '../context/AuthContext';
+import { knowledgeBase } from '../data/knowledgeBase'; // Import knowledgeBase for chapters
 
 interface CustomPracticeModalProps {
   onClose: () => void;
   onSessionComplete: (duration: number, questions_solved: number, questions_skipped: number[]) => void;
   initialTask?: HomeworkData | null;
-  aiPracticeTest?: { questions: PracticeQuestion[], answers: Record<string, string> } | null;
+  aiPracticeTest?: { questions: PracticeQuestion[], answers: Record<string, string | string[]> } | null;
   aiInitialTopic?: string | null;
   defaultPerQuestionTime: number;
   onLogResult: (result: ResultData) => void;
@@ -22,23 +23,37 @@ interface CustomPracticeModalProps {
   animationOrigin?: { x: string, y: string };
 }
 
-const parseAnswers = (text: string): Record<string, string> => {
-  const answers: Record<string, string> = {};
+const parseAnswers = (text: string): Record<string, string | string[]> => {
+  const answers: Record<string, string | string[]> = {};
   if (!text) return answers;
 
-  if (/[:=,;\n]/.test(text)) {
+  // Attempt to parse as full JSON first for arrays
+  try {
+    const jsonAttempt = JSON.parse(text);
+    if (typeof jsonAttempt === 'object' && jsonAttempt !== null && !Array.isArray(jsonAttempt)) {
+      // Validate that all values are string or string[]
+      const isValidJson = Object.values(jsonAttempt).every(
+        val => typeof val === 'string' || (Array.isArray(val) && val.every(item => typeof item === 'string'))
+      );
+      if (isValidJson) return jsonAttempt;
+    }
+  } catch (e) {
+    // Not a direct JSON object, proceed with simpler parsing
+  }
+
+  // Check for key-value pair format (e.g., "1:A, 2:C")
+  if (/[:=,;\n]/.test(text) && !text.includes(' ') ) { // Added !text.includes(' ') to differentiate from space separated list
     const entries = text.split(/[,;\n]/);
     entries.forEach(entry => {
-      const parts = entry.split(/[:=]/);
+      const parts = entry.split(/[:=]/); // Allow : or = as separator
       if (parts.length === 2) {
         const qNum = parts[0].trim();
         const answer = parts[1].trim();
-        if (qNum && answer) {
-          answers[qNum] = answer;
-        }
+        if (qNum && answer) answers[qNum] = answer;
       }
     });
   } else {
+    // Assume space-separated list for questions 1, 2, 3... (e.g., "A C 12.5")
     const answerList = text.trim().split(/\s+/);
     answerList.forEach((answer, index) => {
       if (answer) answers[(index + 1).toString()] = answer;
@@ -47,6 +62,17 @@ const parseAnswers = (text: string): Record<string, string> => {
   return answers;
 };
 
+
+// Helper to format answers back to a displayable string
+const formatAnswers = (answers?: Record<string, string | string[]>): string => {
+  if (!answers) return '';
+  return Object.entries(answers).map(([q, a]) => {
+    if (Array.isArray(a)) {
+      return `${q}:[${a.join(',')}]`;
+    }
+    return `${q}:${a}`;
+  }).join('\n');
+};
 
 export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) => {
   const { onClose, onSessionComplete, initialTask, aiPracticeTest, aiInitialTopic, defaultPerQuestionTime, onLogResult, student, onUpdateWeaknesses, onSaveTask, animationOrigin } = props;
@@ -66,6 +92,10 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
   const [aiTopic, setAiTopic] = useState(aiInitialTopic || '');
   const [aiNumQuestions, setAiNumQuestions] = useState(aiInitialTopic ? 5 : 10);
   const [aiDifficulty, setAiDifficulty] = useState('Medium');
+  const [aiQuestionTypes, setAiQuestionTypes] = useState<('MCQ' | 'NUM' | 'MULTI_CHOICE')[]>(['MCQ']);
+  const [aiIsPYQ, setAiIsPYQ] = useState(false);
+  const [aiPYQChapters, setAiPYQChapters] = useState<string[]>([]);
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -73,7 +103,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
   const [isTimerStarted, setIsTimerStarted] = useState(false);
   const [practiceMode, setPracticeMode] = useState<'custom' | 'jeeMains'>('custom');
   const [practiceQuestions, setPracticeQuestions] = useState<PracticeQuestion[] | null>(null);
-  const [practiceAnswers, setPracticeAnswers] = useState<Record<string, string> | null>(null);
+  const [practiceAnswers, setPracticeAnswers] = useState<Record<string, string | string[]> | null>(null);
 
   const [isExiting, setIsExiting] = useState(false);
   const [isAiKeyModalOpen, setIsAiKeyModalOpen] = useState(false);
@@ -81,8 +111,21 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
   const fileInputRef = useRef<HTMLInputElement>(null);
   const jeeMainsFileInputRef = useRef<HTMLInputElement>(null);
 
+
   const questionNumbers = useMemo(() => getQuestionNumbersFromRanges(qRanges), [qRanges]);
   const totalQuestions = questionNumbers.length;
+
+  // Determine available chapters based on selected subject
+  const availableChapters = useMemo(() => {
+    const subjectKey = subject.toUpperCase() as keyof typeof knowledgeBase;
+    if (knowledgeBase[subjectKey]) {
+      const content = knowledgeBase[subjectKey];
+      // Simple regex to extract chapter-like headings (lines starting with **)
+      const chapterMatches = content.match(/\*\*([^*:]+):\*\*/g);
+      return chapterMatches ? chapterMatches.map(match => match.replace(/\*\*|:\*\*/g, '').trim()) : [];
+    }
+    return [];
+  }, [subject]);
 
   const handleStart = async () => {
     setError('');
@@ -114,7 +157,15 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
 
     setIsLoading(true);
     try {
-      const result = await api.generatePracticeTest({ topic: aiTopic, numQuestions: aiNumQuestions, difficulty: aiDifficulty });
+      // FIX: Pass new AI generation parameters
+      const result = await api.generatePracticeTest({
+        topic: aiTopic,
+        numQuestions: aiNumQuestions,
+        difficulty: aiDifficulty,
+        questionTypes: aiQuestionTypes, // NEW
+        isPYQ: aiIsPYQ, // NEW
+        chapters: aiPYQChapters, // NEW
+      });
       if (result.questions && result.answers) {
         setPracticeMode('custom');
         setPracticeQuestions(result.questions);
@@ -164,10 +215,8 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
       try {
         const txt = evt.target?.result as string;
         const json = JSON.parse(txt);
-        if (typeof json !== 'object' || json === null || Array.isArray(json)) {
-          throw new Error();
-        }
-        const formatted = Object.entries(json).map(([q, a]) => `${q}:${a}`).join('\n');
+        // Using parseAnswers to handle both string and string[]
+        const formatted = formatAnswers(parseAnswers(JSON.stringify(json))); 
         setCorrectAnswersText(formatted);
       } catch {
         alert("Invalid JSON file.");
@@ -184,10 +233,8 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
       try {
         const txt = evt.target?.result as string;
         const json = JSON.parse(txt);
-        if (typeof json !== 'object' || json === null || Array.isArray(json)) {
-          throw new Error();
-        }
-        const formatted = Object.entries(json).map(([q, a]) => `${q}:${a}`).join('\n');
+        // Using parseAnswers to handle both string and string[]
+        const formatted = formatAnswers(parseAnswers(JSON.stringify(json)));
         setJeeMainsCorrectAnswersText(formatted);
       } catch {
         alert("Invalid JSON file.");
@@ -201,6 +248,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
     if (data.practice_test && data.practice_test.questions && data.practice_test.answers) {
       let parsedAnswers = data.practice_test.answers;
 
+      // Ensure answers are correctly parsed if they come as a stringified JSON
       if (typeof parsedAnswers === 'string' && parsedAnswers.trim().startsWith('{')) {
         try {
           parsedAnswers = JSON.parse(parsedAnswers);
@@ -214,7 +262,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
       setPracticeMode('custom');
       setPracticeQuestions(data.practice_test.questions);
       setPracticeAnswers(parsedAnswers);
-      setCategory('Imported Test');
+      setCategory('AI Imported Test');
       setSubject('MIXED');
       setIsTimerStarted(true);
     } else {
@@ -238,6 +286,18 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
     return parseAnswers(correctAnswersText);
   }, [correctAnswersText, jeeMainsCorrectAnswersText, initialTask, activeTab]);
 
+  const handleQuestionTypeChange = (type: 'MCQ' | 'NUM' | 'MULTI_CHOICE', isChecked: boolean) => {
+    setAiQuestionTypes(prev => 
+      isChecked ? [...prev, type] : prev.filter(t => t !== type)
+    );
+  };
+
+  const handlePYQChapterChange = (chapter: string, isChecked: boolean) => {
+    setAiPYQChapters(prev => 
+      isChecked ? [...prev, chapter] : prev.filter(c => c !== chapter)
+    );
+  };
+
   return (
     <>
       <div
@@ -252,9 +312,9 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
           {theme === 'liquid-glass' && (
             <div className="flex-shrink-0 flex items-center p-3 border-b border-[var(--glass-border)]">
               <div className="flex gap-2">
-                <button onClick={handleClose} className="w-3 h-3 bg-red-500 rounded-full"></button>
-                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <button onClick={handleClose} className="w-3 h-3 rounded-full bg-red-500"></button>
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
               </div>
               <h2 className="text-sm text-white font-semibold text-center flex-grow -ml-12">
                 Practice Session
@@ -390,7 +450,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
                           value={correctAnswersText}
                           onChange={(e) => setCorrectAnswersText(e.target.value)}
                           className="w-full h-20 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 mt-1"
-                          placeholder="1:A, 2:C, 3:12.5 OR A C 12.5"
+                          placeholder='1:A, 2:C, 3:12.5 OR 1:["A","C"]' // Updated placeholder
                         />
                       </div>
                     )}
@@ -409,6 +469,21 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
                         className="w-full px-3 py-2 mt-1 text-gray-200 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
                         placeholder="e.g., Rotational Motion"
                       />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-bold text-gray-400">Subject</label>
+                      <select 
+                        value={subject} 
+                        onChange={e => setSubject(e.target.value)} 
+                        className="w-full px-3 py-2 mt-1 text-gray-200 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg"
+                      >
+                        <option value="PHYSICS">Physics</option>
+                        <option value="CHEMISTRY">Chemistry</option>
+                        <option value="MATHS">Maths</option>
+                        {student.CONFIG.settings.examType === 'NEET' && <option value="BIOLOGY">Biology</option>}
+                        <option value="MIXED">Mixed</option>
+                      </select>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -435,6 +510,47 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
                         </select>
                       </div>
                     </div>
+
+                    {/* Question Type Selection */}
+                    <div>
+                      <label className="text-sm font-bold text-gray-400 mb-1 block">Question Types</label>
+                      <div className="flex flex-wrap gap-3 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg p-3">
+                        <label className="flex items-center text-sm text-gray-300">
+                          <input type="checkbox" checked={aiQuestionTypes.includes('MCQ')} onChange={e => handleQuestionTypeChange('MCQ', e.target.checked)} className="w-4 h-4 rounded text-cyan-600 bg-gray-700 border-gray-600 focus:ring-cyan-500 mr-2" />
+                          MCQ
+                        </label>
+                        <label className="flex items-center text-sm text-gray-300">
+                          <input type="checkbox" checked={aiQuestionTypes.includes('NUM')} onChange={e => handleQuestionTypeChange('NUM', e.target.checked)} className="w-4 h-4 rounded text-cyan-600 bg-gray-700 border-gray-600 focus:ring-cyan-500 mr-2" />
+                          Numerical
+                        </label>
+                        <label className="flex items-center text-sm text-gray-300">
+                          <input type="checkbox" checked={aiQuestionTypes.includes('MULTI_CHOICE')} onChange={e => handleQuestionTypeChange('MULTI_CHOICE', e.target.checked)} className="w-4 h-4 rounded text-cyan-600 bg-gray-700 border-gray-600 focus:ring-cyan-500 mr-2" />
+                          Multiple Correct
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* PYQ Selection */}
+                    <div>
+                      <label className="flex items-center text-sm font-bold text-gray-400">
+                        <input type="checkbox" checked={aiIsPYQ} onChange={e => setAiIsPYQ(e.target.checked)} className="w-4 h-4 rounded text-cyan-600 bg-gray-700 border-gray-600 focus:ring-cyan-500 mr-2" />
+                        Include Previous Year Questions (PYQs)
+                      </label>
+                      {aiIsPYQ && availableChapters.length > 0 && (
+                        <div className="mt-2 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg p-3 max-h-32 overflow-y-auto">
+                          <p className="text-xs font-bold text-gray-400 mb-2">Focus on Chapters:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {availableChapters.map(chapter => (
+                              <label key={chapter} className="flex items-center text-xs text-gray-300 bg-gray-800 px-2 py-1 rounded-full">
+                                <input type="checkbox" checked={aiPYQChapters.includes(chapter)} onChange={e => handlePYQChapterChange(chapter, e.target.checked)} className="w-3 h-3 rounded text-cyan-600 bg-gray-700 border-gray-600 focus:ring-cyan-500 mr-1" />
+                                {chapter}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                   </div>
                 )}
 
@@ -493,7 +609,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
                         value={jeeMainsCorrectAnswersText}
                         onChange={(e) => setJeeMainsCorrectAnswersText(e.target.value)}
                         className="w-full h-20 bg-gray-900/70 border border-[var(--glass-border)] rounded-lg p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 mt-1"
-                        placeholder="Provide answers for instant feedback..."
+                        placeholder='1:A, 2:C, 3:12.5 OR 1:["A","C"]' // Updated placeholder
                       />
                     </div>
                   </div>
@@ -514,7 +630,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
 
                   <button
                     onClick={handleStart}
-                    disabled={isLoading || (activeTab === 'manual' && totalQuestions === 0)}
+                    disabled={isLoading || (activeTab === 'manual' && totalQuestions === 0) || (activeTab === 'ai' && aiQuestionTypes.length === 0)}
                     className="flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-[var(--accent-color)] to-[var(--gradient-purple)] text-white hover:opacity-90 disabled:opacity-50"
                   >
                     {isLoading ? (

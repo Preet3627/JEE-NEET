@@ -8,7 +8,7 @@ import { ResultData, StudentData, HomeworkData, ScheduleItem, ScheduleCardData, 
 import TestAnalysisReport from './TestAnalysisReport';
 import SpecificMistakeAnalysisModal from './SpecificMistakeAnalysisModal';
 import MusicVisualizerWidget from './widgets/MusicVisualizerWidget';
-import { useMusicPlayer } from '../context/MusicPlayerContext';
+import { useMusicPlayer } from '../context/MusicPlayerContext'; // Import useMusicPlayer
 
 type PracticeMode = 'custom' | 'jeeMains';
 
@@ -25,13 +25,18 @@ interface McqTimerProps {
   category: string;
   syllabus: string;
   student: StudentData;
-  correctAnswers?: Record<string, string>;
+  // FIX: Updated correctAnswers type to allow string or string[]
+  correctAnswers?: Record<string, string | string[]>; // Modified to accept string or array of strings
   onSaveTask?: (task: ScheduleItem) => void;
   initialTask?: HomeworkData | null;
 }
 
-const normalizeAnswer = (answer?: string): string => {
+// FIX: Updated normalizeAnswer to accept string | string[]
+const normalizeAnswer = (answer?: string | string[]): string | string[] => {
     if (!answer) return '';
+    if (Array.isArray(answer)) {
+        return answer.map(a => a.toUpperCase().trim()).sort();
+    }
     const upperAnswer = answer.toUpperCase().trim();
     switch (upperAnswer) {
         case '1': return 'A';
@@ -42,6 +47,7 @@ const normalizeAnswer = (answer?: string): string => {
     }
 };
 
+
 const McqTimer: React.FC<McqTimerProps> = (props) => {
     const { 
         questionNumbers, questions, perQuestionTime, onClose, onSessionComplete, 
@@ -49,12 +55,13 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
         syllabus, student, correctAnswers, onSaveTask, initialTask 
     } = props;
 
-    const { isPlaying, play, pause, currentTrack, nextTrack } = useMusicPlayer();
+    const { isPlaying, play, pause, currentTrack, nextTrack } = useMusicPlayer(); // Use music player context
 
     const [isActive, setIsActive] = useState(false);
     const [totalSeconds, setTotalSeconds] = useState(practiceMode === 'jeeMains' ? 180 * 60 : perQuestionTime * questionNumbers.length);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-    const [answers, setAnswers] = useState<Record<number, string>>({});
+    // FIX: Updated answers state to allow string or string[]
+    const [answers, setAnswers] = useState<Record<number, string | string[]>>({}); // Updated to string | string[]
     const [timings, setTimings] = useState<Record<number, number>>({});
     const [markedForReview, setMarkedForReview] = useState<number[]>([]);
     const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
@@ -64,7 +71,8 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
     const [testResult, setTestResult] = useState<ResultData | null>(null);
     const [gradingError, setGradingError] = useState('');
     const [isGrading, setIsGrading] = useState(false);
-    const [feedback, setFeedback] = useState<{ status: 'correct' | 'incorrect' | 'answered', correctAnswer?: string } | null>(null);
+    // FIX: Updated feedback state to allow string or string[] for correctAnswer
+    const [feedback, setFeedback] = useState<{ status: 'correct' | 'incorrect' | 'answered', correctAnswer?: string | string[] } | null>(null);
     const [isNavigating, setIsNavigating] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     
@@ -98,16 +106,21 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
     };
 
     const getQuestionInfo = useCallback((index: number) => {
-        if (practiceMode !== 'jeeMains') {
-            return { subject, type: 'MCQ' as 'MCQ' | 'NUM' };
+        // If questions array is provided, use its type. Otherwise, fallback logic.
+        if (questions && questions[index]) {
+            return { subject: subject, type: questions[index].type };
         }
+        if (practiceMode !== 'jeeMains') {
+            return { subject, type: 'MCQ' as 'MCQ' | 'NUM' | 'MULTI_CHOICE' };
+        }
+        // JEE Mains specific question type distribution (example, adjust as needed)
         if (index < 20) return { subject: 'Physics', type: 'MCQ' as const };
         if (index < 25) return { subject: 'Physics', type: 'NUM' as const };
         if (index < 45) return { subject: 'Chemistry', type: 'MCQ' as const };
         if (index < 50) return { subject: 'Chemistry', type: 'NUM' as const };
         if (index < 70) return { subject: 'Maths', type: 'MCQ' as const };
         return { subject: 'Maths', type: 'NUM' as const };
-    }, [practiceMode, subject]);
+    }, [practiceMode, subject, questions]);
 
 
     const gradeTest = useCallback(() => {
@@ -121,17 +134,36 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
         questionNumbers.forEach((qNum, index) => {
             const userAnswer = answers[qNum];
             const correctAnswer = correctAnswers[qNum.toString()];
+            const questionType = currentQuestion?.type || getQuestionInfo(index).type; // Get question type
     
-            if (userAnswer && normalizeAnswer(userAnswer) === normalizeAnswer(correctAnswer)) {
-                score += 4;
-            } else if (userAnswer) { // Answered but incorrect
+            if (!userAnswer) { // Skipped or not answered
                 incorrectQuestionNumbers.push(qNum);
-                if (practiceMode === 'jeeMains') {
-                    const info = getQuestionInfo(index);
-                    if (info.type === 'MCQ') {
-                        score -= 1;
-                    }
-                } else {
+                // Do not deduct for skipped numerical/multi-choice, only for MCQ as per JEE standard
+                if (questionType === 'MCQ' && practiceMode === 'jeeMains') { // Only deduct if MCQ in JEE Mains
+                    score -= 1;
+                }
+                return;
+            }
+
+            const normalizedUserAnswer = normalizeAnswer(userAnswer);
+            const normalizedCorrectAnswer = normalizeAnswer(correctAnswer);
+    
+            let isCorrect = false;
+            if (questionType === 'MULTI_CHOICE') {
+                // For multiple correct, both should be arrays. Compare sorted arrays.
+                if (Array.isArray(normalizedUserAnswer) && Array.isArray(normalizedCorrectAnswer)) {
+                    isCorrect = JSON.stringify(normalizedUserAnswer) === JSON.stringify(normalizedCorrectAnswer);
+                }
+            } else { // MCQ or NUM
+                isCorrect = normalizedUserAnswer === normalizedCorrectAnswer;
+            }
+    
+            if (isCorrect) {
+                score += 4;
+            } else { // Answered but incorrect
+                incorrectQuestionNumbers.push(qNum);
+                // Deduct 1 mark only for MCQs in JEE Mains. Numerical/Multi-choice usually no negative.
+                if (questionType === 'MCQ' && practiceMode === 'jeeMains') { 
                     score -= 1;
                 }
             }
@@ -148,7 +180,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
         
         setTestResult(newResult);
         if (onLogResult) onLogResult(newResult);
-    }, [answers, correctAnswers, questionNumbers, practiceMode, syllabus, timings, onLogResult, getQuestionInfo]);
+    }, [answers, correctAnswers, questionNumbers, practiceMode, syllabus, timings, onLogResult, getQuestionInfo, currentQuestion]);
     
 
     useEffect(() => {
@@ -163,7 +195,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
         setIsActive(false);
         setIsFinished(true);
         const duration = sessionStartTime ? Math.round((Date.now() - sessionStartTime) / 1000) : 0;
-        const solved = Object.keys(answers).filter(k => answers[parseInt(k)] !== '');
+        const solved = Object.keys(answers).filter(k => answers[parseInt(k)] !== '' && (Array.isArray(answers[parseInt(k)]) ? answers[parseInt(k)]?.length > 0 : true));
         const skipped = questionNumbers.filter(q => !solved.includes(q.toString()));
         onSessionComplete(duration, solved.length, skipped);
     }, [isFinished, sessionStartTime, answers, questionNumbers, onSessionComplete]);
@@ -192,17 +224,20 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
         setIsActive(true);
     };
 
-    const handleAnswerSelect = (answer: string) => {
-        if (isNavigating || (feedback && practiceMode !== 'jeeMains')) return;
+    const handleAnswerInput = (value: string | string[]) => {
+        if (isNavigating || (feedback && practiceMode !== 'jeeMains')) return; // No input if feedback is shown in quick practice
 
         playNextSound();
-        setAnswers(prev => ({ ...prev, [currentQuestionNumber]: answer }));
 
-        if (practiceMode === 'jeeMains') return;
+        // For MULTI_CHOICE, value is already an array of selected options
+        setAnswers(prev => ({ ...prev, [currentQuestionNumber]: value }));
+
+        if (practiceMode === 'jeeMains') return; // No instant feedback in JEE Mains mode
 
         if (correctAnswers) {
             const correctAnswer = correctAnswers[currentQuestionNumber.toString()];
-            const isCorrect = normalizeAnswer(answer) === normalizeAnswer(correctAnswer);
+            // FIX: Ensure normalizeAnswer can handle string | string[] for both arguments
+            const isCorrect = normalizeAnswer(value) === normalizeAnswer(correctAnswer);
             setFeedback({
                 status: isCorrect ? 'correct' : 'incorrect',
                 correctAnswer: correctAnswer,
@@ -220,8 +255,9 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
                     const reattemptTask: ScheduleCardData = {
                         ID: `A${Date.now()}${currentQuestionNumber}`, type: 'ACTION', isUserCreated: true,
                         DAY: { EN: nextDay, GU: '' }, TIME: '21:00',
+                        // FIX: Cast correctAnswer to string if it's an array for the FOCUS_DETAIL.
+                        FOCUS_DETAIL: { EN: `You got this question wrong. Try solving it again. Correct answer was: ${Array.isArray(correctAnswer) ? correctAnswer.join(', ') : correctAnswer}.`, GU: '' },
                         CARD_TITLE: { EN: `[RE-ATTEMPT] Q.${currentQuestionNumber} of: ${initialTask.CARD_TITLE.EN}`, GU: '' },
-                        FOCUS_DETAIL: { EN: `You got this question wrong. Try solving it again. Correct answer was: ${correctAnswer}.`, GU: '' },
                         SUBJECT_TAG: initialTask.SUBJECT_TAG, SUB_TYPE: 'ANALYSIS'
                     };
                     onSaveTask(reattemptTask);
@@ -278,7 +314,19 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
         setIsGrading(true);
         setGradingError('');
         try {
-            const resultAnalysis = await api.analyzeTestResults({ imageBase64, userAnswers: answers, timings, syllabus });
+            // Convert answers to a compatible format for the API if needed
+            const userAnswersForApi: Record<string, string | string[]> = {};
+            for (const qNum in answers) {
+                const answer = answers[qNum];
+                if (Array.isArray(answer)) {
+                    userAnswersForApi[qNum] = answer.sort().join(','); // Send multi-choice as comma-separated string
+                } else {
+                    userAnswersForApi[qNum] = answer;
+                }
+            }
+
+            // FIX: Pass userAnswersForApi to api.analyzeTestResults
+            const resultAnalysis = await api.analyzeTestResults({ imageBase64, userAnswers: userAnswersForApi, timings, syllabus });
             
             const newResult: ResultData = {
               ID: `R${Date.now()}`,
@@ -306,15 +354,19 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
     };
 
     const currentQuestionType = useMemo(() => {
+        if (currentQuestion) return currentQuestion.type;
+        // Fallback if `questions` array is not provided (e.g., manual JEE Mains mode)
         if (correctAnswers && correctAnswers[currentQuestionNumber.toString()]) {
-            const answer = normalizeAnswer(correctAnswers[currentQuestionNumber.toString()]);
-            return ['A', 'B', 'C', 'D'].includes(answer) ? 'MCQ' : 'NUM';
+            const answer = correctAnswers[currentQuestionNumber.toString()];
+            if (Array.isArray(answer)) return 'MULTI_CHOICE';
+            // Simple check: if answer contains only A-D, it's likely MCQ. Otherwise, NUM.
+            return ['A', 'B', 'C', 'D'].includes(answer.toUpperCase().trim()) ? 'MCQ' : 'NUM';
         }
         if (practiceMode === 'jeeMains') {
             return getQuestionInfo(currentQuestionIndex).type;
         }
-        return 'MCQ';
-    }, [correctAnswers, currentQuestionIndex, practiceMode, currentQuestionNumber, getQuestionInfo]);
+        return 'MCQ'; // Default to MCQ
+    }, [currentQuestion, correctAnswers, currentQuestionNumber, practiceMode, currentQuestionIndex, getQuestionInfo]);
 
 
     const { subject: currentSubject } = getQuestionInfo(currentQuestionIndex);
@@ -325,8 +377,8 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
               {/* MacOS Traffic Light Header */}
               <div className="flex items-center gap-2 px-4 py-3 mb-6 border-b border-white/10 bg-black/20 rounded-t-lg -mt-4 -mx-4">
                     <button onClick={onClose} className="w-3 h-3 rounded-full bg-[#ff5f56] hover:bg-[#ff5f56]/80 shadow-inner"></button>
-                    <div className="w-3 h-3 rounded-full bg-[#ffbd2e] shadow-inner"></div>
-                    <div className="w-3 h-3 rounded-full bg-[#27c93f] shadow-inner"></div>
+                    <div className="w-3 h-3 rounded-full bg-[#ffbd2e] hover:bg-[#ffbd2e]/80 shadow-inner"></div>
+                    <div className="w-3 h-3 rounded-full bg-[#27c93f] hover:bg-[#27c93f]/80 shadow-inner"></div>
                     <span className="ml-2 text-xs font-medium text-gray-400 tracking-wide">Timer Ready</span>
               </div>
 
@@ -346,8 +398,8 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
                 {/* MacOS Traffic Light Header */}
                 <div className="flex items-center gap-2 px-4 py-3 mb-4 border-b border-white/10 bg-black/20 rounded-t-lg -mt-4 -mx-4">
                     <button onClick={onClose} className="w-3 h-3 rounded-full bg-[#ff5f56] hover:bg-[#ff5f56]/80 shadow-inner"></button>
-                    <div className="w-3 h-3 rounded-full bg-[#ffbd2e] shadow-inner"></div>
-                    <div className="w-3 h-3 rounded-full bg-[#27c93f] shadow-inner"></div>
+                    <div className="w-3 h-3 rounded-full bg-[#ffbd2e] hover:bg-[#ffbd2e]/80 shadow-inner"></div>
+                    <div className="w-3 h-3 rounded-full bg-[#27c93f] hover:bg-[#27c93f]/80 shadow-inner"></div>
                     <span className="ml-2 text-xs font-medium text-gray-400 tracking-wide">Session Report</span>
                 </div>
 
@@ -406,7 +458,8 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
     
     const getOptionClasses = (option: string) => {
         const userAnswer = answers[currentQuestionNumber];
-        const isSelected = userAnswer === option;
+        // FIX: Handle both string and string[] for isSelected check
+        const isSelected = (Array.isArray(userAnswer) && userAnswer.includes(option)) || (typeof userAnswer === 'string' && userAnswer === option);
         
         if (practiceMode === 'jeeMains') {
             if (isSelected) return 'bg-cyan-600 border-cyan-400 text-white ring-2 ring-cyan-300/50';
@@ -422,13 +475,32 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
         }
         
         const normalizedUserAnswer = normalizeAnswer(userAnswer);
-        const correctAnswer = normalizeAnswer(feedback.correctAnswer);
+        const normalizedCorrectAnswer = normalizeAnswer(feedback.correctAnswer);
         const currentOption = normalizeAnswer(option);
 
-        if (currentOption === correctAnswer) return 'bg-green-800/50 border-green-500';
-        if (currentOption === normalizedUserAnswer && normalizedUserAnswer !== correctAnswer) return 'bg-red-800/50 border-red-500';
+        if (currentQuestionType === 'MULTI_CHOICE') {
+            // For multi-choice, check if this option is in correct answers or user's incorrect selections
+            if (Array.isArray(normalizedCorrectAnswer) && normalizedCorrectAnswer.includes(currentOption)) {
+                return 'bg-green-800/50 border-green-500';
+            }
+            if (Array.isArray(normalizedUserAnswer) && normalizedUserAnswer.includes(currentOption) && !normalizedCorrectAnswer.includes(currentOption)) {
+                return 'bg-red-800/50 border-red-500';
+            }
+        } else { // MCQ
+            if (currentOption === normalizedCorrectAnswer) return 'bg-green-800/50 border-green-500';
+            if (currentOption === normalizedUserAnswer && normalizedUserAnswer !== normalizedCorrectAnswer) return 'bg-red-800/50 border-red-500';
+        }
 
         return 'bg-gray-800 border-gray-700 opacity-60';
+    };
+
+    const handleMultiChoiceToggle = (option: string) => {
+        const currentSelections = Array.isArray(answers[currentQuestionNumber]) ? (answers[currentQuestionNumber] as string[]) : [];
+        if (currentSelections.includes(option)) {
+            handleAnswerInput(currentSelections.filter(s => s !== option));
+        } else {
+            handleAnswerInput([...currentSelections, option]);
+        }
     };
   
     return (
@@ -474,31 +546,81 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
                     {currentQuestion ? (
                         <div className="text-left w-full space-y-4">
                             <p className="text-base text-gray-300 whitespace-pre-wrap leading-relaxed">{currentQuestion.text}</p>
-                            <div className="space-y-2">
-                                {currentQuestion.options.map((option, idx) => {
-                                    const optionLetter = String.fromCharCode(65 + idx); // A, B, C, D
-                                    return (
-                                        <button key={idx} onClick={() => handleAnswerSelect(optionLetter)} disabled={isNavigating || (!!feedback && practiceMode !== 'jeeMains')} className={`w-full text-left p-3 rounded-lg border-2 transition-colors flex items-start gap-3 disabled:cursor-default focus:outline-none ${getOptionClasses(optionLetter)}`}>
-                                            <span className="font-bold bg-black/20 px-2 rounded">{optionLetter}</span> 
-                                            <span>{option.replace(/^\([A-D]\)\s*/, '')}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            {currentQuestionType === 'MCQ' && (
+                                <div className="space-y-2">
+                                    {currentQuestion.options.map((option, idx) => {
+                                        const optionLetter = String.fromCharCode(65 + idx);
+                                        return (
+                                            <button key={idx} onClick={() => handleAnswerInput(optionLetter)} disabled={isNavigating || (!!feedback && practiceMode !== 'jeeMains')} className={`w-full text-left p-3 rounded-lg border-2 transition-colors flex items-start gap-3 disabled:cursor-default focus:outline-none ${getOptionClasses(optionLetter)}`}>
+                                                <span className="font-bold bg-black/20 px-2 rounded">{optionLetter}</span> 
+                                                <span>{option.replace(/^\([A-D]\)\s*/, '')}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                            {currentQuestionType === 'MULTI_CHOICE' && (
+                                <div className="space-y-2">
+                                    {currentQuestion.options.map((option, idx) => {
+                                        const optionLetter = String.fromCharCode(65 + idx);
+                                        const isChecked = Array.isArray(answers[currentQuestionNumber]) && (answers[currentQuestionNumber] as string[]).includes(optionLetter);
+                                        return (
+                                            <label key={idx} className={`w-full text-left p-3 rounded-lg border-2 transition-colors flex items-start gap-3 cursor-pointer focus:outline-none ${getOptionClasses(optionLetter)}`}>
+                                                <input type="checkbox" checked={isChecked} onChange={() => handleMultiChoiceToggle(optionLetter)} disabled={isNavigating || (!!feedback && practiceMode !== 'jeeMains')} className="w-4 h-4 rounded text-cyan-600 bg-gray-700 border-gray-600 focus:ring-cyan-500 mt-1 mr-2" />
+                                                <span className="font-bold bg-black/20 px-2 rounded">{optionLetter}</span> 
+                                                <span>{option.replace(/^\([A-D]\)\s*/, '')}</span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                            {currentQuestionType === 'NUM' && (
+                                <input 
+                                    type="text" 
+                                    value={(answers[currentQuestionNumber] as string) || ''} 
+                                    onChange={(e) => handleAnswerInput(e.target.value)} 
+                                    disabled={isNavigating || (!!feedback && practiceMode !== 'jeeMains')} 
+                                    className="w-full text-center text-2xl font-mono bg-gray-900 border border-gray-600 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-60" 
+                                    placeholder="Numerical Answer" 
+                                />
+                            )}
                         </div>
                     ) : (
+                        // Fallback for when `questions` prop is not provided (e.g. JEE Mains mode)
                         <>
                              <h2 className="text-2xl font-bold mb-6 text-white">Question {currentQuestionNumber.toString().padStart(3,'0')}</h2>
-                             {currentQuestionType === 'MCQ' ? (
+                             {currentQuestionType === 'MCQ' && (
                                  <div className="grid grid-cols-2 gap-4 w-full max-w-xs">
                                      {(['A', 'B', 'C', 'D'] as const).map(option => (
-                                         <button key={option} onClick={() => handleAnswerSelect(option)} disabled={isNavigating || (!!feedback && practiceMode !== 'jeeMains')} className={`py-3 px-6 rounded-lg font-semibold border-2 transition-colors disabled:cursor-default focus:outline-none ${getOptionClasses(option)}`}>
+                                         <button key={option} onClick={() => handleAnswerInput(option)} disabled={isNavigating || (!!feedback && practiceMode !== 'jeeMains')} className={`py-3 px-6 rounded-lg font-semibold border-2 transition-colors disabled:cursor-default focus:outline-none ${getOptionClasses(option)}`}>
                                              {option}
                                          </button>
                                      ))}
                                  </div>
-                             ) : (
-                                 <input type="text" value={answers[currentQuestionNumber] || ''} onChange={(e) => handleAnswerSelect(e.target.value)} disabled={isNavigating || (!!feedback && practiceMode !== 'jeeMains')} className="w-full max-w-xs text-center text-2xl font-mono bg-gray-900 border border-gray-600 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-60" placeholder="Numerical Answer" />
+                             )}
+                             {currentQuestionType === 'NUM' && (
+                                 <input 
+                                    type="text" 
+                                    value={(answers[currentQuestionNumber] as string) || ''} 
+                                    onChange={(e) => handleAnswerInput(e.target.value)} 
+                                    disabled={isNavigating || (!!feedback && practiceMode !== 'jeeMains')} 
+                                    className="w-full max-w-xs text-center text-2xl font-mono bg-gray-900 border border-gray-600 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-60" 
+                                    placeholder="Numerical Answer" 
+                                />
+                             )}
+                             {currentQuestionType === 'MULTI_CHOICE' && (
+                                 <div className="space-y-2">
+                                     {['A', 'B', 'C', 'D'].map((option, idx) => {
+                                         const isChecked = Array.isArray(answers[currentQuestionNumber]) && (answers[currentQuestionNumber] as string[]).includes(option);
+                                         return (
+                                             <label key={idx} className={`w-full text-left p-3 rounded-lg border-2 transition-colors flex items-start gap-3 cursor-pointer focus:outline-none ${getOptionClasses(option)}`}>
+                                                 <input type="checkbox" checked={isChecked} onChange={() => handleMultiChoiceToggle(option)} disabled={isNavigating || (!!feedback && practiceMode !== 'jeeMains')} className="w-4 h-4 rounded text-cyan-600 bg-gray-700 border-gray-600 focus:ring-cyan-500 mt-1 mr-2" />
+                                                 <span className="font-bold bg-black/20 px-2 rounded">{option}</span> 
+                                                 <span>Option {option}</span>
+                                             </label>
+                                         );
+                                     })}
+                                 </div>
                              )}
                         </>
                     )}
@@ -509,7 +631,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
             <div className="flex-shrink-0 space-y-2 pt-2 border-t border-gray-700/30">
                  <div className="flex gap-2">
                     <button onClick={() => navigate(currentQuestionIndex - 1)} disabled={isNavigating || currentQuestionIndex === 0} className="flex-1 py-2 text-sm font-semibold rounded-md bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white">Back</button>
-                    <button onClick={() => setAnswers(prev => ({...prev, [currentQuestionNumber]: ''}))} disabled={isNavigating || (!!feedback && practiceMode !== 'jeeMains')} className="flex-1 py-2 text-sm font-semibold rounded-md bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white">Clear</button>
+                    <button onClick={() => setAnswers(prev => ({...prev, [currentQuestionNumber]: (currentQuestionType === 'MULTI_CHOICE' ? [] : '')}))} disabled={isNavigating || (!!feedback && practiceMode !== 'jeeMains')} className="flex-1 py-2 text-sm font-semibold rounded-md bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white">Clear</button>
                     <button onClick={handleMarkForReview} disabled={isNavigating} className="flex-1 py-2 text-sm font-semibold rounded-md bg-yellow-600/20 text-yellow-400 border border-yellow-600/50 hover:bg-yellow-600/30 flex items-center justify-center gap-1 disabled:opacity-50">
                         <Icon name="marker" className="w-4 h-4"/> Review
                     </button>
@@ -524,7 +646,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
             {feedback && feedback.status !== 'answered' && (
                 <div className={`absolute bottom-[120px] left-1/2 -translate-x-1/2 p-3 rounded-lg text-white font-semibold text-sm shadow-lg animate-fadeIn z-20
                     ${feedback.status === 'correct' ? 'bg-green-600' : 'bg-red-600'}`}>
-                    {feedback.status === 'correct' ? 'Correct!' : `Incorrect. Answer: ${feedback.correctAnswer}.`}
+                    {feedback.status === 'correct' ? 'Correct!' : `Incorrect. Answer: ${Array.isArray(feedback.correctAnswer) ? feedback.correctAnswer.join(', ') : feedback.correctAnswer}.`}
                 </div>
             )}
             
@@ -535,7 +657,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
                         <h4 className="font-bold text-lg mb-4 text-white">Question Palette</h4>
                         <div className="grid grid-cols-5 md:grid-cols-8 gap-2">
                             {questionNumbers.map((qNum, index) => {
-                                const isAnswered = qNum in answers && answers[qNum] !== '';
+                                const isAnswered = qNum in answers && (Array.isArray(answers[qNum]) ? (answers[qNum] as string[]).length > 0 : answers[qNum] !== '');
                                 const isMarked = markedForReview.includes(qNum);
                                 const isCurrent = index === currentQuestionIndex;
 

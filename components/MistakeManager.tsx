@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ResultData } from '../types';
 import { useLocalization } from '../context/LocalizationContext';
@@ -51,7 +52,7 @@ const MistakeManager: React.FC<MistakeManagerProps> = ({ result, onToggleMistake
                             className="flex items-center bg-gray-900 p-3 rounded-md cursor-pointer transition-all hover:bg-gray-800/50"
                         >
                             <div className={`w-5 h-5 mr-3 flex-shrink-0 rounded-sm border-2 flex items-center justify-center ${isFixed ? 'bg-green-500 border-green-500' : 'border-gray-500'}`}>
-                                {isFixed && <Icon name="check" className="w-4 h-4 text-white" />}
+                                {isFixed && <Icon name="check" className="w-4 h-4" />}
                             </div>
                             <span className={`text-gray-300 ${isFixed ? 'line-through text-gray-500' : ''}`}>
                                 {mistake}

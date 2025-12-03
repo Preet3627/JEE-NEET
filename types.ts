@@ -64,7 +64,7 @@ export interface HomeworkData {
   isUserCreated?: boolean;
   isStarred?: boolean;
   googleEventId?: string;
-  answers?: Record<string, string>;
+  answers?: Record<string, string | string[]>; // Modified to accept string or array of strings
   solutions?: Record<string, string>;
   date?: string;
   practiceHistory?: PracticeHistory[];
@@ -115,7 +115,7 @@ export interface StudySession {
 export interface ExamData {
   ID: string;
   title: string;
-  subject: 'PHYSICS' | 'CHEMISTRY' | 'MATHS' | 'FULL';
+  subject: 'PHYSICS' | 'CHEMISTRY' | 'MATHS' | 'BIOLOGY' | 'FULL'; // Added BIOLOGY
   date: string;
   time: string;
   syllabus: string;
@@ -262,8 +262,9 @@ export interface StudyMaterialItem {
 export interface PracticeQuestion {
     number: number;
     text: string;
-    options: string[];
-    type: 'MCQ' | 'NUM';
+    options: string[]; // For MCQ & MULTI_CHOICE, empty for NUM
+    type: 'MCQ' | 'NUM' | 'MULTI_CHOICE'; // Added MULTI_CHOICE
+    solution?: string; // Optional detailed solution
 }
 
 export interface Track {

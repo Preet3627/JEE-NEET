@@ -76,7 +76,7 @@ const ScheduleList: React.FC<ScheduleListProps> = (props) => {
         <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl shadow-lg p-6 backdrop-blur-sm relative">
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold text-cyan-400 tracking-widest uppercase">
-                    {t({ EN: "Weekly Schedule", GU: "સાપ્ताહિક શેડ્યૂલ" })}
+                    {t({ EN: "Weekly Schedule", GU: "સાપ્તાહિક શેડ્યૂલ" })}
                 </h2>
                 <div className="flex items-center gap-2">
                     <button onClick={onToggleSelectMode} className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${isSelectMode ? 'bg-red-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>

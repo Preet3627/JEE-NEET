@@ -3,7 +3,7 @@ import { ScheduleItem, ExamData } from '../types';
 
 // Helper to format date to ICS format (YYYYMMDDTHHMMSSZ)
 const toICSDate = (date: Date): string => {
-    return date.toISOString().replace(/-|:|\.\d+/g, '');
+    return date.toISOString().replace(/-|:|\.\d+/g, '') + 'Z'; // Always use Z for UTC time
 };
 
 // Helper to get the next occurrence of a day
@@ -16,27 +16,22 @@ const getNextDateForDay = (dayString: string): Date => {
     if (targetDayIndex === undefined) return new Date();
 
     const now = new Date();
-    const currentDayIndex = now.getDay();
-    let dayDifference = targetDayIndex - currentDayIndex;
-    // If today is the day, but the time has passed, usually we want next week, 
-    // but for export, we'll stick to "next occurrence" logic which might include today if valid.
-    // For simplicity here: if diff < 0, add 7.
-    if (dayDifference < 0) dayDifference += 7;
+    // Create a date for "today" at 00:00:00 UTC to avoid local timezone issues for comparison
+    const todayUTC = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    const currentDayIndex = todayUTC.getUTCDay();
 
-    const nextDate = new Date();
-    nextDate.setDate(now.getDate() + dayDifference);
+    let dayDifference = targetDayIndex - currentDayIndex;
+    if (dayDifference < 0) dayDifference += 7; // Target day is in the next week
+
+    const nextDate = new Date(todayUTC); // Start from today's UTC date
+    nextDate.setUTCDate(todayUTC.getUTCDate() + dayDifference);
     return nextDate;
 };
 
 export const exportCalendar = (items: ScheduleItem[], exams: ExamData[], studentName: string): void => {
-    const calendarParts: string[] = [
-        'BEGIN:VCALENDAR\r\n',
-        'VERSION:2.0\r\n',
-        'PRODID:-//JEE Scheduler Pro//EN\r\n',
-        'CALSCALE:GREGORIAN\r\n',
-        'METHOD:PUBLISH\r\n',
-    ];
+    const calendarEvents: string[] = [];
 
+    // Process Schedule Items
     items
         .filter(item => 'TIME' in item && item.TIME)
         .forEach(item => {
@@ -45,24 +40,22 @@ export const exportCalendar = (items: ScheduleItem[], exams: ExamData[], student
             let startDate: Date;
             let recurrenceRule = '';
 
-            // LOGIC FIX: Only use RRULE if explicitly requested (isRecurring flag)
-            // Otherwise, export as a single event for the immediate next occurrence.
             if (timedItem.date) {
-                startDate = new Date(`${timedItem.date}T00:00:00`);
+                // If specific date, use it. Set time to 00:00:00 UTC to then set specific hours.
+                startDate = new Date(Date.UTC(new Date(timedItem.date).getFullYear(), new Date(timedItem.date).getMonth(), new Date(timedItem.date).getDate()));
             } else {
                 startDate = getNextDateForDay(timedItem.DAY.EN);
-                
-                if (timedItem.isRecurring) {
-                    // Cap recursion at 2 years max to avoid "Whole Life" infinite clutter
-                    const endDate = new Date();
-                    endDate.setFullYear(endDate.getFullYear() + 2);
-                    const untilDate = toICSDate(endDate).split('T')[0]; 
-                    recurrenceRule = `RRULE:FREQ=WEEKLY;UNTIL=${untilDate}`;
-                }
             }
             
-            startDate.setHours(hours, minutes, 0, 0);
+            startDate.setUTCHours(hours, minutes, 0, 0); // Set UTC hours/minutes
+
             const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // Default 1 hour duration
+
+            if (timedItem.isRecurring && !timedItem.date) { // Only recur if no specific date
+                const recurrenceUntil = new Date(startDate);
+                recurrenceUntil.setFullYear(recurrenceUntil.getFullYear() + 2); // 2 years max recurrence
+                recurrenceRule = `RRULE:FREQ=WEEKLY;UNTIL=${toICSDate(recurrenceUntil)}`;
+            }
 
             const summary = timedItem.CARD_TITLE.EN.replace(/,/g, '\\,').replace(/;/g, '\\;');
             
@@ -106,15 +99,16 @@ export const exportCalendar = (items: ScheduleItem[], exams: ExamData[], student
             }
 
             eventParts.push('END:VEVENT');
-            calendarParts.push(eventParts.join('\r\n') + '\r\n');
+            calendarEvents.push(eventParts.join('\r\n') + '\r\n');
         });
     
-    // Exams Logic
+    // Process Exams Logic
     exams.forEach(exam => {
         const [hours, minutes] = exam.time.split(':').map(Number);
-        const startDate = new Date(`${exam.date}T00:00:00`);
-        startDate.setHours(hours, minutes, 0, 0);
-        const endDate = new Date(startDate.getTime() + 3 * 60 * 60 * 1000);
+        // Set to 00:00:00 UTC then apply hours/minutes
+        const startDate = new Date(Date.UTC(new Date(exam.date).getFullYear(), new Date(exam.date).getMonth(), new Date(exam.date).getDate()));
+        startDate.setUTCHours(hours, minutes, 0, 0); // Set UTC hours/minutes
+        const endDate = new Date(startDate.getTime() + 3 * 60 * 60 * 1000); // Default 3 hours for exam
         
         const summary = `EXAM: ${exam.title}`.replace(/,/g, '\\,').replace(/;/g, '\\;');
         const appLink = 'https://jee.ponsrischool.in/?action=view_exams';
@@ -136,10 +130,18 @@ export const exportCalendar = (items: ScheduleItem[], exams: ExamData[], student
             'END:VALARM',
             'END:VEVENT'
         ];
-        calendarParts.push(eventParts.join('\r\n') + '\r\n');
+        calendarEvents.push(eventParts.join('\r\n') + '\r\n');
     });
 
-    calendarParts.push('END:VCALENDAR\r\n');
+    const calendarParts: string[] = [
+        'BEGIN:VCALENDAR\r\n',
+        'VERSION:2.0\r\n',
+        'PRODID:-//JEE Scheduler Pro//EN\r\n',
+        'CALSCALE:GREGORIAN\r\n',
+        'METHOD:PUBLISH\r\n',
+        ...calendarEvents, // Add all generated events
+        'END:VCALENDAR\r\n'
+    ];
     
     try {
         const blob = new Blob(calendarParts, { type: 'text/calendar;charset=utf-8;' });

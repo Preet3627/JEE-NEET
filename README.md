@@ -1,3 +1,4 @@
+
 # JEE Scheduler Pro - Full Stack Edition
 
 This is a secure, multilingual (EN/GU), full-stack Student Management System (SMS) PWA tailored for JEE preparation. It features a robust Node.js backend with a MySQL database and a modern React frontend.
@@ -9,9 +10,9 @@ This is a secure, multilingual (EN/GU), full-stack Student Management System (SM
 - **PWA with Offline Sync:** As an installable PWA, the app caches data for offline viewing. Any changes made offline are queued and automatically synced with the server upon reconnection.
 - **Google Integration:** Seamless Google Sign-In/Sign-Up, with features for backing up data to Google Drive and syncing schedules with Google Calendar.
 - **Admin Broadcast:** Administrators can create and broadcast tasks (schedules, homework) to all students simultaneously, with PWA notifications for users.
-- **Community Hub:** A collaborative forum where students can post questions and solutions, with support for image uploads.
 - **AI-Powered Imports:** Leverage the Gemini API to parse schedules from unstructured text or timetable images directly into the app.
 - **Secure & Configurable:** All sensitive keys and credentials are managed on the backend via environment variables, ensuring the frontend code is secure. User data is encrypted at rest.
+- **Nextcloud Integration:** Seamlessly browse and play music from a private Nextcloud instance or access study materials (PDFs, notes) directly within the app.
 
 ## Tech Stack
 
@@ -19,12 +20,16 @@ This is a secure, multilingual (EN/GU), full-stack Student Management System (SM
 - **Backend:** Node.js, Express.js
 - **Database:** MySQL
 - **Authentication:** JWT (JSON Web Tokens), Google OAuth2
+- **Cloud Storage:** Nextcloud (via WebDAV)
+- **AI:** Google Gemini API
 
 ## Project Setup (Local Development)
 
 1.  **Clone the repository.**
 2.  **Setup Database:** Import the provided SQL schema into your MySQL database.
 3.  **Configure Environment:** Create a `.env` file in the project root. You can copy the contents from `public/.env.example.txt` and fill in your actual database credentials and secret strings.
+    **🚨 IMPORTANT NOTE FOR NEXTCLOUD/WEBDAV 🚨**
+    For the "Study Material" and "Music Player" features to work, you **MUST** fully configure all `NEXTCLOUD_URL`, `NEXTCLOUD_SHARE_TOKEN`, `NEXTCLOUD_SHARE_PASSWORD`, `NEXTCLOUD_MUSIC_SHARE_TOKEN`, and `NEXTCLOUD_MUSIC_SHARE_PASSWORD` variables in your `.env` file. These are essential for connecting to your Nextcloud instance via WebDAV. If they are not set correctly, these features will appear as "Service Unavailable" in the app.
 4.  **Install Dependencies:**
     ```bash
     npm install
@@ -53,5 +58,13 @@ This project is configured for seamless deployment on Vercel.
     - `DB_NAME`: Your MySQL database name.
     - `JWT_SECRET`: A long, random, secure string for signing tokens.
     - `ENCRYPTION_KEY`: A secure, random 32-character string for data encryption. **Do not change this after setting it.**
-
+    - `API_KEY`: Your Google Gemini API Key.
+    - `GOOGLE_CLIENT_ID`: Your Google Cloud Console client ID for OAuth.
+    - `GOOGLE_CLIENT_SECRET`: Your Google Cloud Console client secret for OAuth.
+    - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`: (Optional) Your email server settings for password resets.
+    - `NEXTCLOUD_URL`: Your Nextcloud instance URL (e.g., `https://cloud.example.com`).
+    - `NEXTCLOUD_SHARE_TOKEN`: WebDAV share token for study materials.
+    - `NEXTCLOUD_SHARE_PASSWORD`: Password for the study materials WebDAV share.
+    - `NEXTCLOUD_MUSIC_SHARE_TOKEN`: WebDAV share token for music.
+    - `NEXTCLOUD_MUSIC_SHARE_PASSWORD`: Password for the music WebDAV share.
 5.  **Deploy:** Trigger a new deployment from the Vercel dashboard. Vercel will build the frontend and set up the `api/index.js` file as a Serverless Function to handle all `/api` requests.

@@ -26,9 +26,10 @@ const StudyMaterialView: React.FC<StudyMaterialViewProps> = ({ student, onUpdate
       try {
         const data = await api.getStudyMaterial(path);
         setItems(data);
+        setError(''); // Clear error if successful
       } catch (err: any) {
-        setError(err.error || 'Failed to load study materials. The repository may not be configured by the administrator.');
-        console.error(err);
+        console.error("Failed to load study materials:", err);
+        setError(err.error || 'Failed to load study materials. Please ensure Nextcloud WebDAV is configured correctly in your server\'s .env file.');
       } finally {
         setIsLoading(false);
       }

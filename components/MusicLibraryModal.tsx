@@ -16,6 +16,7 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
     const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState({ title: '', artist: '' });
     const dropInputRef = useRef<HTMLInputElement>(null);
+    const [error, setError] = useState(''); // State for local errors
 
     useEffect(() => {
         api.getMusicFiles('/').then(data => {
@@ -24,7 +25,11 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
                     id: f.path, title: f.name.replace(/\.[^/.]+$/, ""), artist: 'Unknown Artist', genre: 'Unclassified',
                     album: 'Cloud', track: '1', coverArt: '', duration: '--:--', size: f.size.toString(), path: f.path, isLocal: false
                 })));
+                setError('');
             }
+        }).catch(err => {
+            console.error("Failed to load music files:", err);
+            setError(err.error || "Failed to load music files. Please check your Nextcloud configuration in .env.");
         });
     }, []);
 
@@ -109,7 +114,13 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
                 </header>
 
                 <div className="flex-grow overflow-y-auto p-2 md:p-4 custom-scrollbar bg-[#050505] pb-24 md:pb-4">
-                    {view === 'tracks' && (
+                    {error ? (
+                        <div className="text-center text-red-400 py-10 border-2 border-dashed border-red-500/30 rounded-lg mx-4">
+                            <p className="font-semibold">Music Library Unavailable</p>
+                            <p className="text-sm">{error}</p>
+                            <p className="text-xs text-gray-500 mt-2">Please ensure Nextcloud WebDAV is configured correctly in your server's .env file.</p>
+                        </div>
+                    ) : (view === 'tracks' && (
                         <div className="space-y-2">
                              {filteredTracks.map(track => {
                                 const isCurrent = currentTrack?.id === track.id;
@@ -144,7 +155,7 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
                                 )
                             })}
                         </div>
-                    )}
+                    ))}
                 </div>
             </div>
         </div>
