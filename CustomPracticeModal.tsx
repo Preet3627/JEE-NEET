@@ -1,6 +1,7 @@
 
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { McqTimer } from './components/McqTimer';
+import McqTimer from './components/McqTimer';
 import Icon from './components/Icon';
 import { getQuestionNumbersFromRanges } from './utils/qRangesParser';
 import { HomeworkData, ResultData, StudentData, ScheduleItem, PracticeQuestion } from './types';
@@ -51,7 +52,13 @@ const parseAnswers = (text: string): Record<string, string | string[]> => {
       if (parts.length === 2) {
         const qNum = parts[0].trim();
         const answer = parts[1].trim();
-        if (qNum && answer) answers[qNum] = answer;
+        if (qNum && answer) {
+            if (answer.startsWith('[') && answer.endsWith(']')) {
+                answers[qNum] = answer.slice(1, -1).split(',');
+            } else {
+                answers[qNum] = answer;
+            }
+        }
       }
     });
   } else {

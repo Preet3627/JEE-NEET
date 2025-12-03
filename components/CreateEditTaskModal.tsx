@@ -26,30 +26,15 @@ const GRADIENT_PRESETS = [
     { name: 'Midnight', value: 'from-gray-800 to-black' },
 ];
 
-// FIX: Update parseAnswers to return Record<string, string | string[]>
 const parseAnswers = (text: string): Record<string, string | string[]> => {
     const answers: Record<string, string | string[]> = {};
     if (!text) return answers;
 
-    // Attempt to parse as full JSON first for arrays
-    try {
-        const jsonAttempt = JSON.parse(text);
-        if (typeof jsonAttempt === 'object' && jsonAttempt !== null && !Array.isArray(jsonAttempt)) {
-            // Validate that all values are string or string[]
-            const isValidJson = Object.values(jsonAttempt).every(
-                val => typeof val === 'string' || (Array.isArray(val) && val.every(item => typeof item === 'string'))
-            );
-            if (isValidJson) return jsonAttempt;
-        }
-    } catch (e) {
-        // Not a direct JSON object, proceed with simpler parsing
-    }
-
-    // Check for key-value pair format (e.g., "1:A, 2:C")
-    if (/[:=,;\n]/.test(text) && !text.includes(' ') ) { // Added !text.includes(' ') to differentiate from space separated list
+    // Check for key-value pair format
+    if (/[:=,;\n]/.test(text) && !text.includes(' ') ) {
         const entries = text.split(/[,;\n]/);
         entries.forEach(entry => {
-            const parts = entry.split(/[:=]/); // Allow : or = as separator
+            const parts = entry.split(/[:=]/);
             if (parts.length === 2) {
                 const qNum = parts[0].trim();
                 const answer = parts[1].trim();
@@ -63,23 +48,20 @@ const parseAnswers = (text: string): Record<string, string | string[]> => {
             }
         });
     } else {
-        // Assume space-separated list for questions 1, 2, 3... (e.g., "A C 12.5")
         const answerList = text.trim().split(/\s+/);
         answerList.forEach((answer, index) => {
-            if (answer) answers[(index + 1).toString()] = answer;
+            if (answer) {
+                answers[(index + 1).toString()] = answer;
+            }
         });
     }
     return answers;
 };
 
-
-// FIX: Update formatAnswers to accept Record<string, string | string[]>
 const formatAnswers = (answers?: Record<string, string | string[]>): string => {
     if (!answers) return '';
     return Object.entries(answers).map(([q, a]) => {
-        if (Array.isArray(a)) {
-            return `${q}:[${a.join(',')}]`;
-        }
+        if (Array.isArray(a)) return `${q}:[${a.join(',')}]`;
         return `${q}:${a}`;
     }).join('\n');
 };

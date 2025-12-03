@@ -178,7 +178,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         isAiDoubtSolverOpen, setIsAiDoubtSolverOpen, 
         isCreateDeckModalOpen, setCreateDeckModalOpen,
         // FIX: Add isAiFlashcardModalOpen and its setter
-        isAiFlashcardModalOpen, setIsAiFlashcardModalOpen,
+        isAiFlashcardModalOpen, setAiFlashcardModalOpen,
         editingDeck, setEditingDeck,
         viewingDeck, setViewingDeck,
         isCreateCardModalOpen, setCreateCardModalOpen, 
@@ -549,7 +549,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                             onDeleteDeck={handleDeleteDeck}
                             onViewDeck={viewingDeck => openModal('DeckViewModal', setViewingDeck, viewingDeck)}
                             onStartReview={handleStartReviewSession}
-                            onGenerateWithAI={() => openModal('AIGenerateFlashcardsModal', setIsAiFlashcardModalOpen, true)}
+                            onGenerateWithAI={() => openModal('AIGenerateFlashcardsModal', setAiFlashcardModalOpen, true)}
                         />;
             case 'exams':
 // FIX: Pass onDeleteExam prop to ExamsView to satisfy its required props.

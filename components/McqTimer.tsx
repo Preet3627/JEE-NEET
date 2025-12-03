@@ -237,7 +237,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
 
         if (correctAnswers) {
             const correctAnswer = correctAnswers[currentQuestionNumber.toString()];
-            // FIX: Correctly compare string or string[] answers
+            // FIX: Ensure normalizeAnswer can handle string | string[] for both arguments
             const isCorrect = JSON.stringify(normalizeAnswer(value)) === JSON.stringify(normalizeAnswer(correctAnswer));
             setFeedback({
                 status: isCorrect ? 'correct' : 'incorrect',
@@ -467,14 +467,14 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
         }
         
         const normalizedCorrectAnswer = normalizeAnswer(feedback.correctAnswer);
-        const currentOption = normalizeAnswer(option);
+        const currentOption = normalizeAnswer(option) as string;
 
         // Feedback logic for Multi-Choice
         if (isMultiChoice) {
             const normalizedUserAnswers = Array.isArray(userAnswer) ? userAnswer.map(a => normalizeAnswer(a)) : [];
             const normalizedCorrectAnswers = Array.isArray(normalizedCorrectAnswer) ? normalizedCorrectAnswer : [];
 
-            const isCorrectOption = normalizedCorrectAnswers.includes(currentOption as string);
+            const isCorrectOption = normalizedCorrectAnswers.includes(currentOption);
             const wasUserSelected = normalizedUserAnswers.includes(currentOption);
 
             if (isCorrectOption) {
