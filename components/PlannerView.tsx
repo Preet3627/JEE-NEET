@@ -18,7 +18,7 @@ const PlannerView: React.FC<PlannerViewProps> = ({ items, onEdit }) => {
     const renderWeeklyView = () => {
         const scheduleByDay: { [key: string]: ScheduleItem[] } = daysOfWeek.reduce((acc, day) => {
             // FIX: Add a type guard to safely check for the 'date' property on ScheduleItem union type.
-            acc[day] = items.filter(item => !('date' in item && item.date) && item.DAY.EN.toUpperCase() === day);
+            acc[day] = items.filter((item): item is ScheduleItem & { DAY: { EN: string } } => !('date' in item && item.date) && item.DAY.EN.toUpperCase() === day);
             return acc;
         }, {} as { [key: string]: ScheduleItem[] });
 
@@ -62,9 +62,9 @@ const PlannerView: React.FC<PlannerViewProps> = ({ items, onEdit }) => {
             const dayName = date.toLocaleString('en-us', { weekday: 'long' }).toUpperCase();
             
             // FIX: Add a type guard to safely check for the 'date' property on ScheduleItem union type.
-            const repeatingTasks = items.filter(item => !('date' in item && item.date) && item.DAY.EN.toUpperCase() === dayName);
+            const repeatingTasks = items.filter((item): item is ScheduleItem & { DAY: { EN: string } } => !('date' in item && item.date) && item.DAY.EN.toUpperCase() === dayName);
             // FIX: Add a type guard to safely check for the 'date' property on ScheduleItem union type.
-            const datedTasks = items.filter(item => 'date' in item && item.date === dateString);
+            const datedTasks = items.filter((item): item is ScheduleItem & { date: string } => 'date' in item && item.date === dateString);
 
             const tasksForDay = [...repeatingTasks, ...datedTasks].sort((a, b) => 
                 ('TIME' in a && a.TIME ? a.TIME : '23:59').localeCompare('TIME' in b && b.TIME ? b.TIME : '23:59')
@@ -80,7 +80,7 @@ const PlannerView: React.FC<PlannerViewProps> = ({ items, onEdit }) => {
                 {Object.keys(monthlySchedule).map(dateString => (
                      <div key={dateString}>
                         <h3 className="text-lg font-bold text-cyan-400 tracking-wider mb-2 border-b-2 border-cyan-500/30 pb-1">
-                           {new Date(dateString + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                           {new Date(dateString).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                         </h3>
                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                              {monthlySchedule[dateString].map(item => (
@@ -106,7 +106,7 @@ const PlannerView: React.FC<PlannerViewProps> = ({ items, onEdit }) => {
         const scheduleByDay = daysOfWeek.reduce((acc, day) => {
             const dayItems = items
                 // FIX: Add a type guard to safely check for the 'date' property on ScheduleItem union type.
-                .filter(item => !('date' in item && item.date) && item.DAY.EN.toUpperCase() === day)
+                .filter((item): item is ScheduleItem & { DAY: { EN: string } } => !('date' in item && item.date) && item.DAY.EN.toUpperCase() === day)
                 .sort((a,b) => ('TIME' in a && a.TIME ? a.TIME : '23:59').localeCompare('TIME' in b && b.TIME ? b.TIME : '23:59'));
             if(dayItems.length > 0) {
                 acc[day] = dayItems;
@@ -146,7 +146,7 @@ const PlannerView: React.FC<PlannerViewProps> = ({ items, onEdit }) => {
 
         const todaysItems = items
             // FIX: Add a type guard to safely check for the 'date' property on ScheduleItem union type.
-            .filter(item => ('date' in item && item.date === todayDateString) || (!('date' in item && item.date) && item.DAY.EN.toUpperCase() === todayName))
+            .filter((item): item is ScheduleItem & { DAY: { EN: string } } => ('date' in item && item.date === todayDateString) || (!('date' in item && item.date) && item.DAY.EN.toUpperCase() === todayName))
             .sort((a,b) => ('TIME' in a && a.TIME ? a.TIME : '23:59').localeCompare('TIME' in b && b.TIME ? b.TIME : '23:59'));
 
         return (

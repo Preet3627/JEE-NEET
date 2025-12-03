@@ -1,42 +1,60 @@
 import React from 'react';
-import { StudentData } from '../../types';
-import Icon from '../Icon';
+import { useRegisterSW } from 'virtual:pwa-register/react';
+import Icon from './Icon';
 
-interface ReadingHoursWidgetProps {
-  student: StudentData;
+function ReloadPrompt() {
+  const {
+    offlineReady: [offlineReady, setOfflineReady],
+    needRefresh: [needRefresh, setNeedRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    onRegistered(r) {
+      // console.log('SW Registered:', r);
+    },
+    onRegisterError(error) {
+      console.log('SW registration error:', error);
+    },
+  });
+
+  const close = () => {
+    setOfflineReady(false);
+    setNeedRefresh(false);
+  };
+
+  if (needRefresh) {
+    return (
+      <div className="fixed right-4 bottom-24 z-50 p-4 rounded-lg shadow-lg bg-gray-800 border border-gray-600 flex items-center gap-4 animate-scaleIn">
+        <div className="text-white">
+          <div className="font-semibold">New version available!</div>
+          <div className="text-sm text-gray-300">Reload to get the latest updates.</div>
+        </div>
+        <button
+          className="px-4 py-2 text-sm font-semibold rounded-lg bg-cyan-600 text-white hover:bg-cyan-500"
+          onClick={() => updateServiceWorker(true)}
+        >
+          Reload
+        </button>
+      </div>
+    );
+  }
+
+  if (offlineReady) {
+    return (
+        <div className="fixed right-4 bottom-24 z-50 p-4 rounded-lg shadow-lg bg-gray-800 border border-gray-600 flex items-center gap-4 animate-scaleIn">
+            <div className="text-white">
+                <div className="font-semibold">App ready to work offline.</div>
+            </div>
+            <button
+                className="p-2 text-gray-300 hover:text-white"
+                onClick={() => close()}
+            >
+                &times;
+            </button>
+        </div>
+    );
+  }
+
+  return null;
 }
 
-const ReadingHoursWidget: React.FC<ReadingHoursWidgetProps> = ({ student }) => {
-  const sessions = student.STUDY_SESSIONS;
-
-  const totalSeconds = sessions.reduce((acc, session) => acc + session.duration, 0);
-  const totalHours = (totalSeconds / 3600).toFixed(1);
-
-  const totalQuestions = sessions.reduce((acc, session) => acc + session.questions_solved, 0);
-
-  return (
-    <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl shadow-lg p-6 backdrop-blur-sm">
-      <h2 className="text-xl font-semibold text-[var(--accent-color)] tracking-widest uppercase mb-4">
-        Study Stats
-      </h2>
-      <div className="space-y-4">
-        <div className="bg-gray-900 p-3 rounded-lg flex items-center gap-4">
-            <Icon name="stopwatch" className="w-8 h-8 text-cyan-400 flex-shrink-0" />
-            <div>
-                <p className="text-sm text-gray-400">Total Study Time</p>
-                <p className="text-2xl font-bold text-white">{totalHours} <span className="text-base">hrs</span></p>
-            </div>
-        </div>
-        <div className="bg-gray-900 p-3 rounded-lg flex items-center gap-4">
-            <Icon name="check" className="w-8 h-8 text-green-400 flex-shrink-0" />
-            <div>
-                <p className="text-sm text-gray-400">Questions Solved</p>
-                <p className="text-2xl font-bold text-white">{totalQuestions}</p>
-            </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default ReadingHoursWidget;
+export default ReloadPrompt;

@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from './context/AuthContext';
 import { StudentData, ScheduleItem, StudySession, Config, ResultData, ExamData, DoubtData, HomeworkData, PracticeQuestion, FlashcardDeck, Flashcard, StudyMaterialItem } from './types';
@@ -182,7 +180,6 @@ const App: React.FC = () => {
   const [isAnswerKeyUploadModalOpen, setAnswerKeyUploadModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSpecificMistakeAnalysisModalOpen, setIsSpecificMistakeAnalysisModalOpen] = useState(false);
-  const [isAiDoubtSolverOpen, setIsAiDoubtSolverOpen] = useState(false);
 
 
   // General App State
@@ -236,7 +233,6 @@ const App: React.FC = () => {
   ]);
 
   const openModal = useCallback((modalId: string, setter: React.Dispatch<React.SetStateAction<boolean>> | ((val: any) => void), initialValue?: any) => {
-    // Determine if it's a boolean setter (setIsX) or a data setter (setX)
     const isBooleanSetter = typeof initialValue === 'undefined' || typeof initialValue === 'boolean';
 
     if (isBooleanSetter) {
@@ -249,24 +245,20 @@ const App: React.FC = () => {
     modalStackRef.current.push(newModalState);
     currentModalIdRef.current = modalId; 
     
-    // Push a state to browser history, but don't change URL
     window.history.pushState({ modal: newModalState.componentId }, '');
   }, []);
 
   const closeModal = useCallback((modalId: string) => {
     const setter = modalSettersRef.current.get(modalId);
     if (setter) {
-      // If it's a boolean setter, set to false. If it's a data setter, set to null.
-      // This is a heuristic; more robust would be to store setter type.
-      const isBooleanSetter = String(setter).includes('setIs'); // Simple heuristic
+      const isBooleanSetter = String(setter).includes('setIs');
       if (isBooleanSetter) {
         (setter as React.Dispatch<React.SetStateAction<boolean>>)(false);
       } else {
-        (setter as (val: any) => void)(null); // Assuming data setters take null to close
+        (setter as (val: any) => void)(null);
       }
     }
 
-    // Filter out the closed modal from the stack
     modalStackRef.current = modalStackRef.current.filter(m => m.id !== modalId);
     currentModalIdRef.current = modalStackRef.current.length > 0 ? modalStackRef.current[modalStackRef.current.length - 1].id : null;
   }, []);
@@ -277,50 +269,33 @@ const App: React.FC = () => {
       const isModalHistoryState = event.state && event.state.modal;
 
       if (isModalHistoryState) {
-        // Find the modal that corresponds to this history state
-        const modalToClose = modalStackRef.current[modalStackRef.current.length - 1]; // Always close the top-most one
+        const modalToClose = modalStackRef.current[modalStackRef.current.length - 1];
         
         if (modalToClose && modalToClose.componentId === event.state.modal) {
-          // It's our modal's history entry, close the modal UI
           const setter = modalSettersRef.current.get(modalToClose.id);
           if (setter) {
             const isBooleanSetter = String(setter).includes('setIs');
-            if (isBooleanSetter) {
-              (setter as React.Dispatch<React.SetStateAction<boolean>>)(false);
-            } else {
-              (setter as (val: any) => void)(null);
-            }
+            if (isBooleanSetter) (setter as React.Dispatch<React.SetStateAction<boolean>>)(false); else (setter as (val: any) => void)(null);
           }
-          // Remove from internal stack
           modalStackRef.current.pop();
           currentModalIdRef.current = modalStackRef.current.length > 0 ? modalStackRef.current[modalStackRef.current.length - 1].id : null;
         } else if (modalStackRef.current.length > 0) {
-          // History navigated past our modal, but our modal is still open. Close it forcefully.
           const topModal = modalStackRef.current[modalStackRef.current.length - 1];
           const setter = modalSettersRef.current.get(topModal.id);
           if (setter) {
             const isBooleanSetter = String(setter).includes('setIs');
-            if (isBooleanSetter) {
-              (setter as React.Dispatch<React.SetStateAction<boolean>>)(false);
-            } else {
-              (setter as (val: any) => void)(null);
-            }
+            if (isBooleanSetter) (setter as React.Dispatch<React.SetStateAction<boolean>>)(false); else (setter as (val: any) => void)(null);
           }
           modalStackRef.current = [];
           currentModalIdRef.current = null;
         }
       } else {
-        // User navigated back past all modal states to a prior, non-modal state. Close all open modals.
         if (modalStackRef.current.length > 0) {
           modalStackRef.current.forEach(m => {
             const setter = modalSettersRef.current.get(m.id);
             if (setter) {
               const isBooleanSetter = String(setter).includes('setIs');
-              if (isBooleanSetter) {
-                (setter as React.Dispatch<React.SetStateAction<boolean>>)(false);
-              } else {
-                (setter as (val: any) => void)(null);
-              }
+              if (isBooleanSetter) (setter as React.Dispatch<React.SetStateAction<boolean>>)(false); else (setter as (val: any) => void)(null);
             }
           });
           modalStackRef.current = [];
@@ -331,7 +306,7 @@ const App: React.FC = () => {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [closeModal]);
 
 
   const checkBackendStatus = useCallback(async () => {
@@ -514,7 +489,7 @@ const App: React.FC = () => {
         await api.clearAllSchedule();
         await refreshUser();
         alert("All schedule items cleared.");
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to clear schedule:", error);
         alert(`Failed to clear schedule: ${error.message}`);
     } finally {
@@ -579,12 +554,11 @@ const App: React.FC = () => {
     }
   }, [currentUser, refreshUser]);
 
-  const handleLogStudySession = useCallback(async (session: Omit<StudySession, 'date'>) => {
+  const handleLogStudySession = useCallback(async (session: Omit<StudySession, 'date'> & { date: string }) => {
     if (!currentUser) return;
     setIsSyncing(true);
     try {
-        const fullSession = { ...session, date: new Date().toISOString().split('T')[0] };
-        await api.saveStudySession(fullSession);
+        await api.saveStudySession(session);
         await refreshUser();
     } catch (error) {
         console.error("Failed to log study session:", error);
@@ -1015,7 +989,7 @@ const App: React.FC = () => {
     isAnswerKeyUploadModalOpen, setAnswerKeyUploadModalOpen,
     isProfileModalOpen, setIsProfileModalOpen,
     isSpecificMistakeAnalysisModalOpen, setIsSpecificMistakeAnalysisModalOpen
-  ]), [
+  }), [
     openModal, closeModal, isExamTypeSelectionModalOpen, setIsExamTypeSelectionModalOpen,
     isCreateModalOpen, setIsCreateModalOpen, setisAiParserModalOpen, setIsPracticeModalOpen,
     isSettingsModalOpen, setIsSettingsModalOpen, editingTask, setEditingTask,

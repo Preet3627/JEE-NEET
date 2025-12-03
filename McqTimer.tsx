@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Icon from './Icon';
 import { playNextSound, playStopSound, playMarkSound, vibrate } from '../utils/sounds';
@@ -440,7 +439,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
                 {isUploadingKey && <AnswerKeyUploadModal onClose={() => setIsUploadingKey(false)} onGrade={handleGradeWithAI} />}
                 {analyzingMistake !== null && onUpdateWeaknesses && (
                     <SpecificMistakeAnalysisModal 
-                        questionNumber={analyposingMistake}
+                        questionNumber={analyzingMistake}
                         onClose={() => setAnalyzingMistake(null)}
                         onSaveWeakness={(topic) => onUpdateWeaknesses([...new Set([...(student.CONFIG.WEAK || []), topic])])}
                     />

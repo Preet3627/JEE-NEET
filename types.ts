@@ -1,4 +1,3 @@
-
 export type Language = 'EN' | 'GU';
 
 export interface LocalizedString {
@@ -23,7 +22,7 @@ export interface UiText {
 export interface ScheduleCardData {
   ID: string;
   DAY: LocalizedString;
-  TIME: string;
+  TIME?: string; // Made optional for actions that might not have a specific time
   CARD_TITLE: LocalizedString;
   FOCUS_DETAIL: LocalizedString;
   SUBJECT_TAG: LocalizedString;
@@ -35,7 +34,7 @@ export interface ScheduleCardData {
   isStarred?: boolean;
   googleEventId?: string;
   deckId?: string;
-  date?: string;
+  date?: string; // For one-off tasks overriding DAY
   gradient?: string;
   imageUrl?: string;
   externalLink?: string;

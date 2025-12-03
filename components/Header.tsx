@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocalization } from '../context/LocalizationContext';
 import Icon from './Icon';
@@ -14,7 +11,7 @@ interface HeaderProps {
         profilePhoto?: string;
     };
     onLogout: () => void;
-    backendStatus: 'checking' | 'online' | 'offline';
+    backendStatus: 'checking' | 'online' | 'offline' | 'misconfigured';
     isSyncing: boolean;
     onOpenProfile: () => void;
 }
@@ -33,6 +30,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout, backendStatus, isSyncin
         online: { class: 'bg-green-500', text: 'ONLINE', title: 'Connected to server' },
         offline: { class: 'bg-yellow-500', text: 'OFFLINE', title: 'Using cached data. Changes will sync when online.' },
         checking: { class: 'bg-gray-500 animate-pulse', text: '...', title: 'Checking connection' },
+        misconfigured: { class: 'bg-red-500', text: 'ERROR', title: 'Server misconfigured. Contact admin.' }, // Added misconfigured status
     };
 
     useEffect(() => {

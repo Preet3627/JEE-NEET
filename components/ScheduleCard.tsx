@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ScheduleItem, HomeworkData, ScheduleCardData } from '../types';
 import { useLocalization } from '../context/LocalizationContext';
@@ -17,7 +14,7 @@ interface ScheduleCardProps {
   onCompleteTask: (task: ScheduleCardData) => void;
   onMarkDoubt?: (topic: string, q_id: string) => void;
   isSubscribed: boolean;
-  isPast: boolean;
+  isPast: boolean; // Prop to indicate if the card is visually "past"
   isSelectMode: boolean;
   isSelected: boolean;
   onSelect: (id: string) => void;
@@ -52,6 +49,7 @@ const ScheduleCard: React.FC<ScheduleCardProps> = (props) => {
         const today = new Date();
         const todayName = today.toLocaleString('en-us', { weekday: 'long' }).toUpperCase();
         if ('date' in cardData && cardData.date) {
+            // Compare date strings directly for simplicity, assuming YYYY-MM-DD
             return cardData.date === today.toISOString().split('T')[0];
         }
         return cardData.DAY.EN.toUpperCase() === todayName;
@@ -64,26 +62,29 @@ const ScheduleCard: React.FC<ScheduleCardProps> = (props) => {
         }
         const updateProgress = () => {
             const now = new Date();
-            const [hours, minutes] = cardData.TIME.split(':').map(Number);
+            const [hours, minutes] = cardData.TIME!.split(':').map(Number); // Use non-null assertion as checked above
             const startTime = new Date();
             startTime.setHours(hours, minutes, 0, 0);
+            
+            // Start countdown 8 hours before task time
             const countdownStart = new Date(startTime.getTime() - 8 * 60 * 60 * 1000);
 
-            if (now > startTime) {
-                setCountdownProgress(0);
+            if (now.getTime() > startTime.getTime()) {
+                setCountdownProgress(0); // Task has passed
                 return;
             }
-            if (now < countdownStart) {
-                setCountdownProgress(100);
+            if (now.getTime() < countdownStart.getTime()) {
+                setCountdownProgress(100); // Task is far in the future
                 return;
             }
+
             const totalDuration = startTime.getTime() - countdownStart.getTime();
             const elapsed = now.getTime() - countdownStart.getTime();
             const progress = 100 - (elapsed / totalDuration) * 100;
             setCountdownProgress(Math.max(0, progress));
         };
         updateProgress();
-        const interval = setInterval(updateProgress, 60000);
+        const interval = setInterval(updateProgress, 60000); // Update every minute
         return () => clearInterval(interval);
     }, [cardData, isToday]);
 

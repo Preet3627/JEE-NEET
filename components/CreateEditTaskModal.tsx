@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { ScheduleItem, ScheduleCardData, HomeworkData, FlashcardDeck } from '../types';
 import Icon from './Icon';
@@ -27,43 +25,59 @@ const GRADIENT_PRESETS = [
 ];
 
 const parseAnswers = (text: string): Record<string, string | string[]> => {
-    const answers: Record<string, string | string[]> = {};
-    if (!text) return answers;
+  const answers: Record<string, string | string[]> = {};
+  if (!text) return answers;
 
-    // Check for key-value pair format
-    if (/[:=,;\n]/.test(text) && !text.includes(' ') ) {
-        const entries = text.split(/[,;\n]/);
-        entries.forEach(entry => {
-            const parts = entry.split(/[:=]/);
-            if (parts.length === 2) {
-                const qNum = parts[0].trim();
-                const answer = parts[1].trim();
-                if (qNum && answer) {
-                    if (answer.startsWith('[') && answer.endsWith(']')) {
-                        answers[qNum] = answer.slice(1, -1).split(',');
-                    } else {
-                        answers[qNum] = answer;
-                    }
-                }
-            }
-        });
-    } else {
-        const answerList = text.trim().split(/\s+/);
-        answerList.forEach((answer, index) => {
-            if (answer) {
-                answers[(index + 1).toString()] = answer;
-            }
-        });
+  // Attempt to parse as full JSON first for arrays
+  try {
+    const jsonAttempt = JSON.parse(text);
+    if (typeof jsonAttempt === 'object' && jsonAttempt !== null && !Array.isArray(jsonAttempt)) {
+      // Validate that all values are string or string[]
+      const isValidJson = Object.values(jsonAttempt).every(
+        val => typeof val === 'string' || (Array.isArray(val) && val.every(item => typeof item === 'string'))
+      );
+      if (isValidJson) return jsonAttempt;
     }
-    return answers;
+  } catch (e) {
+    // Not a direct JSON object, proceed with simpler parsing
+  }
+
+  // Check for key-value pair format (e.g., "1:A, 2:C")
+  if (/[:=,;\n]/.test(text) && !text.includes(' ') ) { // Added !text.includes(' ') to differentiate from space separated list
+    const entries = text.split(/[,;\n]/);
+    entries.forEach(entry => {
+      const parts = entry.split(/[:=]/); // Allow : or = as separator
+      if (parts.length === 2) {
+        const qNum = parts[0].trim();
+        const answer = parts[1].trim();
+        if (qNum && answer) {
+            if (answer.startsWith('[') && answer.endsWith(']')) {
+                answers[qNum] = answer.slice(1, -1).split(',').map(s => s.trim()); // Trim items in array
+            } else {
+                answers[qNum] = answer;
+            }
+        }
+      }
+    });
+  } else {
+    // Assume space-separated list for questions 1, 2, 3... (e.g., "A C 12.5")
+    const answerList = text.trim().split(/\s+/);
+    answerList.forEach((answer, index) => {
+      if (answer) answers[(index + 1).toString()] = answer;
+    });
+  }
+  return answers;
 };
 
+
 const formatAnswers = (answers?: Record<string, string | string[]>): string => {
-    if (!answers) return '';
-    return Object.entries(answers).map(([q, a]) => {
-        if (Array.isArray(a)) return `${q}:[${a.join(',')}]`;
-        return `${q}:${a}`;
-    }).join('\n');
+  if (!answers) return '';
+  return Object.entries(answers).map(([q, a]) => {
+    if (Array.isArray(a)) {
+      return `${q}:[${a.join(',')}]`;
+    }
+    return `${q}:${a}`;
+  }).join('\n');
 };
 
 const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnly = false, onClose, onSave, decks, animationOrigin }) => {
@@ -142,7 +156,7 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
             type: 'HOMEWORK',
             Q_RANGES: formData.qRanges,
             category: formData.category as HomeworkData['category'],
-            answers: parseAnswers(formData.answers),
+            answers: parseAnswers(formData.answers), // This returns Record<string, string | string[]>
         } as HomeworkData;
     } else { 
         finalTask = {
@@ -196,7 +210,7 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
                 {'TIME' in task && <ViewField label="Time" value={task.TIME} />}
             </div>
             <ViewField label="Subject" value={task.SUBJECT_TAG.EN} />
-            <ViewField label="External Link" value={(task as any).externalLink} />
+            {'externalLink' in task && <ViewField label="External Link" value={task.externalLink} />}
             {task.type === 'HOMEWORK' && <ViewField label="Questions" value={task.Q_RANGES} />}
             
             <div className="flex justify-end gap-4 pt-4">
@@ -237,7 +251,10 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
                        {daysOfWeek.map(d => <option key={d} value={d}>{d.charAt(0) + d.slice(1).toLowerCase()}</option>)}
                     </select>
                 </div>
-                <div><label className="text-sm font-bold text-gray-400">Or Specific Date</label><input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className={inputClass} /></div>
+                <div>
+                    <label className="text-sm font-bold text-gray-400">Or Specific Date</label>
+                    <input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className={inputClass} />
+                </div>
              </div>
              {!formData.date && (
                  <div className="flex items-center gap-2">
@@ -247,7 +264,10 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                 <div><label className="text-sm font-bold text-gray-400">Time</label><input type="time" required={taskType !== 'HOMEWORK'} value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} className={inputClass} /></div>
+                 <div>
+                    <label className="text-sm font-bold text-gray-400">Time</label>
+                    <input type="time" required={taskType !== 'HOMEWORK'} value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} className={inputClass} />
+                </div>
                  <div>
                     <label className="text-sm font-bold text-gray-400">Subject</label>
                     <select required value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})} className={inputClass}>
@@ -274,7 +294,10 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
 
             {taskType === 'HOMEWORK' && (
               <>
-                <div><label className="text-sm font-bold text-gray-400">Question Ranges</label><input value={formData.qRanges} onChange={e => setFormData({...formData, qRanges: e.target.value})} className={inputClass} placeholder="e.g., Ex 1.1: 1-10; PYQs: 15-20" /></div>
+                <div>
+                  <label className="text-sm font-bold text-gray-400">Question Ranges</label>
+                  <input value={formData.qRanges} onChange={e => setFormData({...formData, qRanges: e.target.value})} className={inputClass} placeholder="e.g., Ex 1.1: 1-10; PYQs: 15-20" />
+                </div>
                 <div>
                   <label className="text-sm font-bold text-gray-400">Category</label>
                   <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value as 'Custom' | 'Level-1' | 'Level-2' | 'Classroom-Discussion' | 'PYQ'})} className={inputClass}>
@@ -287,10 +310,12 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
                 </div>
                 <div>
                     <div className="flex justify-between items-center">
-                        <label className="text-sm font-bold text-gray-400">Answer Key</label>
-                        <button type="button" onClick={() => setIsAiKeyModalOpen(true)} className="text-xs font-semibold text-cyan-400 hover:underline flex items-center gap-1"><Icon name="gemini" className="w-3 h-3" /> Generate with AI</button>
+                        <label className="text-sm font-bold text-gray-400">Answer Key (Optional)</label>
+                        <button type="button" onClick={() => setIsAiKeyModalOpen(true)} className="text-xs font-semibold text-cyan-400 hover:underline flex items-center gap-1">
+                            <Icon name="gemini" className="w-3 h-3" /> Generate with AI
+                        </button>
                     </div>
-                  <textarea value={formData.answers} onChange={e => setFormData({...formData, answers: e.target.value})} className={`${inputClass} h-24 font-mono`} placeholder="1:A, 2:C OR A B C" />
+                  <textarea value={formData.answers} onChange={e => setFormData({...formData, answers: e.target.value})} className={`${inputClass} h-24 font-mono`} placeholder="Formats:&#10;1:A, 2:C, 3:12.5 (key-value)&#10;A C 12.5 (space-separated list)" />
                 </div>
               </>
             )}
@@ -299,7 +324,11 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
               <div>
                 <label className="text-sm font-bold text-gray-400">Flashcard Deck</label>
                 <select required value={formData.deckId} onChange={e => setFormData({...formData, deckId: e.target.value})} className={`${inputClass} disabled:opacity-50`} disabled={decks.length === 0}>
-                  {decks.length > 0 ? decks.map(d => <option key={d.id} value={d.id}>{d.name}</option>) : <option>No decks available</option>}
+                  {decks.length > 0 ? (
+                      decks.map(d => <option key={d.id} value={d.id}>{d.name}</option>)
+                  ) : (
+                      <option>No decks available</option>
+                  )}
                 </select>
               </div>
             )}
@@ -310,7 +339,14 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
             </div>
           </form>
       </ModalShell>
-      {isAiKeyModalOpen && <AIGenerateAnswerKeyModal onClose={() => setIsAiKeyModalOpen(false)} onKeyGenerated={(keyText) => setFormData(prev => ({ ...prev, answers: keyText }))} />}
+      {isAiKeyModalOpen && (
+          <AIGenerateAnswerKeyModal
+              onClose={() => setIsAiKeyModalOpen(false)}
+              onKeyGenerated={(keyText) => {
+                  setFormData(prev => ({ ...prev, answers: keyText }));
+              }}
+          />
+      )}
     </>
   );
 };
