@@ -1,9 +1,7 @@
 
-
-
 import React from 'react';
 
-export type IconName = 'bell' | 'copy' | 'check' | 'trash' | 'play' | 'pause' | 'stop' | 'upload' | 'stopwatch' | 'logout' | 'dashboard' | 'users' | 'plus' | 'fixed' | 'login' | 'user-plus' | 'edit' | 'ellipsis' | 'forward' | 'trophy' | 'star' | 'streak' | 'send' | 'message' | 'settings' | 'schedule' | 'planner' | 'performance' | 'community' | 'calendar' | 'image' | 'book-open' | 'drive' | 'gemini' | 'marker' | 'cards' | 'folder' | 'file-text' | 'pin' | 'music' | 'lock-closed' | 'lock-open' | 'shuffle' | 'expand' | 'arrow-left' | 'arrow-right' | 'sound-wave' | 'search';
+export type IconName = 'bell' | 'copy' | 'check' | 'trash' | 'play' | 'pause' | 'stop' | 'upload' | 'stopwatch' | 'logout' | 'dashboard' | 'users' | 'plus' | 'fixed' | 'login' | 'user-plus' | 'edit' | 'ellipsis' | 'forward' | 'trophy' | 'star' | 'streak' | 'send' | 'message' | 'settings' | 'schedule' | 'planner' | 'performance' | 'community' | 'calendar' | 'image' | 'book-open' | 'drive' | 'gemini' | 'marker' | 'cards' | 'folder' | 'file-text' | 'pin' | 'music' | 'lock-closed' | 'lock-open' | 'shuffle' | 'expand' | 'arrow-left' | 'arrow-right' | 'sound-wave' | 'search' | 'download' | 'print';
 
 interface IconProps {
   name: IconName;
@@ -11,7 +9,11 @@ interface IconProps {
 }
 
 const Icon: React.FC<IconProps> = ({ name, className = "w-5 h-5" }) => {
-  const icons = {
+  if (name === 'gemini') {
+      return <img src="https://ponsrischool.in/wp-content/uploads/2025/10/gemini-color.webp" alt="Gemini" className={className} style={{ objectFit: 'contain' }} />;
+  }
+
+  const icons: Partial<Record<IconName, JSX.Element>> = {
     bell: (
       <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -183,11 +185,6 @@ const Icon: React.FC<IconProps> = ({ name, className = "w-5 h-5" }) => {
         <path d="M7.71 3.5L1.5 15l3.12 5.5h14.76L22.5 15 16.29 3.5H7.71zM12 14.25L8.61 8h3.03L15.36 14.25H12zM7.65 15.25l2.22-3.87L12 5l3.07 6.38 2.22 3.87H7.65z"/>
       </svg>
     ),
-    'gemini': (
-        <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 2.5l-2.5 6-6 2.5 6 2.5 2.5 6 2.5-6 6-2.5-6-2.5z" />
-        </svg>
-    ),
     'marker': (
         <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -225,7 +222,7 @@ const Icon: React.FC<IconProps> = ({ name, className = "w-5 h-5" }) => {
     ),
     'lock-open': (
       <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 002 2z" />
       </svg>
     ),
     'shuffle': (
@@ -256,6 +253,16 @@ const Icon: React.FC<IconProps> = ({ name, className = "w-5 h-5" }) => {
     'search': (
       <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+    ),
+    'download': (
+      <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+      </svg>
+    ),
+    'print': (
+      <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
       </svg>
     )
   };

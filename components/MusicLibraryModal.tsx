@@ -16,15 +16,44 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
     const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState({ title: '', artist: '' });
     const dropInputRef = useRef<HTMLInputElement>(null);
-    const [error, setError] = useState(''); // State for local errors
+    const [error, setError] = useState('');
 
     useEffect(() => {
         api.getMusicFiles('/').then(data => {
             if(Array.isArray(data)) {
-                setTracks(data.filter(f => f.name.match(/\.(mp3|m4a|wav)$/i)).map(f => ({
-                    id: f.path, title: f.name.replace(/\.[^/.]+$/, ""), artist: 'Unknown Artist', genre: 'Unclassified',
-                    album: 'Cloud', track: '1', coverArt: '', duration: '--:--', size: f.size.toString(), path: f.path, isLocal: false
-                })));
+                setTracks(data.filter(f => f.name.match(/\.(mp3|m4a|wav)$/i)).map(f => {
+                    // Robust filename parsing for Title - Artist or Artist - Title
+                    let title = f.name.replace(/\.[^/.]+$/, "");
+                    let artist = 'Unknown Artist';
+                    
+                    // Try to split by common separators " - ", " – " (en dash)
+                    const separators = [" - ", " – ", "_-_"];
+                    for (const sep of separators) {
+                        if (title.includes(sep)) {
+                            const parts = title.split(sep);
+                            if (parts.length >= 2) {
+                                // Assume Artist - Title structure mostly
+                                artist = parts[0].trim();
+                                title = parts.slice(1).join(sep).trim();
+                                break;
+                            }
+                        }
+                    }
+
+                    return {
+                        id: f.path, 
+                        title, 
+                        artist, 
+                        genre: 'Unclassified',
+                        album: 'Cloud', 
+                        track: '1', 
+                        coverArt: '', 
+                        duration: '--:--', 
+                        size: f.size.toString(), 
+                        path: f.path, 
+                        isLocal: false
+                    };
+                }));
                 setError('');
             }
         }).catch(err => {
@@ -75,6 +104,17 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
         e.stopPropagation();
         addToQueue(track);
     };
+    
+    const handleDownload = (e: React.MouseEvent, track: Track) => {
+        e.stopPropagation();
+        // Trigger download
+        const link = document.createElement('a');
+        link.href = api.getMusicContentUrl(track.id);
+        link.download = `${track.artist} - ${track.title}.mp3`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
     const getGradient = (id: string) => {
         const colors = [
@@ -89,7 +129,7 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
         return colors[Math.abs(hash) % colors.length];
     };
 
-    const filteredTracks = tracks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()));
+    const filteredTracks = tracks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()) || t.artist.toLowerCase().includes(searchQuery.toLowerCase()));
 
     return (
         <div className="fixed inset-0 bg-black z-[60] flex flex-col pt-safe-top pb-safe-bottom">
@@ -146,6 +186,7 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
                                             )}
                                         </div>
                                         <div className="flex items-center gap-2">
+                                            <button onClick={(e) => handleDownload(e, track)} className="p-2 text-gray-400 hover:text-cyan-400 bg-[#222] rounded-full hover:bg-[#333] transition-colors" title="Download"><Icon name="download" className="w-4 h-4" /></button>
                                             <button onClick={(e) => handlePlayNext(e, track)} className="p-2 text-gray-400 hover:text-green-400 bg-[#222] rounded-full hover:bg-[#333] transition-colors" title="Play Next"><Icon name="forward" className="w-4 h-4" /></button>
                                             <button onClick={(e) => handleAddToQueue(e, track)} className="p-2 text-gray-400 hover:text-cyan-400 bg-[#222] rounded-full hover:bg-[#333] transition-colors" title="Add to Queue"><Icon name="schedule" className="w-4 h-4" /></button>
                                             <button onClick={(e) => handleAddToPlaylist(e, track)} className="p-2 text-gray-400 hover:text-yellow-400 bg-[#222] rounded-full hover:bg-[#333] transition-colors" title="Add to Playlist"><Icon name="plus" className="w-4 h-4" /></button>

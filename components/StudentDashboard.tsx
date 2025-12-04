@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { StudentData, ScheduleItem, ActivityData, Config, StudySession, HomeworkData, ExamData, ResultData, DoubtData, FlashcardDeck, Flashcard, StudyMaterialItem, ScheduleCardData, PracticeQuestion, ActiveTab, DashboardWidgetItem } from '../types';
 import ScheduleList from './ScheduleList';
@@ -143,7 +142,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         student, onSaveTask, onSaveBatchTasks, onDeleteTask, onToggleMistakeFixed, onUpdateConfig, onLogStudySession, 
         onUpdateWeaknesses, onLogResult, onAddExam, onUpdateExam, onDeleteExam, onExportToIcs, onBatchImport, 
         googleAuthStatus, onGoogleSignIn, onGoogleSignOut, onBackupToDrive, onRestoreFromDrive, allDoubts, 
-        onPostDoubt, onPostSolution, deepLinkAction, setDeepLinkAction, openModal, closeModal, // Destructure openModal and closeModal
+        onPostDoubt, onPostSolution, deepLinkAction, setDeepLinkAction, openModal, closeModal,
         
         // Destructure all modal state setters and getters from modalControlProps
         isCreateModalOpen, setIsCreateModalOpen,
@@ -177,7 +176,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         isAiChatLoading, setIsAiChatLoading,
         isAiDoubtSolverOpen, setIsAiDoubtSolverOpen, 
         isCreateDeckModalOpen, setCreateDeckModalOpen,
-        // FIX: Add isAiFlashcardModalOpen and its setter
         isAiFlashcardModalOpen, setAiFlashcardModalOpen,
         editingDeck, setEditingDeck,
         viewingDeck, setViewingDeck,
@@ -187,11 +185,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         viewingFile, setViewingFile,
         isMusicLibraryOpen, setIsMusicLibraryOpen,
         analyzingMistake, setAnalyzingMistake,
-        handleMoveSelected, handleSaveDeck, handleDeleteCard, handleSaveCard, // Destructure new handlers
+        handleMoveSelected, handleSaveDeck, handleDeleteCard, handleSaveCard,
     } = props;
     const { refreshUser } = useAuth();
     const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
     const [scheduleView, setScheduleView] = useState<'upcoming' | 'past'>('upcoming');
+    const [deepLinkData, setDeepLinkData] = useState<any | null>(null);
     
     // Local state for dashboard widgets
     const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidgetItem[]>([]); 
@@ -205,6 +204,13 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     const taskItems = student.SCHEDULE_ITEMS;
     const activityItems = student.SCHEDULE_ITEMS.filter(item => item.type === 'ACTIVITY') as ActivityData[];
 
+    useEffect(() => {
+        if (deepLinkAction) {
+            if (deepLinkAction.action === 'new_schedule' || deepLinkAction.action === 'import_data') {
+                 setDeepLinkData(deepLinkAction.data);
+            }
+        }
+    }, [deepLinkAction]);
 
     useEffect(() => {
         if (student.CONFIG.settings.dashboardLayout) {
@@ -215,9 +221,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             setDashboardWidgets(defaultWidgets.map(id => ({ id })));
         }
     }, [student.CONFIG.settings.dashboardLayout]);
-
-    // --- Handlers ---
-    // handleSaveDeck is now passed from App.tsx, so no local definition needed.
 
     const handleDataImport = (data: any) => {
         // Check for custom widgets
@@ -234,7 +237,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                 }
             });
             alert("New Custom Widget Added to Dashboard!");
-            closeModal('AIParserModal'); // Use closeModal
+            closeModal('AIParserModal');
             return;
         }
         
@@ -247,23 +250,23 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                 isLocked: false,
                 cards: (data.flashcard_deck.cards || []).map((c: any, i: number) => ({ ...c, id: `card_${Date.now()}_${i}` }))
             };
-            handleSaveDeck(newDeck); // Use handleSaveDeck from props
+            handleSaveDeck(newDeck);
             alert(`Imported new deck: ${newDeck.name}`);
-            closeModal('AIParserModal'); // Use closeModal
+            closeModal('AIParserModal');
             return;
         }
 
-        setDeepLinkAction(data); // Use setDeepLinkAction from props
-        closeModal('AIParserModal'); // Use closeModal
+        setDeepLinkData(data); // Trigger modal via local state
+        closeModal('AIParserModal');
     };
 
-    const handleEditClick = (item: ScheduleItem) => { setEditingTask(item); openModal('CreateEditTaskModal', setIsCreateModalOpen, true); }; // Use openModal
-    const handleAiPracticeTest = (data: any) => { setAiPracticeTest(data); closeModal('AIParserModal'); setTimeout(() => openModal('CustomPracticeModal', setIsPracticeModalOpen), 300); }; // Use closeModal, openModal
+    const handleEditClick = (item: ScheduleItem) => { setEditingTask(item); openModal('CreateEditTaskModal', setIsCreateModalOpen, true); }; 
+    const handleAiPracticeTest = (data: any) => { setAiPracticeTest(data); closeModal('AIParserModal'); setTimeout(() => openModal('CustomPracticeModal', setIsPracticeModalOpen), 300); };
     const handleCompleteTask = (task: ScheduleCardData) => { onDeleteTask(task.ID); };
     const handleStarTask = (taskId: string) => { const task = student.SCHEDULE_ITEMS.find(t => t.ID === taskId); if (task) onSaveTask({ ...task, isStarred: !task.isStarred }); };
-    const handleStartPractice = (homework: HomeworkData) => { setPracticeTask(homework); openModal('CustomPracticeModal', setIsPracticeModalOpen); }; // Use openModal
+    const handleStartPractice = (homework: HomeworkData) => { setPracticeTask(homework); openModal('CustomPracticeModal', setIsPracticeModalOpen); };
     const handleSaveWeakness = (newWeakness: string) => { const updatedWeaknesses = [...new Set([...student.CONFIG.WEAK, newWeakness])]; onUpdateWeaknesses(updatedWeaknesses); };
-    const handleApiKeySet = () => { if (!student.CONFIG.settings.hasGeminiKey) openModal('AIChatPopup', setAiChatOpen); setShowAiChatFab(true); }; // Use openModal
+    const handleApiKeySet = () => { if (!student.CONFIG.settings.hasGeminiKey) openModal('AIChatPopup', setAiChatOpen); setShowAiChatFab(true); };
     const handleAiChatMessage = async (prompt: string, imageBase64?: string) => {
         const newHistory = [...aiChatHistory, { role: 'user', parts: [{ text: prompt }] }];
         setAiChatHistory(newHistory);
@@ -284,7 +287,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     };
     const handleToggleSelectMode = () => { setIsSelectMode(prev => !prev); setSelectedTaskIds([]); };
     const handleTaskSelect = (taskId: string) => { setSelectedTaskIds(prev => prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]); };
-    // handleMoveSelected is now passed from App.tsx, so no local definition needed.
+    
     const handleDeleteSelected = async () => { 
         if (selectedTaskIds.length === 0) return;
         if (!window.confirm(`Are you sure you want to delete ${selectedTaskIds.length} selected tasks?`)) return;
@@ -308,27 +311,25 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             alert(`Failed to clear schedule: ${error.message}`);
         }
     };
-    const handleEditResult = (result: ResultData) => { setEditingResult(result); openModal('EditResultModal', setEditResultModalOpen); }; // Use openModal
-    const onUpdateResult = async (result: ResultData) => { await api.updateResult(result); refreshUser(); }; // Refresh after update
-    const onDeleteResult = async (resultId: string) => { await api.deleteResult(resultId); refreshUser(); }; // Refresh after delete
+    const handleEditResult = (result: ResultData) => { setEditingResult(result); openModal('EditResultModal', setEditResultModalOpen); };
+    const onUpdateResult = async (result: ResultData) => { await api.updateResult(result); refreshUser(); };
+    const onDeleteResult = async (resultId: string) => { await api.deleteResult(resultId); refreshUser(); };
     const handleDeleteDeck = async (deckId: string) => {
         if (!window.confirm("Are you sure you want to delete this deck and all its cards?")) return;
         const newDecks = student.CONFIG.flashcardDecks?.filter(d => d.id !== deckId) || [];
         onUpdateConfig({ flashcardDecks: newDecks });
         alert("Deck deleted.");
     };
-    // handleSaveCard is now passed from App.tsx, so no local definition needed.
-    // handleDeleteCard is now passed from App.tsx, so no local definition needed.
-    const handleStartReviewSession = (deckId: string) => { const deck = student.CONFIG.flashcardDecks?.find(d => d.id === deckId); if (deck) setReviewingDeck(deck); openModal('FlashcardReviewModal', setReviewingDeck, deck); }; // Use openModal
+    const handleStartReviewSession = (deckId: string) => { const deck = student.CONFIG.flashcardDecks?.find(d => d.id === deckId); if (deck) setReviewingDeck(deck); openModal('FlashcardReviewModal', setReviewingDeck, deck); };
     const handleSearchAction = (action: string, data?: any) => {
         switch (action) {
-            case 'create_task': setEditingTask(null); openModal('CreateEditTaskModal', setIsCreateModalOpen); break; // Use openModal
-            case 'practice': openModal('CustomPracticeModal', setIsPracticeModalOpen); break; // Use openModal
-            case 'log_result': openModal('LogResultModal', setLogResultModalOpen); break; // Use openModal
-            case 'analyze_mistake': openModal('AIMistakeAnalysisModal', setAiMistakeModalOpen); break; // Use openModal
-            case 'edit_task': setEditingTask(data); openModal('CreateEditTaskModal', setIsCreateModalOpen); break; // Use openModal
-            case 'edit_exam': setEditingExam(data); openModal('CreateEditExamModal', setIsExamModalOpen); break; // Use openModal
-            case 'view_deck': setViewingDeck(data); openModal('DeckViewModal', setViewingDeck, data); break; // Use openModal
+            case 'create_task': setEditingTask(null); openModal('CreateEditTaskModal', setIsCreateModalOpen); break;
+            case 'practice': openModal('CustomPracticeModal', setIsPracticeModalOpen); break;
+            case 'log_result': openModal('LogResultModal', setLogResultModalOpen); break;
+            case 'analyze_mistake': openModal('AIMistakeAnalysisModal', setAiMistakeModalOpen); break;
+            case 'edit_task': setEditingTask(data); openModal('CreateEditTaskModal', setIsCreateModalOpen); break;
+            case 'edit_exam': setEditingExam(data); openModal('CreateEditExamModal', setIsExamModalOpen); break;
+            case 'view_deck': setViewingDeck(data); openModal('DeckViewModal', setViewingDeck, data); break;
             default: break;
         }
     };
@@ -367,8 +368,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             'countdown': <CountdownWidget items={student.SCHEDULE_ITEMS} />,
             'dailyInsight': <DailyInsightWidget weaknesses={student.CONFIG.WEAK} exams={student.EXAMS} />,
             'quote': <MotivationalQuoteWidget quote="The expert in anything was once a beginner." />,
-            'music': <MusicPlayerWidget onOpenLibrary={() => openModal('MusicLibraryModal', setIsMusicLibraryOpen, true)} />, // Use openModal
-            'practice': <PracticeLauncherWidget onLaunch={() => openModal('CustomPracticeModal', setIsPracticeModalOpen)} />, // Use openModal
+            'music': <MusicPlayerWidget onOpenLibrary={() => openModal('MusicLibraryModal', setIsMusicLibraryOpen, true)} />,
+            'practice': <PracticeLauncherWidget onLaunch={() => openModal('CustomPracticeModal', setIsPracticeModalOpen)} />,
             'subjectAllocation': <SubjectAllocationWidget items={student.SCHEDULE_ITEMS} />,
             'scoreTrend': <ScoreTrendWidget results={student.RESULTS} />,
             'flashcards': <InteractiveFlashcardWidget 
@@ -380,7 +381,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                     if(deck) {
                         setViewingDeck(deck);
                         setEditingCard(null);
-                        // FIX: Use openModal pattern for creating new card from widget
                         openModal('CreateEditFlashcardModal', setCreateCardModalOpen); 
                     } else {
                         alert("Please create a deck first.");
@@ -388,7 +388,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                 }}
                 onOpenDeck={(deckId) => {
                     const deck = student.CONFIG.flashcardDecks?.find(d => d.id === deckId);
-                    if(deck) openModal('DeckViewModal', setViewingDeck, deck); // Use openModal
+                    if(deck) openModal('DeckViewModal', setViewingDeck, deck);
                 }}
             />,
             'readingHours': <ReadingHoursWidget student={student} />,
@@ -399,7 +399,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             'weather': <WeatherWidget />,
         };
 
-        // Add Custom Widgets dynamically
         student.CONFIG.customWidgets?.forEach(cw => {
             widgetComponents[cw.id] = <CustomWidget title={cw.title} content={cw.content} />;
         });
@@ -431,7 +430,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                         if (!widget) return null;
                         
                         const isLarge = ['countdown', 'dailyInsight', 'quote', 'clock'].includes(item.id) || item.wide;
-                        const isTall = item.tall; // Use new tall property
+                        const isTall = item.tall; 
                         const isMinimized = item.minimized;
 
                         return (
@@ -448,11 +447,10 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                                     '--glass-border': `rgba(255, 255, 255, 0.1)`
                                 } as React.CSSProperties}
                             >
-                                {/* MacOS Traffic Light Header */}
                                 <div className="flex items-center gap-1.5 p-2 pl-3 mb-1 window-controls absolute top-2 left-2 z-20">
                                     <div onClick={() => handleRemoveWidget(item.id)} className="traffic-light traffic-red cursor-pointer shadow-md"></div>
                                     <div onClick={() => handleToggleMinimizeWidget(item.id)} className="traffic-light traffic-yellow cursor-pointer shadow-md"></div>
-                                    <div onClick={() => { /* Maximize logic later */ }} className="traffic-light traffic-green cursor-pointer shadow-md"></div>
+                                    <div onClick={() => {}} className="traffic-light traffic-green cursor-pointer shadow-md"></div>
                                 </div>
                                 
                                 <div className={`h-full pt-8 ${isMinimized ? 'opacity-50' : ''}`}>
@@ -502,10 +500,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
 
     const renderContent = () => {
         switch (activeTab) {
-            case 'dashboard':
-                return renderDashboardContent();
-            case 'today':
-                return <TodayPlanner items={taskItems} onEdit={handleEditClick} />;
+            case 'dashboard': return renderDashboardContent();
+            case 'today': return <TodayPlanner items={taskItems} onEdit={handleEditClick} />;
             case 'schedule':
                  return (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -528,7 +524,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                                 onTaskSelect={handleTaskSelect}
                                 onToggleSelectMode={handleToggleSelectMode}
                                 onDeleteSelected={handleDeleteSelected}
-                                onMoveSelected={() => openModal('MoveTasksModal', setMoveModalOpen, true)} // Use openModal
+                                onMoveSelected={() => openModal('MoveTasksModal', setMoveModalOpen, true)}
                             />
                         </div>
                         <div className="space-y-8">
@@ -537,10 +533,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                         </div>
                     </div>
                  );
-             case 'planner':
-                return <PlannerView items={taskItems} onEdit={handleEditClick} />;
-            case 'material':
-                return <StudyMaterialView student={student} onUpdateConfig={onUpdateConfig} onViewFile={viewingFile => openModal('FileViewerModal', setViewingFile, viewingFile)} />;
+             case 'planner': return <PlannerView items={taskItems} onEdit={handleEditClick} />;
+            case 'material': return <StudyMaterialView student={student} onUpdateConfig={onUpdateConfig} onViewFile={viewingFile => openModal('FileViewerModal', setViewingFile, viewingFile)} />;
             case 'flashcards':
                 return <FlashcardManager 
                             decks={student.CONFIG.flashcardDecks || []}
@@ -552,7 +546,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                             onGenerateWithAI={() => openModal('AIGenerateFlashcardsModal', setAiFlashcardModalOpen, true)}
                         />;
             case 'exams':
-// FIX: Pass onDeleteExam prop to ExamsView to satisfy its required props.
                 return <ExamsView exams={student.EXAMS} onAdd={() => { setEditingExam(null); openModal('CreateEditExamModal', setIsExamModalOpen, true); }} onEdit={(exam) => { setEditingExam(exam); openModal('CreateEditExamModal', setIsExamModalOpen, true); }} onDelete={onDeleteExam} />;
             case 'performance':
                  return (
@@ -572,11 +565,10 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                 );
             case 'doubts':
                 return <CommunityDashboard student={student} allDoubts={allDoubts} onPostDoubt={onPostDoubt} onPostSolution={onPostSolution} onAskAi={() => openModal('AIDoubtSolverModal', setIsAiDoubtSolverOpen, true)} />;
-            default:
-                return null;
+            default: return null;
         }
     };
-// FIX: Add a return statement to the StudentDashboard component to render JSX and resolve the 'void' return type error.
+
     return (
         <main className={`mt-8 ${useToolbarLayout ? 'pb-24' : ''}`}>
             {useToolbarLayout ? (
@@ -593,6 +585,15 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             </div>
 
             {useToolbarLayout && <BottomToolbar activeTab={activeTab} setActiveTab={setActiveTab} onFabClick={() => { setEditingTask(null); openModal('CreateEditTaskModal', setIsCreateModalOpen, true); }} />}
+            
+            {deepLinkData && (
+                <DeepLinkConfirmationModal data={deepLinkData} onClose={() => setDeepLinkData(null)} onConfirm={() => onBatchImport({
+                    schedules: deepLinkData.schedules || [],
+                    exams: deepLinkData.exams || [],
+                    results: deepLinkData.results || [],
+                    weaknesses: deepLinkData.weaknesses || []
+                })} />
+            )}
         </main>
     );
 };

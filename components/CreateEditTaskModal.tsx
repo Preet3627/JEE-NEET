@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ScheduleItem, ScheduleCardData, HomeworkData, FlashcardDeck } from '../types';
 import Icon from './Icon';
@@ -15,69 +16,38 @@ interface CreateEditTaskModalProps {
 
 type TaskType = 'ACTION' | 'HOMEWORK' | 'FLASHCARD_REVIEW';
 
-const GRADIENT_PRESETS = [
-    { name: 'None', value: '' },
-    { name: 'Sunrise', value: 'from-orange-400 to-red-600' },
-    { name: 'Ocean', value: 'from-cyan-500 to-blue-600' },
-    { name: 'Nebula', value: 'from-purple-500 to-pink-600' },
-    { name: 'Emerald', value: 'from-green-400 to-emerald-600' },
-    { name: 'Midnight', value: 'from-gray-800 to-black' },
-];
+const parseAnswers = (text: string): Record<string, string> => {
+    const answers: Record<string, string> = {};
+    if (!text) return answers;
 
-const parseAnswers = (text: string): Record<string, string | string[]> => {
-  const answers: Record<string, string | string[]> = {};
-  if (!text) return answers;
-
-  // Attempt to parse as full JSON first for arrays
-  try {
-    const jsonAttempt = JSON.parse(text);
-    if (typeof jsonAttempt === 'object' && jsonAttempt !== null && !Array.isArray(jsonAttempt)) {
-      // Validate that all values are string or string[]
-      const isValidJson = Object.values(jsonAttempt).every(
-        val => typeof val === 'string' || (Array.isArray(val) && val.every(item => typeof item === 'string'))
-      );
-      if (isValidJson) return jsonAttempt;
-    }
-  } catch (e) {
-    // Not a direct JSON object, proceed with simpler parsing
-  }
-
-  // Check for key-value pair format (e.g., "1:A, 2:C")
-  if (/[:=,;\n]/.test(text) && !text.includes(' ') ) { // Added !text.includes(' ') to differentiate from space separated list
-    const entries = text.split(/[,;\n]/);
-    entries.forEach(entry => {
-      const parts = entry.split(/[:=]/); // Allow : or = as separator
-      if (parts.length === 2) {
-        const qNum = parts[0].trim();
-        const answer = parts[1].trim();
-        if (qNum && answer) {
-            if (answer.startsWith('[') && answer.endsWith(']')) {
-                answers[qNum] = answer.slice(1, -1).split(',').map(s => s.trim()); // Trim items in array
-            } else {
-                answers[qNum] = answer;
+    // Check for key-value pair format first
+    if (/[:=,;\n]/.test(text)) {
+        const entries = text.split(/[,;\n]/);
+        entries.forEach(entry => {
+            const parts = entry.split(/[:=]/);
+            if (parts.length === 2) {
+                const qNum = parts[0].trim();
+                const answer = parts[1].trim();
+                if (qNum && answer) {
+                    answers[qNum] = answer;
+                }
             }
-        }
-      }
-    });
-  } else {
-    // Assume space-separated list for questions 1, 2, 3... (e.g., "A C 12.5")
-    const answerList = text.trim().split(/\s+/);
-    answerList.forEach((answer, index) => {
-      if (answer) answers[(index + 1).toString()] = answer;
-    });
-  }
-  return answers;
+        });
+    } else {
+        // Assume space-separated list for questions 1, 2, 3...
+        const answerList = text.trim().split(/\s+/);
+        answerList.forEach((answer, index) => {
+            if (answer) {
+                answers[(index + 1).toString()] = answer;
+            }
+        });
+    }
+    return answers;
 };
 
-
-const formatAnswers = (answers?: Record<string, string | string[]>): string => {
-  if (!answers) return '';
-  return Object.entries(answers).map(([q, a]) => {
-    if (Array.isArray(a)) {
-      return `${q}:[${a.join(',')}]`;
-    }
-    return `${q}:${a}`;
-  }).join('\n');
+const formatAnswers = (answers?: Record<string, string>): string => {
+    if (!answers) return '';
+    return Object.entries(answers).map(([q, a]) => `${q}:${a}`).join('\n');
 };
 
 const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnly = false, onClose, onSave, decks, animationOrigin }) => {
@@ -96,7 +66,7 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
     if (task && task.type === 'HOMEWORK') return '';
     const initialType = getInitialTaskType();
     if (initialType === 'HOMEWORK') return '';
-    return '20:00'; 
+    return '20:00';
   };
 
   const [taskType, setTaskType] = useState<TaskType>(getInitialTaskType());
@@ -106,15 +76,11 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
     subject: task ? task.SUBJECT_TAG.EN : 'PHYSICS',
     time: getInitialTime(),
     day: task ? task.DAY.EN.toUpperCase() : new Date().toLocaleString('en-us', {weekday: 'long'}).toUpperCase(),
-    date: task && 'date' in task ? task.date : '', 
+    date: task && 'date' in task ? task.date : '',
     qRanges: task?.type === 'HOMEWORK' ? task.Q_RANGES : '',
     category: task?.type === 'HOMEWORK' ? task.category || 'Custom' : 'Custom',
     deckId: task?.type === 'ACTION' && task.SUB_TYPE === 'FLASHCARD_REVIEW' ? task.deckId : (decks.length > 0 ? decks[0].id : ''),
     answers: task?.type === 'HOMEWORK' ? formatAnswers(task.answers) : '',
-    gradient: (task && 'gradient' in task) ? task.gradient : '',
-    imageUrl: (task && 'imageUrl' in task) ? task.imageUrl : '',
-    externalLink: (task && 'externalLink' in task) ? task.externalLink : '',
-    isRecurring: (task && 'isRecurring' in task) ? !!task.isRecurring : false,
   });
   const [isExiting, setIsExiting] = useState(false);
   const [isAiKeyModalOpen, setIsAiKeyModalOpen] = useState(false);
@@ -134,37 +100,36 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
     const dayData = formData.date ? { EN: new Date(`${formData.date}T12:00:00Z`).toLocaleString('en-us', {weekday: 'long', timeZone: 'UTC'}).toUpperCase(), GU: "" } : { EN: formData.day, GU: "" };
     const dateData = formData.date ? { date: formData.date } : {};
 
-    const baseData = {
-        isUserCreated: true,
-        DAY: dayData,
-        ...dateData,
-        CARD_TITLE: { EN: formData.title, GU: "" },
-        FOCUS_DETAIL: { EN: formData.details, GU: "" },
-        SUBJECT_TAG: { EN: formData.subject.toUpperCase(), GU: "" },
-        TIME: formData.time || undefined,
-        googleEventId: isEditing && 'googleEventId' in task ? task.googleEventId : undefined,
-        gradient: formData.gradient,
-        imageUrl: formData.imageUrl,
-        externalLink: formData.externalLink,
-        isRecurring: formData.isRecurring && !formData.date, // Only recur if no specific date
-    };
-
     if (taskType === 'HOMEWORK') {
         finalTask = {
-            ...baseData,
             ID: isEditing && task.type === 'HOMEWORK' ? task.ID : `H${Date.now()}`,
             type: 'HOMEWORK',
+            isUserCreated: true,
+            DAY: dayData,
+            ...dateData,
+            CARD_TITLE: { EN: formData.title, GU: "" },
+            FOCUS_DETAIL: { EN: formData.details, GU: "" },
+            SUBJECT_TAG: { EN: formData.subject.toUpperCase(), GU: "" },
             Q_RANGES: formData.qRanges,
+            TIME: formData.time || undefined,
             category: formData.category as HomeworkData['category'],
-            answers: parseAnswers(formData.answers), // This returns Record<string, string | string[]>
+            answers: parseAnswers(formData.answers),
+            googleEventId: isEditing && 'googleEventId' in task ? task.googleEventId : undefined,
         } as HomeworkData;
-    } else { 
+    } else {
         finalTask = {
-            ...baseData,
             ID: isEditing && task.type === 'ACTION' ? task.ID : `A${Date.now()}`,
             type: 'ACTION',
             SUB_TYPE: taskType === 'FLASHCARD_REVIEW' ? 'FLASHCARD_REVIEW' : 'DEEP_DIVE',
+            isUserCreated: true,
+            DAY: dayData,
+            ...dateData,
+            CARD_TITLE: { EN: formData.title, GU: "" },
+            FOCUS_DETAIL: { EN: formData.details, GU: "" },
+            SUBJECT_TAG: { EN: formData.subject.toUpperCase(), GU: "" },
+            TIME: formData.time,
             deckId: taskType === 'FLASHCARD_REVIEW' ? formData.deckId : undefined,
+            googleEventId: isEditing && 'googleEventId' in task ? task.googleEventId : undefined,
         } as ScheduleCardData;
     }
 
@@ -177,21 +142,35 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
   const inputClass = "w-full px-4 py-2 mt-1 text-gray-200 bg-gray-900/50 border border-[var(--glass-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:bg-gray-800/50 disabled:cursor-not-allowed";
 
   const ViewField: React.FC<{ label: string, value?: string }> = ({ label, value }) => (
-    value ? <div><p className="text-sm font-bold text-gray-400">{label}</p><p className="text-gray-200 mt-1">{value}</p></div> : null
+    value ? (
+        <div>
+            <p className="text-sm font-bold text-gray-400">{label}</p>
+            <p className="text-gray-200 mt-1">{value}</p>
+        </div>
+    ) : null
   );
 
   const ModalShell: React.FC<{ children: React.ReactNode, title: string }> = ({ children, title }) => (
-    <div className={`fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${animationClasses}`} style={{ '--clip-origin-x': animationOrigin?.x, '--clip-origin-y': animationOrigin?.y } as React.CSSProperties} onClick={handleClose}>
-      <div className={`w-full max-w-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--modal-border-radius)] shadow-[var(--modal-shadow)] ${contentAnimationClasses} max-h-[90vh] overflow-hidden flex flex-col`} onClick={(e) => e.stopPropagation()}>
-        {/* MacOS Traffic Light Header */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-black/20">
-            <button onClick={handleClose} className="w-3 h-3 rounded-full bg-[#ff5f56] hover:bg-[#ff5f56]/80 shadow-inner"></button>
-            <div className="w-3 h-3 rounded-full bg-[#ffbd2e] shadow-inner"></div>
-            <div className="w-3 h-3 rounded-full bg-[#27c93f] shadow-inner"></div>
-            <span className="ml-2 text-xs font-medium text-gray-400 tracking-wide">{title}</span>
-        </div>
-
-        <div className={`p-6 ${theme === 'liquid-glass' ? 'overflow-y-auto' : ''}`}>
+    <div
+      className={`fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${animationClasses}`}
+      style={{ '--clip-origin-x': animationOrigin?.x, '--clip-origin-y': animationOrigin?.y } as React.CSSProperties}
+      onClick={handleClose}
+    >
+      <div
+        className={`w-full max-w-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--modal-border-radius)] shadow-[var(--modal-shadow)] ${contentAnimationClasses} max-h-[90vh] overflow-hidden flex flex-col`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {theme === 'liquid-glass' && (
+          <div className="flex-shrink-0 flex items-center p-3 border-b border-[var(--glass-border)]">
+            <div className="flex gap-2">
+              <button onClick={handleClose} className="w-3 h-3 rounded-full bg-red-500"></button>
+              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+            </div>
+            <h2 className="text-sm font-semibold text-white text-center flex-grow -ml-12">{title}</h2>
+          </div>
+        )}
+        <div className={`p-6 flex-grow overflow-y-auto ${theme === 'liquid-glass' ? '' : ''}`}>
           {theme !== 'liquid-glass' && <h2 className="text-2xl font-bold text-white mb-4">{title}</h2>}
           {children}
         </div>
@@ -210,7 +189,6 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
                 {'TIME' in task && <ViewField label="Time" value={task.TIME} />}
             </div>
             <ViewField label="Subject" value={task.SUBJECT_TAG.EN} />
-            {'externalLink' in task && <ViewField label="External Link" value={task.externalLink} />}
             {task.type === 'HOMEWORK' && <ViewField label="Questions" value={task.Q_RANGES} />}
             
             <div className="flex justify-end gap-4 pt-4">
@@ -237,14 +215,13 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
 
             <div>
               <label className="text-sm font-bold text-gray-400">Title</label>
-              <input required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className={inputClass} />
+              <input required autoComplete="off" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className={inputClass} />
             </div>
              <div>
               <label className="text-sm font-bold text-gray-400">Details</label>
-              <textarea required value={formData.details} onChange={e => setFormData({...formData, details: e.target.value})} className={inputClass}></textarea>
+              <textarea required autoComplete="off" value={formData.details} onChange={e => setFormData({...formData, details: e.target.value})} className={inputClass}></textarea>
             </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                  <div>
                     <label className="text-sm font-bold text-gray-400">Repeating Day</label>
                     <select required value={formData.day} onChange={e => setFormData({...formData, day: e.target.value, date: ''})} className={`${inputClass} disabled:opacity-50`} disabled={!!formData.date}>
@@ -256,13 +233,6 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
                     <input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className={inputClass} />
                 </div>
              </div>
-             {!formData.date && (
-                 <div className="flex items-center gap-2">
-                     <input type="checkbox" checked={formData.isRecurring} onChange={e => setFormData({...formData, isRecurring: e.target.checked})} className="w-4 h-4 rounded text-cyan-600 bg-gray-900 border-gray-600" />
-                     <label className="text-sm text-gray-300">Repeat Weekly in Calendar (2 years)</label>
-                 </div>
-             )}
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                  <div>
                     <label className="text-sm font-bold text-gray-400">Time</label>
@@ -277,19 +247,6 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
                         <option value="OTHER">Other</option>
                     </select>
                 </div>
-             </div>
-             
-             {/* Customization & Linking */}
-             <div className="bg-gray-900/50 p-3 rounded-lg border border-gray-700/50 space-y-3">
-                 <h4 className="text-sm font-bold text-cyan-400">Advanced</h4>
-                 <div><label className="text-xs font-bold text-gray-400">External App Link</label><input value={formData.externalLink} onChange={e => setFormData({...formData, externalLink: e.target.value})} className={inputClass + " py-1 text-sm"} placeholder="https://zoom.us/..., https://unacademy.com/..." /></div>
-                 <div><label className="text-xs font-bold text-gray-400">Background Image</label><input value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} className={inputClass + " py-1 text-sm"} placeholder="https://example.com/image.jpg" /></div>
-                 <div>
-                    <label className="text-xs font-bold text-gray-400">Gradient</label>
-                    <select value={formData.gradient} onChange={e => setFormData({...formData, gradient: e.target.value})} className={inputClass + " py-1 text-sm"}>
-                        {GRADIENT_PRESETS.map(p => <option key={p.name} value={p.value}>{p.name}</option>)}
-                    </select>
-                 </div>
              </div>
 
             {taskType === 'HOMEWORK' && (
@@ -315,7 +272,7 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
                             <Icon name="gemini" className="w-3 h-3" /> Generate with AI
                         </button>
                     </div>
-                  <textarea value={formData.answers} onChange={e => setFormData({...formData, answers: e.target.value})} className={`${inputClass} h-24 font-mono`} placeholder="Formats:&#10;1:A, 2:C, 3:12.5 (key-value)&#10;A C 12.5 (space-separated list)" />
+                  <textarea autoComplete="off" value={formData.answers} onChange={e => setFormData({...formData, answers: e.target.value})} className={`${inputClass} h-24 font-mono`} placeholder="Formats:&#10;1:A, 2:C, 3:12.5 (key-value)&#10;A C 12.5 (space-separated list)" />
                 </div>
               </>
             )}

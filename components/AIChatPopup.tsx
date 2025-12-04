@@ -37,6 +37,7 @@ const AIChatPopup: React.FC<AIChatPopupProps> = ({ history, onSendMessage, onClo
   const jsonFileInputRef = useRef<HTMLInputElement>(null);
   const chatBodyRef = useRef<HTMLDivElement>(null);
   
+  // Auto-scroll to bottom whenever history updates or loading state changes
   useEffect(() => {
     if (chatBodyRef.current) {
       chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
