@@ -640,10 +640,10 @@ async function getUserData(userId) {
     return {
         ...user,
         CONFIG: config,
-        SCHEDULE_ITEMS: schedule.map(r => ({ ...decrypt(JSON.parse(r.data)), ID: r.ID.toString() })),
-        RESULTS: results.map(r => decrypt(JSON.parse(r.data))),
-        EXAMS: exams.map(r => decrypt(JSON.parse(r.data))),
-        STUDY_SESSIONS: sessions.map(r => decrypt(JSON.parse(r.data)))
+        SCHEDULE_ITEMS: schedule.map(r => ({ ...decrypt(r.data), ID: r.ID.toString() })),
+        RESULTS: results.map(r => decrypt(r.data)),
+        EXAMS: exams.map(r => decrypt(r.data)),
+        STUDY_SESSIONS: sessions.map(r => decrypt(r.data))
     };
 }
 
