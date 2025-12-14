@@ -321,11 +321,22 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
                 setDuration(audio.duration);
                 updateMediaPosition();
             });
+            audio.addEventListener('error', (e) => {
+                console.error("Audio playback error:", e);
+                setIsPlaying(false);
+                setCurrentTrack(null);
+                alert("Failed to load or play audio. Please check the network or try another track.");
+            });
         }
         if (!djDropAudioRef.current) {
             const drop = new Audio(DJ_DROP_URL);
             drop.crossOrigin = "anonymous";
             djDropAudioRef.current = drop;
+            // Add error handler for DJ drop audio element
+            drop.addEventListener('error', (e) => {
+                console.error("DJ Drop audio error:", e);
+                // Optionally, inform user or disable DJ drop for current session
+            });
         }
     }, [navigateTrack]);
 
