@@ -19,7 +19,6 @@ const app = express();
 // Fix for Cross-Origin-Opener-Policy blocking Google Sign-In popup
 app.use((req, res, next) => {
     res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-    res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
     res.setHeader("Referrer-Policy", "no-referrer-when-downgrade");
     next();
 });
@@ -497,9 +496,31 @@ app.post('/api/register', async (req, res) => {
         // Default Config
         const defaultConfig = {
             WAKE: '06:00', SCORE: '0/300', WEAK: [],
-            settings: { accentColor: '#0891b2', theme: 'default', examType: 'JEE' }
+            settings: { 
+                accentColor: '#0891b2', theme: 'default', examType: 'JEE',
+                dashboardLayout: [
+                    { id: 'clock' }, { id: 'practice' }, { id: 'dailyInsight', wide: true }, 
+                    { id: 'quote', wide: true }, { id: 'music', wide: true }, 
+                    { id: 'subjectAllocation' }, { id: 'scoreTrend' }, 
+                    { id: 'flashcards' }, { id: 'readingHours' }, 
+                    { id: 'todaysAgenda', wide: true }, { id: 'upcomingExams', wide: true }, 
+                    { id: 'homework' }, { id: 'visualizer' }, { id: 'weather' }, { id: 'countdown' }
+                ]
+            }
         };
         await pool.query('INSERT INTO user_configs (user_id, config) VALUES (?, ?)', [newUserId, JSON.stringify(defaultConfig)]);
+
+        // Add a sample welcome task
+        const welcomeTask = {
+            ID: `A${Date.now()}`, type: 'ACTION', isUserCreated: true,
+            DAY: { EN: new Date().toLocaleString('en-us', {weekday: 'long'}).toUpperCase(), GU: "" },
+            TIME: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+            CARD_TITLE: { EN: "Welcome to JEE Scheduler Pro!", GU: "" },
+            FOCUS_DETAIL: { EN: "This is a sample task. You can edit or delete it. Explore the app and start planning your studies!", GU: "" },
+            SUBJECT_TAG: { EN: "GENERAL", GU: "" },
+        };
+        const encryptedTask = JSON.stringify(encrypt(welcomeTask));
+        await pool.query('INSERT INTO schedule_items (user_id, data) VALUES (?, ?)', [newUserId, encryptedTask]);
 
         // Send verification email
         if (mailer) {
@@ -551,9 +572,31 @@ app.post('/api/auth/google', async (req, res) => {
             
             const defaultConfig = {
                 WAKE: '06:00', SCORE: '0/300', WEAK: [],
-                settings: { accentColor: '#0891b2', theme: 'default', examType: 'JEE' }
+                settings: { 
+                    accentColor: '#0891b2', theme: 'default', examType: 'JEE',
+                    dashboardLayout: [
+                        { id: 'clock' }, { id: 'practice' }, { id: 'dailyInsight', wide: true }, 
+                        { id: 'quote', wide: true }, { id: 'music', wide: true }, 
+                        { id: 'subjectAllocation' }, { id: 'scoreTrend' }, 
+                        { id: 'flashcards' }, { id: 'readingHours' }, 
+                        { id: 'todaysAgenda', wide: true }, { id: 'upcomingExams', wide: true }, 
+                        { id: 'homework' }, { id: 'visualizer' }, { id: 'weather' }, { id: 'countdown' }
+                    ]
+                }
             };
             await pool.query('INSERT INTO user_configs (user_id, config) VALUES (?, ?)', [user.id, JSON.stringify(defaultConfig)]);
+
+            // Add a sample welcome task
+            const welcomeTask = {
+                ID: `A${Date.now()}`, type: 'ACTION', isUserCreated: true,
+                DAY: { EN: new Date().toLocaleString('en-us', {weekday: 'long'}).toUpperCase(), GU: "" },
+                TIME: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+                CARD_TITLE: { EN: "Welcome to JEE Scheduler Pro!", GU: "" },
+                FOCUS_DETAIL: { EN: "This is a sample task. You can edit or delete it. Explore the app and start planning your studies!", GU: "" },
+                SUBJECT_TAG: { EN: "GENERAL", GU: "" },
+            };
+            const encryptedTask = JSON.stringify(encrypt(welcomeTask));
+            await pool.query('INSERT INTO schedule_items (user_id, data) VALUES (?, ?)', [user.id, encryptedTask]);
         }
 
         const token = jwt.sign({ id: user.id, sid: user.sid, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
@@ -713,22 +756,29 @@ async function getUserData(userId) {
         WAKE: '06:00', SCORE: '0/300', WEAK: [],
         settings: { 
             accentColor: '#0891b2', 
-            blurEnabled: false, // Default value
-            mobileLayout: 'standard', // Default value
-            forceOfflineMode: false, // Default value
-            perQuestionTime: 180, // Default value
-            showAiChatAssistant: true, // Default value
-            hasGeminiKey: false, // Default value
-            examType: 'JEE', // Default value
-            theme: 'default', // Default value
-            dashboardLayout: [], // Default empty array
-            dashboardFlashcardDeckIds: [], // Default empty array
-            musicPlayerWidgetLayout: 'minimal', // Default value
-            dashboardBackgroundImage: '', // Default empty string
-            dashboardTransparency: 0.8, // Default value
-            notchSettings: { position: 'top', size: 'small', width: 100, enabled: false }, // Default object
-            visualizerSettings: { preset: 'bars', colorMode: 'rgb' }, // Default object
-            djDropSettings: { enabled: false, autoTrigger: false }, // Default object
+            blurEnabled: false, 
+            mobileLayout: 'standard', 
+            forceOfflineMode: false, 
+            perQuestionTime: 180, 
+            showAiChatAssistant: true, 
+            hasGeminiKey: false, 
+            examType: 'JEE', 
+            theme: 'default', 
+            dashboardLayout: [
+                { id: 'clock' }, { id: 'practice' }, { id: 'dailyInsight', wide: true }, 
+                { id: 'quote', wide: true }, { id: 'music', wide: true }, 
+                { id: 'subjectAllocation' }, { id: 'scoreTrend' }, 
+                { id: 'flashcards' }, { id: 'readingHours' }, 
+                { id: 'todaysAgenda', wide: true }, { id: 'upcomingExams', wide: true }, 
+                { id: 'homework' }, { id: 'visualizer' }, { id: 'weather' }, { id: 'countdown' }
+            ], 
+            dashboardFlashcardDeckIds: [], 
+            musicPlayerWidgetLayout: 'minimal',
+            dashboardBackgroundImage: '', 
+            dashboardTransparency: 0.8, 
+            notchSettings: { position: 'top', size: 'small', width: 100, enabled: false }, 
+            visualizerSettings: { preset: 'bars', colorMode: 'rgb' },
+            djDropSettings: { enabled: false, autoTrigger: false },
         }
     };
     const config = { 
