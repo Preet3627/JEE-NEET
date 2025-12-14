@@ -5,7 +5,6 @@ import Icon from './Icon';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
 import { Track } from '../types';
 import StaticWaveform from './StaticWaveform';
-import * as mm from 'music-metadata-browser';
 import { addTrackToDb, getAllTracksFromDb, deleteTrackFromDb, getTrackFromDb } from '../utils/musicDb';
 import { useServerStatus } from '../context/ServerStatusContext';
 
@@ -20,29 +19,23 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
     const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState({ title: '', artist: '' });
     const [error, setError] = useState('');
-    const localFilesInputRef = useRef<HTMLInputElement>(null);
-    const localFolderInputRef = useRef<HTMLInputElement>(null);
     const [isSyncing, setIsSyncing] = useState(false);
 
     const loadTracks = async (syncWithCloud = false) => {
         setIsSyncing(true);
         setError('');
-
-        // Load from IndexedDB first
-        const localTracks = await getAllTracksFromDb();
-        const localTrackObjects = localTracks.map(t => ({...t.track, path: URL.createObjectURL(t.blob), isLocal: true}));
         
         if (!syncWithCloud) {
-            setTracks(localTrackObjects);
+            setTracks([]); // No local tracks to load without adding local files
             setIsSyncing(false);
             if (!status?.musicWebDAV.configured) {
-                setError("The administrator has not configured the music library. You can still add and play local files.");
+                setError("The administrator has not configured the music library. You can still play music from cloud if configured.");
             }
             return;
         }
 
         if (!status?.musicWebDAV.configured) {
-            setError("The administrator has not configured the music library. You can still add and play local files.");
+            setError("The administrator has not configured the music library. You can still play music from cloud if configured.");
             setIsSyncing(false);
             return;
         }
@@ -52,55 +45,27 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
             const files = await api.getMusicFiles('/');
             if (Array.isArray(files)) {
                 const audioFiles = files.filter(f => f.name.match(/\.(mp3|m4a|wav)$/i));
-                const paths = audioFiles.map(f => f.path);
-
-                const metadataResults = await api.getMusicMetadataBatch(paths);
                 
                 const remoteTracks = audioFiles.map(file => {
-                    const metadataResult = metadataResults.find(m => m.path === file.path);
-                    if (metadataResult && !metadataResult.error) {
-                        const metadata = metadataResult.metadata;
-                        return {
-                            id: file.path,
-                            title: metadata.common.title || file.name.replace(/\.[^/.]+$/, ""),
-                            artist: metadata.common.artist || 'Unknown Artist',
-                            album: metadata.common.album || 'Cloud',
-                            genre: metadata.common.genre?.[0] || 'Unclassified',
-                            track: metadata.common.track.no?.toString() || '1',
-                            coverArt: metadata.common.picture?.[0] ? `data:${metadata.common.picture[0].format};base64,${metadata.common.picture[0].data.toString('base64')}` : '',
-                            duration: metadata.format.duration ? metadata.format.duration.toString() : '--:--',
-                            size: file.size.toString(),
-                            path: file.path,
-                            isLocal: false
-                        };
-                    } else {
-                        // Fallback
-                        let title = file.name.replace(/\.[^/.]+$/, "");
-                        let artist = 'Unknown Artist';
-                        const separators = [" - ", " – ", "_-_"];
-                        for (const sep of separators) {
-                            if (title.includes(sep)) {
-                                const parts = title.split(sep);
-                                if (parts.length >= 2) {
-                                    artist = parts[0].trim();
-                                    title = parts.slice(1).join(sep).trim();
-                                    break;
-                                }
+                    let title = file.name.replace(/\.[^/.]+$/, "");
+                    let artist = 'Unknown Artist';
+                    const separators = [" - ", " – ", "_-_"];
+                    for (const sep of separators) {
+                        if (title.includes(sep)) {
+                            const parts = title.split(sep);
+                            if (parts.length >= 2) {
+                                artist = parts[0].trim();
+                                title = parts.slice(1).join(sep).trim();
+                                break;
                             }
                         }
-                        return {
-                            id: file.path, title, artist, genre: 'Unclassified', album: 'Cloud', track: '1', coverArt: '', duration: '--:--', size: file.size.toString(), path: file.path, isLocal: false
-                        };
                     }
+                    return {
+                        id: file.path, title, artist, genre: 'Unclassified', album: 'Cloud', track: '1', coverArt: '', duration: '--:--', size: file.size.toString(), path: file.path, isLocal: false
+                    };
                 });
                 
-                const allTracks = [...localTrackObjects];
-                remoteTracks.forEach(remoteTrack => {
-                    if (!allTracks.some(localTrack => localTrack.id === remoteTrack.id)) {
-                        allTracks.push(remoteTrack);
-                    }
-                });
-                setTracks(allTracks);
+                setTracks(remoteTracks);
             }
         } catch (err: any) {
             console.error("Failed to load music files:", err);
@@ -117,51 +82,6 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
             loadTracks(false);
         }
     }, [status]);
-
-    const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const files = event.target.files;
-        if (!files) return;
-    
-        const newTracks: Track[] = [];
-        for (const file of Array.from(files)) {
-            if (file.type.startsWith('audio/')) {
-                try {
-                    const metadata = await mm.parseBlob(file);
-                    const newTrack: Track = {
-                        id: `local_${file.name}_${Date.now()}`,
-                        title: metadata.common.title || file.name.replace(/\.[^/.]+$/, ""),
-                        artist: metadata.common.artist || 'Unknown Artist',
-                        album: metadata.common.album || 'Local File',
-                        genre: metadata.common.genre?.[0] || 'Unclassified',
-                        track: metadata.common.track.no?.toString() || '1',
-                        coverArt: metadata.common.picture?.[0] ? URL.createObjectURL(new Blob([metadata.common.picture[0].data], { type: metadata.common.picture[0].format })) : '',
-                        duration: metadata.format.duration ? metadata.format.duration.toString() : '0',
-                        size: file.size.toString(),
-                        path: URL.createObjectURL(file),
-                        isLocal: true
-                    };
-                    newTracks.push(newTrack);
-                } catch (error) {
-                    console.error('Error parsing metadata for', file.name, error);
-                    const newTrack: Track = {
-                        id: `local_${file.name}_${Date.now()}`,
-                        title: file.name.replace(/\.[^/.]+$/, ""),
-                        artist: 'Unknown Artist',
-                        album: 'Local File',
-                        genre: 'Unclassified',
-                        track: '1',
-                        coverArt: '',
-                        duration: '0',
-                        size: file.size.toString(),
-                        path: URL.createObjectURL(file),
-                        isLocal: true
-                    };
-                    newTracks.push(newTrack);
-                }
-            }
-        }
-        setTracks(prev => [...prev, ...newTracks]);
-    };
 
     const handleEditClick = (e: React.MouseEvent, track: Track) => {
         e.stopPropagation();
@@ -263,17 +183,9 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
                             <button onClick={() => loadTracks(true)} disabled={isSyncing || !status?.musicWebDAV.configured} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 disabled:opacity-50">
                                 <Icon name="sync" className={isSyncing ? 'animate-spin' : ''} /> Sync with Cloud
                             </button>
-                            <button onClick={() => localFilesInputRef.current?.click()} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2">
-                                <Icon name="plus" /> Add Files
-                            </button>
-                            <button onClick={() => localFolderInputRef.current?.click()} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2">
-                                <Icon name="folder" /> Add Folder
-                            </button>
                         </div>
                         <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search tracks..." className="bg-[#222] border border-white/10 rounded-full px-5 py-3 text-base text-white w-full md:w-64 focus:border-cyan-500 outline-none transition-colors" />
                     </div>
-                    <input type="file" multiple accept="audio/*" ref={localFilesInputRef} onChange={handleFileSelect} className="hidden" />
-                    <input type="file" webkitdirectory="" directory="" multiple accept="audio/*" ref={localFolderInputRef} onChange={handleFileSelect} className="hidden" />
                 </header>
 
                 <div className="flex-grow overflow-y-auto p-2 md:p-4 custom-scrollbar bg-[#050505] pb-24 md:pb-4">

@@ -137,7 +137,6 @@ export const api = {
     
     // Music
     getMusicFiles: (path: string) => authFetch(`/music/browse?path=${encodeURIComponent(path)}`),
-    getMusicMetadataBatch: (paths: string[]) => authFetch('/music/metadata/batch', { method: 'POST', body: JSON.stringify({ paths }) }),
     getMusicContentUrl: (path: string) => `${API_URL}/music/content?path=${encodeURIComponent(path)}&token=${localStorage.getItem('token')}`, // Directly returns URL for audio element
     getMusicAlbumArtUrl: (path: string) => `${API_URL}/music/album-art?path=${encodeURIComponent(path)}&token=${localStorage.getItem('token')}`, // Directly returns URL for audio element
 

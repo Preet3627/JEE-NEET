@@ -1066,6 +1066,69 @@ app.post('/api/ai/chat', authenticateToken, async (req, res) => {
     }
 });
 
+app.post('/api/ai/daily-insight', authenticateToken, async (req, res) => {
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    const { weaknesses, syllabus } = req.body;
+
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        
+        let prompt = `Generate a concise, inspiring daily study insight.`;
+        if (weaknesses && weaknesses.length > 0) {
+            prompt += ` Focus on these weaknesses: ${weaknesses.join(', ')}.`;
+        }
+        if (syllabus) {
+            prompt += ` Also consider the following syllabus: ${syllabus}.`;
+        }
+        prompt += ` Provide both a short motivational quote and a practical study tip. Format your response as a JSON object with 'quote' and 'insight' fields.`;
+
+        const result = await model.generateContent(prompt);
+        const insight = parseAIResponse(result.response.text());
+        
+        if (!insight.quote || !insight.insight) {
+            throw new Error("AI response did not contain expected 'quote' or 'insight' fields.");
+        }
+
+        res.json(insight);
+    } catch (e) {
+        console.error("AI Daily Insight Error", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/ai/generate-practice-test', authenticateToken, async (req, res) => {
+    if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
+    const { topic, numQuestions, difficulty, questionTypes, isPYQ, chapters, examType, userId } = req.body;
+
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        
+        let prompt = `Generate a practice test with ${numQuestions} questions.`;
+        if (topic) prompt += ` The main topic is "${topic}".`;
+        if (difficulty) prompt += ` Difficulty: ${difficulty}.`;
+        if (questionTypes && questionTypes.length > 0) prompt += ` Include question types: ${questionTypes.join(', ')}.`;
+        if (isPYQ) prompt += ` Include Previous Year Questions (PYQ).`;
+        if (chapters && chapters.length > 0) prompt += ` Focus on chapters: ${chapters.join(', ')}.`;
+        if (examType) prompt += ` The exam type is ${examType}.`;
+        
+        prompt += ` Provide an array of question objects and a separate JSON object for correct answers. Each question object must have 'number', 'text', 'options' (array of strings, empty for NUM), and 'type' ('MCQ', 'NUM', or 'MULTI_CHOICE'). The answers object should map question numbers to their correct answers (e.g., {"1": "A", "2": "12.5", "3": ["A", "B"]}). If there are no options, leave it blank. If multi choice, make options in array.
+
+        Format your response as a JSON object with two fields: 'questions' (an array of question objects) and 'answers' (a JSON object mapping question numbers to their correct answers).`;
+
+        const result = await model.generateContent(prompt);
+        const practiceTest = parseAIResponse(result.response.text());
+        
+        if (!practiceTest.questions || !Array.isArray(practiceTest.questions) || !practiceTest.answers || typeof practiceTest.answers !== 'object') {
+            throw new Error("AI response did not contain expected 'questions' array or 'answers' object.");
+        }
+
+        res.json(practiceTest);
+    } catch (e) {
+        console.error("AI Generate Practice Test Error", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.post('/api/ai/parse-text', authenticateToken, async (req, res) => {
     if (!genAI) return res.status(503).json({ error: "AI Service Unavailable" });
     const { text } = req.body;
