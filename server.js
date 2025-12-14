@@ -514,6 +514,16 @@ app.post('/api/auth/google', async (req, res) => {
 
         const token = jwt.sign({ id: user.id, sid: user.sid, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
         const userData = await getUserData(user.id);
+
+        // --- Simulated call to fetchGoogleUserInfo for robustness demonstration ---
+        try {
+            const googleUserInfo = await fetchGoogleUserInfo('DUMMY_ACCESS_TOKEN');
+            console.log('Simulated Google User Info (for robustness test):', googleUserInfo);
+        } catch (simulatedError) {
+            console.warn('Simulated fetchGoogleUserInfo call failed (expected if DUMMY_ACCESS_TOKEN is invalid):', simulatedError.message);
+        }
+        // --- End of simulated call ---
+
         res.json({ token, user: userData });
 
     } catch (error) {
@@ -568,6 +578,33 @@ async function getUserData(userId) {
         STUDY_SESSIONS: sessions.map(r => decrypt(JSON.parse(r.data)))
     };
 }
+
+// Helper to fetch user info from Google (to address potential original error)
+async function fetchGoogleUserInfo(accessToken) {
+    try {
+        const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            }
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Failed to fetch user data from Google:', response.status, errorText);
+            throw new Error('Failed to fetch user data from Google: ' + errorText);
+        }
+        try {
+            return await response.json();
+        } catch (jsonError) {
+            const responseText = await response.text();
+            console.error('Failed to parse Google user data as JSON:', jsonError, 'Response Text:', responseText);
+            throw new Error('Failed to parse Google user data as JSON: ' + responseText);
+        }
+    } catch (error) {
+        console.error('Error in fetchGoogleUserInfo:', error);
+        throw error;
+    }
+}
+
 
 // Protected Routes
 app.get('/api/me', authenticateToken, async (req, res) => {
