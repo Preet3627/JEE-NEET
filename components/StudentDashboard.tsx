@@ -192,6 +192,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
     const [scheduleView, setScheduleView] = useState<'upcoming' | 'past'>('upcoming');
     const [deepLinkData, setDeepLinkData] = useState<any | null>(null);
+    const [triggeredAlarms, setTriggeredAlarms] = useState<Set<string>>(new Set());
     const [isGeneratingPractice, setIsGeneratingPractice] = useState(false);
     
     // Local state for dashboard widgets
