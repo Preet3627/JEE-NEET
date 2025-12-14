@@ -697,7 +697,39 @@ async function getUserData(userId) {
     const user = userRows[0];
     
     const [configRows] = await pool.query('SELECT config FROM user_configs WHERE user_id = ?', [userId]);
-    const config = configRows[0] ? decrypt(configRows[0].config) : {};
+    const storedConfig = configRows[0] ? decrypt(configRows[0].config) : {};
+    
+    // Ensure default settings are merged to prevent undefined errors in frontend
+    const defaultConfig = {
+        WAKE: '06:00', SCORE: '0/300', WEAK: [],
+        settings: { 
+            accentColor: '#0891b2', 
+            blurEnabled: false, // Default value
+            mobileLayout: 'standard', // Default value
+            forceOfflineMode: false, // Default value
+            perQuestionTime: 180, // Default value
+            showAiChatAssistant: true, // Default value
+            hasGeminiKey: false, // Default value
+            examType: 'JEE', // Default value
+            theme: 'default', // Default value
+            dashboardLayout: [], // Default empty array
+            dashboardFlashcardDeckIds: [], // Default empty array
+            musicPlayerWidgetLayout: 'minimal', // Default value
+            dashboardBackgroundImage: '', // Default empty string
+            dashboardTransparency: 0.8, // Default value
+            notchSettings: { position: 'top', size: 'small', width: 100, enabled: false }, // Default object
+            visualizerSettings: { preset: 'bars', colorMode: 'rgb' }, // Default object
+            djDropSettings: { enabled: false, autoTrigger: false }, // Default object
+        }
+    };
+    const config = { 
+        ...defaultConfig, 
+        ...storedConfig, 
+        settings: { 
+            ...defaultConfig.settings, 
+            ...storedConfig.settings 
+        } 
+    };
     
     // Encrypted Data Tables
     const [schedule] = await pool.query('SELECT id as ID, data FROM schedule_items WHERE user_id = ?', [userId]);
