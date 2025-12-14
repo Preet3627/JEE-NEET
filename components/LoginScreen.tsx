@@ -44,13 +44,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onSwitchToRegister, onSwitchT
     }, [googleClientId, googleAuthStatus, backendStatus]);
 
     const handleGoogleCallback = async (response: any) => {
-        setGoogleAuthStatus('loading');
         setError('');
+        setIsLoading(true); // Set local loading state
         try {
             await googleLogin(response.credential);
         } catch (err: any) {
             setError(err.message || 'Google login failed.');
-            setGoogleAuthStatus('signed_out');
+        } finally {
+            setIsLoading(false); // Reset local loading state
         }
     };
 
