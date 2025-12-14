@@ -22,7 +22,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       strategies: 'injectManifest',
-      srcDir: '.',
+      srcDir: 'public',
       filename: 'service-worker.js',
       devOptions: {
         enabled: true
