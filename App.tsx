@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from './context/AuthContext';
 import { urlBase64ToUint8Array } from './utils/push';
+import { api } from './api/apiService';
 
 import Header from './components/Header';
 import StudentDashboard from './components/StudentDashboard';

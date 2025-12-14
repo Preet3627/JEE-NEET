@@ -367,7 +367,7 @@ app.get('/api/config/public', async (req, res) => {
     res.json({ status: 'online', googleClientId: process.env.GOOGLE_CLIENT_ID, djDropUrl });
 });
 
-app.get('/api/status', (req, res) => {
+app.get('/api/status', async (req, res) => {
     const checks = {
         database: {
             configured: !!process.env.DB_HOST,
