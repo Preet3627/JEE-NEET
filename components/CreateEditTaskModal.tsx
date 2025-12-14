@@ -81,6 +81,9 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
     category: task?.type === 'HOMEWORK' ? task.category || 'Custom' : 'Custom',
     deckId: task?.type === 'ACTION' && task.SUB_TYPE === 'FLASHCARD_REVIEW' ? task.deckId : (decks.length > 0 ? decks[0].id : ''),
     answers: task?.type === 'HOMEWORK' ? formatAnswers(task.answers) : '',
+    gradient: task && 'gradient' in task && task.gradient ? task.gradient : '',
+    imageUrl: task && 'imageUrl' in task && task.imageUrl ? task.imageUrl : '',
+    externalLink: task && 'externalLink' in task && task.externalLink ? task.externalLink : '',
   });
   const [isExiting, setIsExiting] = useState(false);
   const [isAiKeyModalOpen, setIsAiKeyModalOpen] = useState(false);
@@ -100,21 +103,28 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
     const dayData = formData.date ? { EN: new Date(`${formData.date}T12:00:00Z`).toLocaleString('en-us', {weekday: 'long', timeZone: 'UTC'}).toUpperCase(), GU: "" } : { EN: formData.day, GU: "" };
     const dateData = formData.date ? { date: formData.date } : {};
 
+    const commonData = {
+        ...dateData,
+        CARD_TITLE: { EN: formData.title, GU: "" },
+        FOCUS_DETAIL: { EN: formData.details, GU: "" },
+        SUBJECT_TAG: { EN: formData.subject.toUpperCase(), GU: "" },
+        gradient: formData.gradient || undefined,
+        imageUrl: formData.imageUrl || undefined,
+        externalLink: formData.externalLink || undefined,
+        googleEventId: isEditing && task && 'googleEventId' in task ? task.googleEventId : undefined,
+    };
+
     if (taskType === 'HOMEWORK') {
         finalTask = {
             ID: isEditing && task.type === 'HOMEWORK' ? task.ID : `H${Date.now()}`,
             type: 'HOMEWORK',
             isUserCreated: true,
             DAY: dayData,
-            ...dateData,
-            CARD_TITLE: { EN: formData.title, GU: "" },
-            FOCUS_DETAIL: { EN: formData.details, GU: "" },
-            SUBJECT_TAG: { EN: formData.subject.toUpperCase(), GU: "" },
+            ...commonData,
             Q_RANGES: formData.qRanges,
             TIME: formData.time || undefined,
             category: formData.category as HomeworkData['category'],
             answers: parseAnswers(formData.answers),
-            googleEventId: isEditing && 'googleEventId' in task ? task.googleEventId : undefined,
         } as HomeworkData;
     } else {
         finalTask = {
@@ -123,13 +133,9 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
             SUB_TYPE: taskType === 'FLASHCARD_REVIEW' ? 'FLASHCARD_REVIEW' : 'DEEP_DIVE',
             isUserCreated: true,
             DAY: dayData,
-            ...dateData,
-            CARD_TITLE: { EN: formData.title, GU: "" },
-            FOCUS_DETAIL: { EN: formData.details, GU: "" },
-            SUBJECT_TAG: { EN: formData.subject.toUpperCase(), GU: "" },
+            ...commonData,
             TIME: formData.time,
             deckId: taskType === 'FLASHCARD_REVIEW' ? formData.deckId : undefined,
-            googleEventId: isEditing && 'googleEventId' in task ? task.googleEventId : undefined,
         } as ScheduleCardData;
     }
 
@@ -249,9 +255,40 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
                 </div>
              </div>
 
+            <div className="border-t border-[var(--glass-border)] pt-4 space-y-4 mt-4">
+                <h3 className="text-md font-semibold text-gray-300">Customization (Optional)</h3>
+                <div>
+                  <label className="text-sm font-bold text-gray-400">External Link (e.g., Lecture URL)</label>
+                  <input
+                    value={formData.externalLink}
+                    onChange={e => setFormData({...formData, externalLink: e.target.value})}
+                    className={inputClass}
+                    placeholder="https://example.com/lecture/..."
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-bold text-gray-400">Custom Background Image URL</label>
+                  <input
+                    value={formData.imageUrl}
+                    onChange={e => setFormData({...formData, imageUrl: e.target.value})}
+                    className={inputClass}
+                    placeholder="https://example.com/image.png"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-bold text-gray-400">Custom CSS Gradient</label>
+                  <input
+                    value={formData.gradient}
+                    onChange={e => setFormData({...formData, gradient: e.target.value})}
+                    className={inputClass}
+                    placeholder="linear-gradient(to right, #ff7e5f, #feb47b)"
+                  />
+                </div>
+            </div>
+
             {taskType === 'HOMEWORK' && (
               <>
-                <div>
+                <div className="mt-4">
                   <label className="text-sm font-bold text-gray-400">Question Ranges</label>
                   <input value={formData.qRanges} onChange={e => setFormData({...formData, qRanges: e.target.value})} className={inputClass} placeholder="e.g., Ex 1.1: 1-10; PYQs: 15-20" />
                 </div>

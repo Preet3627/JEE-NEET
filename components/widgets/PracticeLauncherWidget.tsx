@@ -4,9 +4,10 @@ import Icon from '../Icon';
 
 interface PracticeLauncherWidgetProps {
   onLaunch: () => void;
+  onLaunchWithWeaknesses: () => void;
 }
 
-const PracticeLauncherWidget: React.FC<PracticeLauncherWidgetProps> = ({ onLaunch }) => {
+const PracticeLauncherWidget: React.FC<PracticeLauncherWidgetProps> = ({ onLaunch, onLaunchWithWeaknesses }) => {
   const { currentUser } = useAuth();
   const mistakesCount = currentUser?.RESULTS.reduce((acc, r) => acc + (r.MISTAKES?.length || 0) - (r.FIXED_MISTAKES?.length || 0), 0) || 0;
 
@@ -25,7 +26,7 @@ const PracticeLauncherWidget: React.FC<PracticeLauncherWidgetProps> = ({ onLaunc
         
         <div className="relative z-10 mt-4 flex flex-col gap-2">
              {mistakesCount > 0 && (
-                <button onClick={onLaunch} className="flex-1 flex items-center justify-between p-2 bg-red-900/40 border border-red-500/30 rounded-lg hover:bg-red-900/60 transition-colors">
+                <button onClick={onLaunchWithWeaknesses} className="flex-1 flex items-center justify-between p-2 bg-red-900/40 border border-red-500/30 rounded-lg hover:bg-red-900/60 transition-colors">
                     <span className="text-xs font-bold text-red-300 uppercase">Fix Mistakes</span>
                     <span className="font-black text-lg text-white">{mistakesCount}</span>
                 </button>

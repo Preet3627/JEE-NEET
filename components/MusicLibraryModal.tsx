@@ -111,8 +111,12 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
     };
 
     useEffect(() => {
-        loadTracks();
-    }, []);
+        if (status?.musicWebDAV.configured) {
+            loadTracks(true);
+        } else {
+            loadTracks(false);
+        }
+    }, [status]);
 
     const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const files = event.target.files;

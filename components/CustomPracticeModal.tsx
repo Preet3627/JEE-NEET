@@ -135,19 +135,50 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
 
   const handleStart = async () => {
     setError('');
+    
+    // Manual Tab: Generate questions from homework context
     if (activeTab === 'manual') {
-      if (totalQuestions > 0) {
-        setPracticeMode('custom');
-        setIsTimerStarted(true);
-      } else {
+      if (totalQuestions > 0 && initialTask) {
+        setIsLoading(true);
+        try {
+            const result = await api.generatePracticeTest({
+              topic: `Practice questions on ${initialTask.CARD_TITLE.EN} for ${initialTask.SUBJECT_TAG.EN}`,
+              numQuestions: totalQuestions,
+              difficulty: 'Medium',
+              questionTypes: ['MCQ', 'NUM'],
+              isPYQ: false,
+              chapters: [],
+              examType: student?.CONFIG.settings.examType,
+              userId: student?.sid,
+            });
+            if (result.questions && result.answers) {
+                setPracticeMode('custom');
+                setPracticeQuestions(result.questions);
+                setPracticeAnswers(result.answers);
+                setSyllabus(initialTask.CARD_TITLE.EN); // Set syllabus for context
+                setCategory('Homework Practice');
+                setIsTimerStarted(true);
+            } else {
+                throw new Error("AI failed to return a valid test format.");
+            }
+        } catch (err: any) {
+            setError(err.error || 'Failed to generate practice questions. You can still practice without question text by using the provided answer key.');
+            // Fallback to old behavior on error
+            setPracticeMode('custom');
+            setIsTimerStarted(true);
+        } finally {
+            setIsLoading(false);
+        }
+      } else if (totalQuestions === 0) {
         alert('Please enter valid question ranges.');
       }
       return;
     }
 
+    // JEE Mains Tab
     if (activeTab === 'jeeMains') {
       if (!syllabus.trim()) {
-        setError('Please provide a syllabus.');
+        setError('Please provide a syllabus for the mock test.');
         return;
       }
       setPracticeMode('jeeMains');
@@ -155,28 +186,30 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
       return;
     }
 
-    // AI mode
+    // AI Tab
     if (!aiTopic.trim()) {
-      setError('Please enter a topic.');
+      setError('Please enter a topic to generate questions.');
       return;
     }
 
     setIsLoading(true);
     try {
-      // FIX: Pass new AI generation parameters
-                const result = await api.generatePracticeTest({
-                  topic: aiTopic,
-                  numQuestions: aiNumQuestions,
-                  difficulty: aiDifficulty,
-                  questionTypes: aiQuestionTypes, // NEW
-                  isPYQ: aiIsPYQ, // NEW
-                  chapters: aiPYQChapters, // NEW
-                  examType: student?.CONFIG.settings.examType, // Pass examType from student config
-                  userId: student?.sid, // Pass userId for context
-                });      if (result.questions && result.answers) {
+        const result = await api.generatePracticeTest({
+          topic: aiTopic,
+          numQuestions: aiNumQuestions,
+          difficulty: aiDifficulty,
+          questionTypes: aiQuestionTypes,
+          isPYQ: aiIsPYQ,
+          chapters: aiPYQChapters,
+          examType: student?.CONFIG.settings.examType,
+          userId: student?.sid,
+        });
+      if (result.questions && result.answers) {
         setPracticeMode('custom');
         setPracticeQuestions(result.questions);
         setPracticeAnswers(result.answers);
+        setSyllabus(aiTopic);
+        setCategory('AI Generated Practice');
         setIsTimerStarted(true);
       } else {
         throw new Error("AI returned an invalid test format.");

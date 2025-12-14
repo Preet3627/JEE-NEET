@@ -192,7 +192,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
     const [scheduleView, setScheduleView] = useState<'upcoming' | 'past'>('upcoming');
     const [deepLinkData, setDeepLinkData] = useState<any | null>(null);
-    const [triggeredAlarms, setTriggeredAlarms] = useState<Set<string>>(new Set());
+    const [isGeneratingPractice, setIsGeneratingPractice] = useState(false);
     
     // Local state for dashboard widgets
     const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidgetItem[]>([]); 
@@ -205,6 +205,38 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     const useToolbarLayout = window.innerWidth < 768 && student.CONFIG.settings.mobileLayout === 'toolbar';
     const taskItems = student.SCHEDULE_ITEMS;
     const activityItems = student.SCHEDULE_ITEMS.filter(item => item.type === 'ACTIVITY') as ActivityData[];
+
+    const handleLaunchWeaknessPractice = async () => {
+        const weaknesses = student.CONFIG.WEAK;
+        if (!weaknesses || weaknesses.length === 0) {
+            alert("You haven't recorded any weaknesses yet. Complete a test or add them in settings.");
+            return;
+        }
+        setIsGeneratingPractice(true);
+        try {
+            const result = await api.generatePracticeTest({
+                topic: `A practice test focusing on my weak topics: ${weaknesses.join(', ')}`,
+                numQuestions: 10, // Default to 10 questions for a weakness session
+                difficulty: 'Medium',
+                questionTypes: ['MCQ', 'NUM'],
+                isPYQ: false,
+                chapters: [],
+                examType: student?.CONFIG.settings.examType,
+                userId: student?.sid,
+            });
+            if (result.questions && result.answers) {
+                setAiPracticeTest(result);
+                openModal('CustomPracticeModal', setIsPracticeModalOpen, true);
+            } else {
+                throw new Error("AI failed to return a valid test format.");
+            }
+        } catch (error) {
+            alert("Failed to generate a practice test for your weaknesses. Please try again.");
+            console.error(error);
+        } finally {
+            setIsGeneratingPractice(false);
+        }
+    };
 
     useEffect(() => {
         const alarmInterval = setInterval(() => {
@@ -397,7 +429,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             'dailyInsight': <DailyInsightWidget weaknesses={student.CONFIG.WEAK} exams={student.EXAMS} />,
             'quote': <MotivationalQuoteWidget quote="The expert in anything was once a beginner." />,
             'music': <MusicPlayerWidget onOpenLibrary={() => openModal('MusicLibraryModal', setIsMusicLibraryOpen, true)} />,
-            'practice': <PracticeLauncherWidget onLaunch={() => openModal('CustomPracticeModal', setIsPracticeModalOpen)} />,
+            'practice': <PracticeLauncherWidget onLaunch={() => openModal('CustomPracticeModal', setIsPracticeModalOpen, true)} onLaunchWithWeaknesses={handleLaunchWeaknessPractice} />,
             'subjectAllocation': <SubjectAllocationWidget items={student.SCHEDULE_ITEMS} />,
             'scoreTrend': <ScoreTrendWidget results={student.RESULTS} />,
             'flashcards': <InteractiveFlashcardWidget 

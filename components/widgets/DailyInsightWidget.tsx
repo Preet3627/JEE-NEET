@@ -36,7 +36,7 @@ const DailyInsightWidget: React.FC<DailyInsightWidgetProps> = ({ weaknesses, exa
             console.error(err);
             const randomQuote = motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)];
             setInsight({ quote: randomQuote, insight: "Keep pushing forward! Every small step counts towards your big goal." });
-            setError('Could not load AI insight, showing a quote instead.');
+            // setError('Could not load AI insight, showing a quote instead.'); // Error removed as requested
         } finally {
             setIsLoading(false);
         }
@@ -54,7 +54,6 @@ const DailyInsightWidget: React.FC<DailyInsightWidgetProps> = ({ weaknesses, exa
                     <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 </div>
             )}
-            {error && <p className="text-center text-xs text-yellow-500 mb-2">{error}</p>}
             {insight && (
                 <div className="space-y-4">
                     <p className="text-lg font-medium text-gray-300 italic text-center">"{insight.quote}"</p>
