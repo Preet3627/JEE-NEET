@@ -19,7 +19,7 @@ const app = express();
 // Fix for Cross-Origin-Opener-Policy blocking Google Sign-In popup
 app.use((req, res, next) => {
     res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-    res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+    res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
     res.setHeader("Referrer-Policy", "no-referrer-when-downgrade");
     next();
 });
@@ -772,7 +772,7 @@ app.get('/api/me', authenticateToken, async (req, res) => {
 
 app.post('/api/heartbeat', authenticateToken, async (req, res) => {
     await pool.query('UPDATE users SET last_seen = NOW() WHERE id = ?', [req.user.id]);
-    res.sendStatus(200);
+    res.status(200).json({ success: true });
 });
 
 app.post('/api/schedule-items', authenticateToken, async (req, res) => {
