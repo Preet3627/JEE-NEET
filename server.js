@@ -93,7 +93,7 @@ const parseAIResponse = (text) => {
         let correctedText = cleanedText.replace(/(?<!\\)\\(?!["\/bfnrtu])/g, '\\\\');
         
         // Escape unescaped double quotes that are NOT part of a key or value boundary
-        correctedText = correctedText.replace(/(?<![:"[\]])\s*"\s*(?![:",\]}])/g, '\\"'); 
+        correctedText = correctedText.replace(/(?<![:"[\]])\s*"\s*(?![:",\]}])/g, '\"'); 
         
         // Escape newlines inside values
         correctedText = correctedText.replace(/\n/g, '\\n');
@@ -153,7 +153,7 @@ const decrypt = (text) => {
         }
     } catch (error) {
         return text; 
-    }
+    } 
 };
 
 // --- DATABASE INITIALIZATION ---
@@ -414,12 +414,12 @@ app.get('/api/status', async (req, res) => {
             status: !!googleClient ? 'ok' : 'misconfigured',
         },
         studyMaterialWebDAV: {
-            configured: !!(process.env.NEXTCLOUD_URL && process.env.NEXTCLOUD_SHARE_TOKEN),
+            configured: !!(process.env.NEXTCLOUD_URL && process.env.NEXTCLOUD_SHARE_TOKEN && process.env.NEXTCLOUD_SHARE_PASSWORD),
             initialized: !!webdavClient,
             status: !!webdavClient ? 'ok' : 'error',
         },
         musicWebDAV: {
-            configured: !!(process.env.NEXTCLOUD_URL && process.env.NEXTCLOUD_MUSIC_SHARE_TOKEN),
+            configured: !!(process.env.NEXTCLOUD_URL && process.env.NEXTCLOUD_MUSIC_SHARE_TOKEN && process.env.NEXTCLOUD_MUSIC_SHARE_PASSWORD),
             initialized: !!musicWebdavClient,
             status: !!musicWebdavClient ? 'ok' : 'error',
         },
@@ -606,8 +606,6 @@ async function getUserData(userId) {
         STUDY_SESSIONS: sessions.map(r => decrypt(JSON.parse(r.data)))
     };
 }
-
-
 
 
 
@@ -927,6 +925,7 @@ app.get('/api/music/browse', async (req, res) => {
         }));
         res.json(items);
     } catch (e) {
+        console.error('Error browsing music WebDAV:', e); // Added specific logging here
         res.status(500).json({ error: e.message });
     }
 });
