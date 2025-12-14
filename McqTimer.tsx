@@ -571,10 +571,13 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
                             </div>
                         </div>
                     ) : (
-                        <>
-                             <h2 className="text-2xl font-bold mb-6">Question {currentQuestionNumber.toString().padStart(3,'0')}</h2>
+                        <div className="text-center">
+                             <Icon name="file-text" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                             <h2 className="text-2xl font-bold mb-2">Question {currentQuestionNumber.toString().padStart(3,'0')}</h2>
+                             <p className="text-gray-400 mb-6">Question text is not available in this mode.</p>
+                             <p className="text-gray-300 mb-4">Select your answer:</p>
                              {currentQuestionType === 'MCQ' || currentQuestionType === 'MULTI_CHOICE' ? (
-                                 <div className="grid grid-cols-2 gap-4 w-full max-w-xs">
+                                 <div className="grid grid-cols-2 gap-4 w-full max-w-xs mx-auto">
                                      {(['A', 'B', 'C', 'D'] as const).map(option => {
                                          const isSelected = Array.isArray(answers[currentQuestionNumber]) 
                                             ? (answers[currentQuestionNumber] as string[]).includes(option)
@@ -610,7 +613,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
                              ) : (
                                  <input type="text" value={(answers[currentQuestionNumber] as string) || ''} onChange={(e) => handleAnswerInput(e.target.value)} disabled={isNavigating || !!feedback} className="w-full max-w-xs text-center text-2xl font-mono bg-gray-900 border border-gray-600 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-60" placeholder="Numerical Answer" />
                              )}
-                        </>
+                        </div>
                     )}
                 </div>
             </div>

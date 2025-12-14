@@ -25,10 +25,11 @@ interface SettingsModalProps {
   onToggleEditLayout?: () => void;
   onTogglePushNotifications: (enabled: boolean) => void;
   pushNotificationsEnabled: boolean;
+  isVapidKeyAvailable: boolean;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = (props) => {
-  const { settings, decks, driveLastSync, isCalendarSyncEnabled, calendarLastSync, onClose, onSave, onExportToIcs, googleAuthStatus, onGoogleSignIn, onGoogleSignOut, onBackupToDrive, onRestoreFromDrive, onApiKeySet, onOpenAssistantGuide, onOpenAiGuide, onClearAllSchedule, onToggleEditLayout, onTogglePushNotifications, pushNotificationsEnabled } = props;
+  const { settings, decks, driveLastSync, isCalendarSyncEnabled, calendarLastSync, onClose, onSave, onExportToIcs, googleAuthStatus, onGoogleSignIn, onGoogleSignOut, onBackupToDrive, onRestoreFromDrive, onApiKeySet, onOpenAssistantGuide, onOpenAiGuide, onClearAllSchedule, onToggleEditLayout, onTogglePushNotifications, pushNotificationsEnabled, isVapidKeyAvailable } = props;
   
   const { setNotchSettings, setVisualizerSettings, notchSettings: currentNotch, visualizerSettings: currentVis } = useMusicPlayer();
 
@@ -219,8 +220,15 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                     </div>
 
                     <div className="flex items-center justify-between">
-                        <label className="text-sm text-gray-300">Push Notifications</label>
-                        <input type="checkbox" checked={pushNotificationsEnabled} onChange={e => onTogglePushNotifications(e.target.checked)} className="w-4 h-4 rounded text-cyan-600 bg-gray-700 border-gray-600 focus:ring-cyan-500" />
+                        <label className={`text-sm text-gray-300 ${!isVapidKeyAvailable ? 'opacity-50' : ''}`} title={!isVapidKeyAvailable ? 'Push notifications are not configured by the administrator.' : ''}>Push Notifications</label>
+                        <input 
+                            type="checkbox" 
+                            checked={pushNotificationsEnabled} 
+                            onChange={e => onTogglePushNotifications(e.target.checked)} 
+                            disabled={!isVapidKeyAvailable}
+                            className="w-4 h-4 rounded text-cyan-600 bg-gray-700 border-gray-600 focus:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={!isVapidKeyAvailable ? 'Push notifications are not configured by the administrator.' : ''}
+                        />
                     </div>
                     
                     <button type="button" onClick={onExportToIcs} className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-gray-800 hover:bg-gray-700 text-white border border-gray-600">

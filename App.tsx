@@ -137,6 +137,19 @@ const App: React.FC = () => {
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline' | 'misconfigured'>('checking');
   const [googleClientId, setGoogleClientId] = useState<string | null>(null);
   const [apiTokenLoaded, setApiTokenLoaded] = useState<string | null>(null);
+  const [pushNotificationsEnabled, setPushNotificationsEnabled] = useState(false);
+
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then(registration => {
+            registration.pushManager.getSubscription().then(subscription => {
+                if (subscription) {
+                    setPushNotificationsEnabled(true);
+                }
+            });
+        });
+    }
+  }, []);
 
   // Modal States
   const [isExamTypeSelectionModalOpen, setIsExamTypeSelectionModalOpen] = useState(false);
@@ -280,50 +293,31 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
-      const isModalHistoryState = event.state && event.state.modal;
+      const state = event.state || {}; // Get the state we pushed, or an empty object
 
-      if (isModalHistoryState) {
-        const modalToClose = modalStackRef.current[modalStackRef.current.length - 1];
-        
-        if (modalToClose && modalToClose.componentId === event.state.modal) {
+      // Close any modals that are open in the app but not present in the new history state
+      if (modalStackRef.current.length > 0 && modalStackRef.current[modalStackRef.current.length - 1].componentId !== state.modal) {
+        const modalToClose = modalStackRef.current.pop();
+        if (modalToClose) {
           const setter = modalSettersRef.current.get(modalToClose.id);
           if (setter) {
             const isBooleanSetter = String(setter).includes('setIs');
             if (isBooleanSetter) (setter as React.Dispatch<React.SetStateAction<boolean>>)(false); else (setter as (val: any) => void)(null);
           }
-          modalStackRef.current.pop();
-          currentModalIdRef.current = modalStackRef.current.length > 0 ? modalStackRef.current[modalStackRef.current.length - 1].id : null;
-        } else if (modalStackRef.current.length > 0) {
-          const topModal = modalStackRef.current[modalStackRef.current.length - 1];
-          const setter = modalSettersRef.current.get(topModal.id);
-          if (setter) {
-            const isBooleanSetter = String(setter).includes('setIs');
-            if (isBooleanSetter) (setter as React.Dispatch<React.SetStateAction<boolean>>)(false); else (setter as (val: any) => void)(null);
-          }
-          modalStackRef.current = [];
-          currentModalIdRef.current = null;
         }
-      } else if (event.state && event.state.tab) {
-          setActiveTab(event.state.tab);
-      } else {
-        if (modalStackRef.current.length > 0) {
-          modalStackRef.current.forEach(m => {
-            const setter = modalSettersRef.current.get(m.id);
-            if (setter) {
-              const isBooleanSetter = String(setter).includes('setIs');
-              if (isBooleanSetter) (setter as React.Dispatch<React.SetStateAction<boolean>>)(false); else (setter as (val: any) => void)(null);
-            }
-          });
-          modalStackRef.current = [];
-          currentModalIdRef.current = null;
-        }
-        setActiveTab('dashboard'); // Default to dashboard if no tab in history state
       }
+
+      // Sync the active tab with the history state, or default to dashboard
+      setActiveTab(state.tab || 'dashboard');
     };
 
     window.addEventListener('popstate', handlePopState);
+
+    // Set the initial state of the app
+    window.history.replaceState({ tab: 'dashboard' }, '');
+
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [closeModal, setActiveTab]);
+  }, [setActiveTab]);
 
 
   const checkBackendStatus = useCallback(async () => {
@@ -891,41 +885,56 @@ const App: React.FC = () => {
   }, [userRole, loginWithToken]);
 
   const handleTogglePushNotifications = useCallback(async (enabled: boolean) => {
+    if (!import.meta.env.VITE_VAPID_PUBLIC_KEY) {
+        alert('Push notification service is not configured by the administrator.');
+        setPushNotificationsEnabled(false);
+        return;
+    }
+
     if (enabled) {
-        // Request permission
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {
             alert('Permission for notifications was denied.');
+            setPushNotificationsEnabled(false);
             return;
         }
 
-        // Register service worker if not already
         const registration = await navigator.serviceWorker.getRegistration();
         if (!registration) {
             alert('Service worker not registered.');
+            setPushNotificationsEnabled(false);
             return;
         }
 
-        // Get push subscription
-        const subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(process.env.VAPID_PUBLIC_KEY as string),
-        });
-
-        // Send subscription to backend
-        await api.savePushSubscription(subscription);
-        alert('Push notifications enabled!');
+        try {
+            const subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC_KEY as string),
+            });
+            await api.savePushSubscription(subscription);
+            setPushNotificationsEnabled(true);
+            alert('Push notifications enabled!');
+        } catch (error) {
+            console.error("Push subscription failed:", error);
+            alert("Failed to subscribe to push notifications.");
+            setPushNotificationsEnabled(false);
+        }
     } else {
-        // Unsubscribe from push notifications
         const registration = await navigator.serviceWorker.getRegistration();
         const subscription = await registration?.pushManager.getSubscription();
         if (subscription) {
-            await subscription.unsubscribe();
-            await api.deletePushSubscription(); // Tell backend to delete
-            alert('Push notifications disabled.');
+            try {
+                await subscription.unsubscribe();
+                await api.deletePushSubscription();
+                setPushNotificationsEnabled(false);
+                alert('Push notifications disabled.');
+            } catch (error) {
+                console.error("Push unsubscription failed:", error);
+                alert("Failed to disable push notifications.");
+            }
         }
     }
-}, []);
+  }, []);
 
   // Group all modal control props for easier passing
   const modalControlProps: ModalControlProps = useMemo(() => ({
@@ -1109,7 +1118,7 @@ const App: React.FC = () => {
             };
             await handleLogStudySession(session);
         }} defaultPerQuestionTime={currentUser?.CONFIG.settings.perQuestionTime || 180} onLogResult={handleLogResult} student={currentUser} onUpdateWeaknesses={handleUpdateWeaknesses} onSaveTask={handleSaveTask} />}
-        {isSettingsModalOpen && <SettingsModal settings={currentUser?.CONFIG.settings} decks={currentUser?.CONFIG.flashcardDecks || []} onClose={() => closeModal('SettingsModal')} onSave={(s) => handleUpdateConfig({ settings: { ...currentUser?.CONFIG.settings, ...s } as any })} onExportToIcs={handleExportToIcs} googleAuthStatus={googleAuthStatus} onGoogleSignIn={handleGoogleSignIn} onGoogleSignOut={handleGoogleSignOut} onBackupToDrive={handleBackupToDrive} onRestoreFromDrive={handleRestoreFromDrive} onApiKeySet={() => setShowAiChatFab(true)} onOpenAssistantGuide={() => openModal('GoogleAssistantGuideModal', setAssistantGuideOpen)} onOpenAiGuide={() => openModal('AIGuideModal', setAiGuideModalOpen)} onClearAllSchedule={handleClearAllSchedule} onToggleEditLayout={() => handleUpdateConfig({ settings: { ...currentUser?.CONFIG.settings, dashboardLayout: currentUser?.CONFIG.settings.dashboardLayout || [] } })} onTogglePushNotifications={handleTogglePushNotifications} />}
+        {isSettingsModalOpen && <SettingsModal settings={currentUser?.CONFIG.settings} decks={currentUser?.CONFIG.flashcardDecks || []} onClose={() => closeModal('SettingsModal')} onSave={(s) => handleUpdateConfig({ settings: { ...currentUser?.CONFIG.settings, ...s } as any })} onExportToIcs={handleExportToIcs} googleAuthStatus={googleAuthStatus} onGoogleSignIn={handleGoogleSignIn} onGoogleSignOut={handleGoogleSignOut} onBackupToDrive={handleBackupToDrive} onRestoreFromDrive={handleRestoreFromDrive} onApiKeySet={handleApiKeySet} onOpenAssistantGuide={() => openModal('GoogleAssistantGuideModal', setAssistantGuideOpen)} onOpenAiGuide={() => openModal('AIGuideModal', setAiGuideModalOpen)} onClearAllSchedule={handleClearAllSchedule} onToggleEditLayout={() => handleUpdateConfig({ settings: { ...currentUser?.CONFIG.settings, dashboardLayout: currentUser?.CONFIG.settings.dashboardLayout || [] } })} onTogglePushNotifications={handleTogglePushNotifications} pushNotificationsEnabled={pushNotificationsEnabled} isVapidKeyAvailable={!!import.meta.env.VITE_VAPID_PUBLIC_KEY} />}
         {isEditWeaknessesModalOpen && <EditWeaknessesModal currentWeaknesses={currentUser?.CONFIG.WEAK || []} onClose={() => closeModal('EditWeaknessesModal')} onSave={handleUpdateWeaknesses} />}
         {isLogResultModalOpen && <LogResultModal onClose={() => closeModal('LogResultModal')} onSave={handleLogResult} initialScore={initialScoreForModal} initialMistakes={initialMistakesForModal} />}
         {isEditResultModalOpen && editingResult && <EditResultModal result={editingResult} onClose={() => closeModal('EditResultModal')} onSave={handleLogResult} />}

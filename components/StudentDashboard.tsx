@@ -192,6 +192,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
     const [scheduleView, setScheduleView] = useState<'upcoming' | 'past'>('upcoming');
     const [deepLinkData, setDeepLinkData] = useState<any | null>(null);
+    const [triggeredAlarms, setTriggeredAlarms] = useState<Set<string>>(new Set());
     
     // Local state for dashboard widgets
     const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidgetItem[]>([]); 
@@ -204,6 +205,32 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     const useToolbarLayout = window.innerWidth < 768 && student.CONFIG.settings.mobileLayout === 'toolbar';
     const taskItems = student.SCHEDULE_ITEMS;
     const activityItems = student.SCHEDULE_ITEMS.filter(item => item.type === 'ACTIVITY') as ActivityData[];
+
+    useEffect(() => {
+        const alarmInterval = setInterval(() => {
+            const now = new Date();
+            const currentTime = now.toTimeString().slice(0, 5); // HH:MM
+            const todayDateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+            const todayName = now.toLocaleString('en-us', { weekday: 'long' }).toUpperCase();
+
+            student.SCHEDULE_ITEMS.forEach(item => {
+                const hasTime = 'TIME' in item && item.TIME;
+                if (!hasTime || !item.externalLink || triggeredAlarms.has(item.ID)) {
+                    return;
+                }
+
+                const isToday = ('date' in item && item.date === todayDateStr) || (!('date' in item) && item.DAY.EN.toUpperCase() === todayName);
+
+                if (isToday && item.TIME === currentTime) {
+                    console.log(`Triggering alarm for: ${item.CARD_TITLE.EN}`);
+                    window.open(item.externalLink, '_blank');
+                    setTriggeredAlarms(prev => new Set(prev).add(item.ID));
+                }
+            });
+        }, 60000); // Check every minute
+
+        return () => clearInterval(alarmInterval);
+    }, [student.SCHEDULE_ITEMS, triggeredAlarms]);
 
     useEffect(() => {
         if (deepLinkAction) {

@@ -44,7 +44,9 @@ export function initClient(
                     onStatusChange(false);
                 }
             });
-
+            // Signal that initialization is complete, but the user is not yet "signed in"
+            // via this specific client. This will un-stick the "loading" state.
+            onStatusChange(false); 
         } catch (error: any) {
             console.error("GAPI Client Init Error:", error);
             onError(error);

@@ -117,7 +117,8 @@ const ScheduleCard: React.FC<ScheduleCardProps> = (props) => {
         backgroundStyle.backgroundPosition = 'center';
         containerClasses += " border-0 shadow-lg";
     } else if (gradient) {
-        containerClasses += ` bg-gradient-to-br ${gradient} border-0 shadow-md`;
+        backgroundStyle.background = gradient;
+        containerClasses += " border-0 shadow-md";
     } else {
         containerClasses += " bg-gray-800/50 border border-gray-700/80 hover:border-cyan-500/50 hover:shadow-2xl hover:shadow-cyan-500/10";
     }

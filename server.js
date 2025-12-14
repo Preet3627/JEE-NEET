@@ -1052,8 +1052,20 @@ app.get('/api/study-material/browse', authenticateToken, async (req, res) => {
 app.get('/api/study-material/content', authenticateToken, async (req, res) => {
     if (!webdavClient) return res.status(503).json({ error: "Service Unavailable" });
     try {
-        const path = req.query.path;
-        const stream = webdavClient.createReadStream(path);
+        const filePath = req.query.path;
+        const extension = path.extname(filePath).toLowerCase();
+        
+        let contentType = 'application/octet-stream'; // Default
+        if (extension === '.pdf') {
+            contentType = 'application/pdf';
+        } else if (['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(extension)) {
+            contentType = `image/${extension.substring(1)}`;
+        }
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', 'inline');
+
+        const stream = webdavClient.createReadStream(filePath);
         stream.pipe(res);
     } catch (e) {
         res.status(500).json({ error: e.message });
