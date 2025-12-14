@@ -11,7 +11,6 @@ import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from 'webdav';
-import { knowledgeBase } from './data/knowledgeBase.js';
 import * as mm from 'music-metadata';
 
 // --- SERVER SETUP ---
@@ -37,7 +36,6 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 // --- ENV & SETUP CHECK ---
 const isConfiguredBase = process.env.DB_HOST && process.env.JWT_SECRET && process.env.DB_USER && process.env.DB_NAME && process.env.ENCRYPTION_KEY && process.env.GOOGLE_CLIENT_ID;
-// isNextcloudConfigured will be true if *either* study material or music WebDAV is fully configured AND successfully connected
 let isNextcloudConfigured = false; 
 
 let pool = null;
@@ -92,10 +90,10 @@ const parseAIResponse = (text) => {
         
         // Attempt 2: Aggressive backslash and quote escaping
         // Replace unescaped backslashes with double backslashes, carefully avoiding already escaped ones
-        let correctedText = cleanedText.replace(/(?<!\\)\\(?!["\\/bfnrtu])/g, '\\\\');
+        let correctedText = cleanedText.replace(/(?<!\\)\\(?!["\/bfnrtu])/g, '\\\\');
         
         // Escape unescaped double quotes that are NOT part of a key or value boundary
-        correctedText = correctedText.replace(/(?<![:"\[,])\s*"\s*(?![:",\]}])/g, '\\"'); 
+        correctedText = correctedText.replace(/(?<![:"[\]])\s*"\s*(?![:",\]}])/g, '\\"'); 
         
         // Escape newlines inside values
         correctedText = correctedText.replace(/\n/g, '\\n');
@@ -192,7 +190,6 @@ const initDB = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires_at DATETIME;
         `);
         // Other tables... (simplified for brevity in this re-creation, assuming they exist or will be created on first use if needed, typically schema migration is separate)
-        // Ideally we should have the full schema here as in the truncated file, but for repair, ensuring connection is key.
         // Re-adding the tables from the truncated file:
         await connection.query(`
             CREATE TABLE IF NOT EXISTS user_configs (
@@ -374,6 +371,31 @@ app.get('/api/config/public', async (req, res) => {
     res.json({ status: 'online', googleClientId: process.env.GOOGLE_CLIENT_ID, djDropUrl });
 });
 
+// Helper function to capture recent logs for /api/status/errors
+const recentLogs = [];
+const MAX_LOG_SIZE = 100; // Keep last 100 log entries
+
+// Override console methods to capture logs
+const originalConsoleError = console.error;
+const originalConsoleWarn = console.warn;
+const originalConsoleInfo = console.info;
+
+console.error = (...args) => {
+    recentLogs.push({ timestamp: new Date().toISOString(), level: 'error', message: args.join(' ') });
+    if (recentLogs.length > MAX_LOG_SIZE) recentLogs.shift();
+    originalConsoleError(...args);
+};
+console.warn = (...args) => {
+    recentLogs.push({ timestamp: new Date().toISOString(), level: 'warn', message: args.join(' ') });
+    if (recentLogs.length > MAX_LOG_SIZE) recentLogs.shift();
+    originalConsoleWarn(...args);
+};
+console.info = (...args) => {
+    recentLogs.push({ timestamp: new Date().toISOString(), level: 'info', message: args.join(' ') });
+    if (recentLogs.length > MAX_LOG_SIZE) recentLogs.shift();
+    originalConsoleInfo(...args);
+};
+
 app.get('/api/status', async (req, res) => {
     const checks = {
         database: {
@@ -419,6 +441,11 @@ app.get('/api/status', async (req, res) => {
         checks,
         djDropUrl,
     });
+});
+
+app.get('/api/status/errors', authenticateToken, (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    res.json(recentLogs);
 });
 
 
@@ -579,7 +606,6 @@ async function getUserData(userId) {
         STUDY_SESSIONS: sessions.map(r => decrypt(JSON.parse(r.data)))
     };
 }
-
 
 
 
