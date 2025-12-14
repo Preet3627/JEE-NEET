@@ -163,9 +163,9 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
             }
         } catch (err: any) {
             setError(err.error || 'Failed to generate practice questions. You can still practice without question text by using the provided answer key.');
-            // Fallback to old behavior on error
-            setPracticeMode('custom');
-            setIsTimerStarted(true);
+            setIsLoading(false); // Make sure loading is off
+            alert("Failed to generate questions. Please check your AI/backend configuration and try again. You can still use manual mode with an answer key.");
+            return; // Stay on the modal
         } finally {
             setIsLoading(false);
         }

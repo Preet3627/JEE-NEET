@@ -136,3 +136,39 @@ Users can now download music and study materials for in-app offline use. This me
 
 ### 6.5 Persistent Dashboard Layout
 User-customized dashboard layouts (widget arrangement, minimization) are now correctly saved and persist across sessions.
+
+---
+## 7. Deep Link Generation for Schedules
+The AI agent can generate deep links that, when clicked, directly open the application and prompt the user to add a schedule item (or a batch of items). This is useful for pre-filling schedules or sharing specific tasks.
+
+**Format:**
+The deep link should be a URL with the following structure:
+`https://<your-app-url>/?action=import_data&data=<URL_ENCODED_JSON>`
+
+Where `<URL_ENCODED_JSON>` is a URL-encoded JSON string containing a single object with a `schedules` array.
+
+**`schedules` Array Format:**
+Each item in the `schedules` array should conform to the `schedules` object schema defined in Section 4 of this guide.
+
+**Example Request to AI:**
+"Generate a deep link to add a Physics homework task on Monday at 9:00 AM, titled 'Chapter 5 Problems', covering questions 1-10 from Ex 1.2."
+
+**Example JSON Output from AI (which would be URL-encoded and embedded in the deep link):**
+```json
+{
+  "schedules": [
+    {
+      "id": "H_DL_123456789",
+      "type": "HOMEWORK",
+      "day": "MONDAY",
+      "time": "09:00",
+      "title": "Chapter 5 Problems",
+      "detail": "Complete questions 1-10 from Exercise 1.2.",
+      "subject": "PHYSICS",
+      "category": "Level-1",
+      "q_ranges": "Ex 1.2: 1-10"
+    }
+  ]
+}
+```
+**Important:** The AI agent should only generate the JSON data. The frontend application will handle the URL encoding and construction of the full deep link.
