@@ -7,15 +7,15 @@ import Icon from './Icon';
 import { api } from '../api/apiService';
 
 interface ProfileModalProps {
-  user: StudentData;
+  user: StudentData | null;
   onClose: () => void;
 }
 
 const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose }) => {
   const { updateProfile, refreshUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const [fullName, setFullName] = useState(user.fullName);
-  const [profilePhoto, setProfilePhoto] = useState(user.profilePhoto);
+  const [fullName, setFullName] = useState(user?.fullName || '');
+  const [profilePhoto, setProfilePhoto] = useState(user?.profilePhoto || '');
   const [isSaving, setIsSaving] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
   const [apiToken, setApiToken] = useState<string | null>(null);
@@ -42,8 +42,8 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose }) => {
     setIsSaving(true);
     try {
       await updateProfile({
-        fullName: fullName !== user.fullName ? fullName : undefined,
-        profilePhoto: profilePhoto !== user.profilePhoto ? profilePhoto : undefined,
+        fullName: fullName !== user?.fullName ? fullName : undefined,
+        profilePhoto: profilePhoto !== user?.profilePhoto ? profilePhoto : undefined,
       });
       setIsEditing(false);
       refreshUser(); // To show updated data in modal without closing
@@ -124,9 +124,8 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ user, onClose }) => {
                     <h3 className="mt-4 text-2xl font-bold text-white">{fullName}</h3>
                 )}
             
-                <p className="text-sm text-gray-400">{user.sid}</p>
-                <p className="text-sm text-gray-400">{user.email}</p>
-            </div>
+                            <p className="text-sm text-gray-400">{user?.sid}</p>
+                            <p className="text-sm text-gray-400">{user?.email}</p>            </div>
             
             <div className="mt-6 border-t border-gray-700/50 pt-6">
                 <h3 className="text-lg font-bold text-white mb-2">API Access</h3>

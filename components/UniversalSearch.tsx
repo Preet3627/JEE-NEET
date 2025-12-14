@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import Icon, { IconName } from './Icon';
-import { ScheduleItem, ExamData, FlashcardDeck } from '../types';
+import Icon from './Icon';
+import { IconName, ScheduleItem, ExamData, FlashcardDeck } from '../types';
 import { useLocalization } from '../context/LocalizationContext';
 
 interface UniversalSearchProps {

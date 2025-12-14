@@ -24,5 +24,6 @@
     "noEmit": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true
-  }
+  },
+  "exclude": ["public"]
 }

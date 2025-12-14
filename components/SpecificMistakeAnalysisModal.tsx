@@ -7,7 +7,7 @@ import { renderMarkdown } from '../utils/markdownParser';
 interface SpecificMistakeAnalysisModalProps {
   questionNumber: number;
   onClose: () => void;
-  onSaveWeakness: (weakness: string) => void;
+  onSaveWeakness: (weaknesses: string[]) => void;
 }
 
 interface AnalysisResult {
@@ -71,7 +71,7 @@ const SpecificMistakeAnalysisModal: React.FC<SpecificMistakeAnalysisModalProps> 
 
   const handleAddWeakness = () => {
     if (analysisResult) {
-      onSaveWeakness(analysisResult.topic);
+      onSaveWeakness([analysisResult.topic]);
       handleClose();
     }
   };

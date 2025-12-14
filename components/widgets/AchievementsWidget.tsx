@@ -1,7 +1,8 @@
 import React from 'react';
 import { StudentData, DoubtData } from '../../types';
 import { useLocalization } from '../../context/LocalizationContext';
-import Icon, { IconName } from '../Icon';
+import Icon from '../Icon';
+import { IconName } from '../../types';
 import { calculateAchievements, Achievement } from '../../utils/achievements';
 
 interface AchievementsWidgetProps {

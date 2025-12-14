@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StudentData, ScheduleItem, ActivityData, Config, StudySession, HomeworkData, ExamData, ResultData, DoubtData, FlashcardDeck, Flashcard, StudyMaterialItem, ScheduleCardData, PracticeQuestion, ActiveTab, DashboardWidgetItem } from '../types';
 import ScheduleList from './ScheduleList';
-import Icon, { IconName } from './Icon';
+import Icon from './Icon';
+import { IconName } from '../types';
 import CommunityDashboard from './CommunityDashboard';
 import PlannerView from './PlannerView';
 import MistakeManager from './MistakeManager';
@@ -118,7 +119,7 @@ interface StudentDashboardProps extends ModalControlProps {
     onDeleteTask: (taskId: string) => void;
     onToggleMistakeFixed: (resultId: string, mistake: string) => void;
     onUpdateConfig: (config: Partial<Config>) => void;
-    onLogStudySession: (session: Omit<StudySession, 'date'>) => void;
+    onLogStudySession: (session: Omit<StudySession, 'date'> & { date: string }) => Promise<void>;
     onUpdateWeaknesses: (weaknesses: string[]) => void;
     onLogResult: (result: ResultData) => void;
     onAddExam: (exam: ExamData) => void;

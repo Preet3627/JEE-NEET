@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import Icon from './components/Icon';
 import { useAuth } from './context/AuthContext';
@@ -10,18 +8,19 @@ interface RegistrationScreenProps {
     backendStatus: 'checking' | 'online' | 'offline' | 'misconfigured';
     initialEmail: string | null;
     onVerificationSuccess: () => void;
-    googleClientId: string | null;
+    // googleClientId: string | null; // No longer passed as prop, now from AuthContext
 }
 
-const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onSwitchToLogin, backendStatus, initialEmail, onVerificationSuccess, googleClientId }) => {
-    const { googleLogin, loginWithToken } = useAuth();
+const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onSwitchToLogin, backendStatus, initialEmail, onVerificationSuccess }) => {
+    const { googleLogin, loginWithToken, googleClientId, googleAuthStatus, setGoogleAuthStatus } = useAuth();
     const [formData, setFormData] = useState({ fullName: '', sid: '', email: initialEmail || '', password: '' });
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+    // const [isGoogleLoading, setIsGoogleLoading] = useState(false); // Managed by AuthContext googleAuthStatus
 
     useEffect(() => {
-        if (window.google && googleClientId) {
+        // Render Google button when googleAuthStatus indicates it's ready (not loading or unconfigured)
+        if (window.google && googleClientId && googleAuthStatus !== 'loading' && googleAuthStatus !== 'unconfigured' && backendStatus === 'online') {
             try {
                 window.google.accounts.id.initialize({
                     client_id: googleClientId,
@@ -32,20 +31,22 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onSwitchToLogin
                     { theme: "outline", size: "large", type: 'standard', text: 'signup_with' }
                 );
             } catch (error) {
-                console.error("Google Sign-Up initialization error:", error);
+                console.error("Google Sign-Up render button error:", error);
+                setGoogleAuthStatus('unconfigured'); // Mark as unconfigured if rendering fails
             }
         }
-    }, [googleClientId]);
+    }, [googleClientId, googleAuthStatus, backendStatus]); // Re-render when these change
 
     const handleGoogleCallback = async (response: any) => {
-        setIsGoogleLoading(true);
+        setGoogleAuthStatus('loading'); // Indicate Google sign-up is in progress
         setError('');
         try {
             await googleLogin(response.credential);
             onVerificationSuccess();
+            // googleAuthStatus will be set to 'signed_in' by AuthContext on success
         } catch (err: any) {
             setError(err.message || 'Google sign-up failed.');
-            setIsGoogleLoading(false);
+            setGoogleAuthStatus('signed_out'); // Reset status on failure
         }
     };
     
@@ -77,6 +78,8 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onSwitchToLogin
     const labelClass = "text-sm font-bold text-gray-400";
     const buttonClass = "w-full flex items-center justify-center gap-2 px-4 py-3 text-base font-semibold text-white rounded-lg transition-transform hover:scale-105 active:scale-100 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-[var(--gradient-cyan)] to-[var(--gradient-purple)]";
 
+    const isGoogleButtonDisabled = backendStatus !== 'online' || !googleClientId || googleAuthStatus === 'loading' || googleAuthStatus === 'unconfigured';
+
     return (
         <div className="min-h-screen flex items-center justify-center p-4">
             <div className="w-full max-w-md p-8 space-y-6 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl shadow-2xl shadow-purple-500/10 backdrop-blur-md">
@@ -87,8 +90,11 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onSwitchToLogin
                 </div>
 
                 <div className="space-y-4">
-                    <div id="googleSignUpButton" className={`flex justify-center transition-opacity ${backendStatus !== 'online' || isGoogleLoading || !googleClientId ? 'opacity-50 pointer-events-none' : ''}`}></div>
-                    {(isGoogleLoading) && <p className="text-sm text-center text-gray-400 animate-pulse">Creating account with Google...</p>}
+                    {/* Render Google Sign-Up button only if configured and ready */}
+                    {googleClientId && googleAuthStatus !== 'unconfigured' && (
+                        <div id="googleSignUpButton" className={`flex justify-center transition-opacity ${isGoogleButtonDisabled ? 'opacity-50 pointer-events-none' : ''}`}></div>
+                    )}
+                    {googleAuthStatus === 'loading' && <p className="text-sm text-center text-gray-400 animate-pulse">Creating account with Google...</p>}
                     <div className="relative">
                         <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-600"></div></div>
                         <div className="relative flex justify-center text-sm"><span className="px-2 bg-gray-800 text-gray-400">Or with an Email</span></div>
@@ -113,7 +119,7 @@ const RegistrationScreen: React.FC<RegistrationScreenProps> = ({ onSwitchToLogin
                         <input id="password" name="password" type="password" required className={inputClass} onChange={handleInputChange} value={formData.password} />
                     </div>
                     {error && <p className="text-sm text-center text-red-400">{error}</p>}
-                    <button type="submit" disabled={isLoading || isGoogleLoading || backendStatus !== 'online'} className={buttonClass}>
+                    <button type="submit" disabled={isLoading || isGoogleButtonDisabled || backendStatus !== 'online'} className={buttonClass}>
                         {isLoading ? 'Creating Account...' : <> <Icon name="user-plus" /> Sign Up </>}
                     </button>
                 </form>

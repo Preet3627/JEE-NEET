@@ -4,6 +4,7 @@ import { StudentData } from '../types';
 import { api } from '../api/apiService';
 // FIX: Corrected import path for mockData.
 import { studentDatabase } from '../data/mockData';
+import { initClient, handleSignIn as handleGoogleClientSignIn, handleSignOut as handleGoogleClientSignOut } from '../utils/googleAuth'; // Import initClient and rename functions
 
 interface AuthContextType {
     currentUser: StudentData | null;
@@ -20,9 +21,11 @@ interface AuthContextType {
     refreshUser: () => Promise<void>;
     updateProfile: (data: { fullName?: string; profilePhoto?: string }) => Promise<void>;
     setVerificationEmail: (email: string | null) => void;
-    // FIX: Add googleAuthStatus and its setter to the context type
     googleAuthStatus: 'signed_in' | 'signed_out' | 'loading' | 'unconfigured';
     setGoogleAuthStatus: React.Dispatch<React.SetStateAction<'signed_in' | 'signed_out' | 'loading' | 'unconfigured'>>;
+    googleClientId: string | null; // Add googleClientId to context type
+    handleGoogleSignIn: () => void; // Add to interface
+    handleGoogleSignOut: () => void; // Add to interface
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,8 +37,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [isDemoMode, setIsDemoMode] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [verificationEmail, setVerificationEmail] = useState<string | null>(null);
-    // FIX: Add state for googleAuthStatus
     const [googleAuthStatus, setGoogleAuthStatus] = useState<'signed_in' | 'signed_out' | 'loading' | 'unconfigured'>('unconfigured');
+    const [googleClientId, setGoogleClientId] = useState<string | null>(null); // Add state for googleClientId
 
     const logout = useCallback(() => {
         setCurrentUser(null);
@@ -44,7 +47,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setIsDemoMode(false);
         setVerificationEmail(null);
         localStorage.clear();
-    }, []);
+        // Also sign out from Google if signed in
+        if (googleAuthStatus === 'signed_in') {
+            handleGoogleClientSignOut((isSignedIn: boolean) => {
+                setGoogleAuthStatus(isSignedIn ? 'signed_in' : 'signed_out');
+            });
+        }
+    }, [googleAuthStatus]);
 
     const handleLoginSuccess = useCallback((data: { token: string; user: StudentData }) => {
         setToken(data.token);
@@ -113,6 +122,36 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         loadInitialState();
     }, [refreshUser, logout]); // Added dependencies
 
+    // Effect for Google API initialization
+    useEffect(() => {
+        const loadGoogleClient = async () => {
+            setGoogleAuthStatus('loading');
+            try {
+                const config = await api.getPublicConfig();
+                if (config.googleClientId) {
+                    setGoogleClientId(config.googleClientId);
+                    initClient(
+                        config.googleClientId,
+                        (isSignedIn) => {
+                            setGoogleAuthStatus(isSignedIn ? 'signed_in' : 'signed_out');
+                        },
+                        (error) => {
+                            console.error("Google Auth Init Error:", error);
+                            setGoogleAuthStatus('unconfigured'); // Or 'error'
+                        }
+                    );
+                } else {
+                    setGoogleAuthStatus('unconfigured');
+                }
+            } catch (error) {
+                console.error("Failed to fetch public config for Google Client ID:", error);
+                setGoogleAuthStatus('unconfigured');
+            }
+        };
+        loadGoogleClient();
+    }, []);
+
+
     const login = async (sid: string, password: string) => {
         try {
             const data = await api.login(sid, password);
@@ -127,9 +166,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     const googleLogin = async (credential: string) => {
-        const data = await api.googleLogin(credential);
-        handleLoginSuccess(data);
-        setIsLoading(false);
+        try {
+            setGoogleAuthStatus('loading');
+            const data = await api.googleLogin(credential);
+            handleLoginSuccess(data);
+            setGoogleAuthStatus('signed_in');
+            setIsLoading(false);
+        } catch (error) {
+            console.error("Google Login failed:", error);
+            setGoogleAuthStatus('signed_out');
+            throw error;
+        }
     };
 
     const loginWithToken = useCallback(async (newToken: string) => {
@@ -169,7 +216,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setIsLoading(false);
     };
 
-    const value = { currentUser, userRole, token, isDemoMode, isLoading, verificationEmail, login, googleLogin, logout, enterDemoMode, loginWithToken, refreshUser, updateProfile, setVerificationEmail, googleAuthStatus, setGoogleAuthStatus };
+    const value = { currentUser, userRole, token, isDemoMode, isLoading, verificationEmail, login, googleLogin, logout, enterDemoMode, loginWithToken, refreshUser, updateProfile, setVerificationEmail, googleAuthStatus, setGoogleAuthStatus, googleClientId, handleGoogleSignIn: handleGoogleClientSignIn, handleGoogleSignOut: () => handleGoogleClientSignOut((isSignedIn: boolean) => setGoogleAuthStatus(isSignedIn ? 'signed_in' : 'signed_out')) };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

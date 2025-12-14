@@ -583,6 +583,46 @@ app.post('/api/verify-email', async (req, res) => {
     }
 });
 
+// Resend Verification Email
+app.post('/api/resend-verification-email', async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database offline" });
+    if (!mailer) return res.status(500).json({ error: "Email service not configured" });
+
+    const { email } = req.body;
+    try {
+        const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+        const user = rows[0];
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+        if (user.is_verified) {
+            return res.status(400).json({ error: 'Email already verified.' });
+        }
+
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        const verificationTokenExpiresAt = new Date(Date.now() + 3600000); // 1 hour
+
+        await pool.query(
+            'UPDATE users SET verification_token = ?, verification_token_expires_at = ? WHERE id = ?',
+            [verificationToken, verificationTokenExpiresAt, user.id]
+        );
+
+        const verificationUrl = `${req.protocol}://${req.get('host')}/verify-email?token=${verificationToken}`;
+        await mailer.sendMail({
+            from: process.env.SMTP_FROM || 'no-reply@jeescheduler.com',
+            to: email,
+            subject: 'Verify your email for JEE Scheduler Pro',
+            html: `Please click this link to verify your email: <a href="${verificationUrl}">${verificationUrl}</a>`
+        });
+
+        res.json({ success: true, message: 'Verification email resent successfully.' });
+    } catch (error) {
+        console.error("Error resending verification email:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Helper to get full user data
 async function getUserData(userId) {
     const [userRows] = await pool.query('SELECT id, sid, email, full_name as fullName, profile_photo as profilePhoto, role, api_token as apiToken, last_seen FROM users WHERE id = ?', [userId]);

@@ -6,7 +6,7 @@ import { renderMarkdown } from '../utils/markdownParser';
 
 interface AIMistakeAnalysisModalProps {
   onClose: () => void;
-  onSaveWeakness: (weakness: string) => void;
+  onSaveWeakness: (weaknesses: string[]) => void;
 }
 
 interface AnalysisResult {
@@ -68,7 +68,7 @@ const AIMistakeAnalysisModal: React.FC<AIMistakeAnalysisModalProps> = ({ onClose
 
   const handleAddWeakness = () => {
     if (analysisResult) {
-      onSaveWeakness(analysisResult.mistake_topic);
+      onSaveWeakness([analysisResult.mistake_topic]);
       handleClose();
     }
   };

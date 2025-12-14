@@ -1,7 +1,6 @@
 import React from 'react';
-import Icon, { IconName } from './Icon';
-// FIX: Import ActiveTab from the central types file.
-import { ActiveTab } from '../types';
+import Icon from './Icon';
+import { ActiveTab, IconName } from '../types';
 
 // FIX: Removed local ActiveTab type definition.
 

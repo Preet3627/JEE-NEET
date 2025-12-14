@@ -3,6 +3,11 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAuth } from './context/AuthContext';
 import { urlBase64ToUint8Array } from './utils/push';
 import { api } from './api/apiService';
+import { 
+  ScheduleItem, HomeworkData, ResultData, ExamData, FlashcardDeck, Flashcard, StudyMaterialItem, 
+  StudentData, DoubtData, Config, StudySession, PracticeQuestion, ActiveTab, NotchSettings, 
+  VisualizerSettings, DjDropSettings, LocalPlaylist, Track 
+} from './types';
 
 import Header from './components/Header';
 import StudentDashboard from './components/StudentDashboard';
@@ -13,7 +18,7 @@ import ConfigurationErrorScreen from './components/ConfigurationErrorScreen';
 import { exportCalendar } from './utils/calendar';
 import * as gcal from './utils/googleCalendar';
 import * as gdrive from './utils/googleDrive';
-import * as auth from './utils/googleAuth';
+
 import ExamTypeSelectionModal from './components/ExamTypeSelectionModal';
 import { useMusicPlayer } from './context/MusicPlayerContext';
 import FullScreenMusicPlayer from './components/FullScreenMusicPlayer';
@@ -124,8 +129,8 @@ interface ModalControlProps {
 
 
 const App: React.FC = () => {
-  const { currentUser, userRole, isLoading, isDemoMode, enterDemoMode, logout, refreshUser, token, googleAuthStatus, setGoogleAuthStatus, loginWithToken, verificationEmail, setVerificationEmail } = useAuth();
-  const { isFullScreenPlayerOpen, toggleLibrary, isLibraryOpen, currentTrack, analyser, visualizerSettings, notchSettings, play, pause, nextTrack, prevTrack } = useMusicPlayer(); 
+  const { currentUser, userRole, isLoading, isDemoMode, enterDemoMode, logout, refreshUser, token, googleAuthStatus, setGoogleAuthStatus, loginWithToken, verificationEmail, setVerificationEmail, handleGoogleSignIn, handleGoogleSignOut } = useAuth();
+  const { isFullScreenPlayerOpen, toggleLibrary, isLibraryOpen, currentTrack, analyser, visualizerSettings, notchSettings, play, pause, nextTrack, prevTrack, isPlaying } = useMusicPlayer(); 
     
   const [allStudents, setAllStudents] = useState<StudentData[]>([]);
   const [allDoubts, setAllDoubts] = useState<DoubtData[]>([]);
@@ -194,7 +199,6 @@ const App: React.FC = () => {
 
   // General App State
   const [isSyncing, setIsSyncing] = useState(false);
-  const [gapiLoaded, setGapiLoaded] = useState(false);
   const [resetToken, setResetToken] = useState<string | null>(null);
 
   // Modal History Management
@@ -361,33 +365,7 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [token, checkBackendStatus]);
 
-  // Google API client initialization
-  useEffect(() => {
-    if (!googleClientId || backendStatus !== 'online') return;
-    if (!window.gapi || !window.google) {
-      console.warn("Google API scripts not yet loaded.");
-      return;
-    }
 
-    const initGoogleClient = async () => {
-      try {
-        auth.initClient(
-          googleClientId,
-          (isSignedIn: boolean) => setGoogleAuthStatus(isSignedIn ? 'signed_in' : 'signed_out'),
-          (error: any) => console.error("Google Auth Init Error", error)
-        );
-        setGapiLoaded(true);
-      } catch (error) {
-        console.error("Failed to initialize Google GAPI client:", error);
-      }
-    };
-
-    if (window.gapi.client && window.gapi.client.init) {
-      initGoogleClient();
-    } else {
-      window.gapi.load('client', initGoogleClient);
-    }
-  }, [googleClientId, backendStatus, setGoogleAuthStatus]);
 
   // Deep Link Handling
   useEffect(() => {
@@ -514,7 +492,7 @@ const App: React.FC = () => {
 
       const isFixed = result.FIXED_MISTAKES?.includes(mistake);
       const updatedFixedMistakes = isFixed
-          ? result.FIXED_MISTAKES.filter(m => m !== mistake)
+          ? (result.FIXED_MISTAKES || []).filter(m => m !== mistake)
           : [...(result.FIXED_MISTAKES || []), mistake];
       
       const updatedResult = { ...result, FIXED_MISTAKES: updatedFixedMistakes };
@@ -666,21 +644,9 @@ const App: React.FC = () => {
     }
   }, [currentUser, refreshUser]);
 
-  const handleGoogleSignIn = useCallback(async () => {
-    if (!gapiLoaded) {
-      alert("Google API not fully loaded. Please try again in a moment.");
-      return;
-    }
-    auth.handleSignIn();
-  }, [gapiLoaded]);
 
-  const handleGoogleSignOut = useCallback(() => {
-    if (googleAuthStatus !== 'signed_in') return;
-    auth.handleSignOut((isSignedIn: boolean) => {
-      setGoogleAuthStatus(isSignedIn ? 'signed_in' : 'signed_out');
-      alert("Disconnected from Google services.");
-    });
-  }, [googleAuthStatus, setGoogleAuthStatus]);
+
+
 
   const handleFullCalendarSync = useCallback(async () => {
     if (!currentUser || googleAuthStatus !== 'signed_in') return;
@@ -1075,7 +1041,7 @@ const App: React.FC = () => {
       <div className={`min-h-screen ${currentUser?.CONFIG.settings.theme === 'liquid-glass' ? 'theme-liquid-glass' : currentUser?.CONFIG.settings.theme === 'midnight' ? 'theme-midnight' : ''}`} >
         <div className="container mx-auto px-4 pt-4 sm:pt-6">
           <Header
-            user={{ name: currentUser.fullName, id: currentUser.sid, profilePhoto: currentUser.profilePhoto }}
+            user={currentUser ? { name: currentUser.fullName, id: currentUser.sid, profilePhoto: currentUser.profilePhoto } : { name: '', id: '', profilePhoto: '' }}
             onLogout={logout}
             backendStatus={backendStatus}
             isSyncing={isSyncing}
@@ -1134,7 +1100,15 @@ const App: React.FC = () => {
         {isExamTypeSelectionModalOpen && <ExamTypeSelectionModal onClose={() => closeModal('ExamTypeSelectionModal')} onSelect={(type) => { handleUpdateConfig({ settings: { ...currentUser?.CONFIG.settings, examType: type } }); closeModal('ExamTypeSelectionModal'); }} />}
         {isCreateModalOpen && <CreateEditTaskModal task={editingTask || viewingTask} viewOnly={!!viewingTask} onClose={() => closeModal('CreateEditTaskModal')} onSave={handleSaveTask} decks={currentUser?.CONFIG.flashcardDecks || []} />}
         {isAiParserModalOpen && <AIParserModal onClose={() => closeModal('AIParserModal')} onDataReady={setDeepLinkAction} onPracticeTestReady={setAiPracticeTest} onOpenGuide={() => openModal('AIGuideModal', setAiGuideModalOpen)} examType={currentUser?.CONFIG.settings.examType} />}
-        {isPracticeModalOpen && <CustomPracticeModal initialTask={practiceTask} aiPracticeTest={aiPracticeTest} onClose={() => closeModal('CustomPracticeModal')} onSessionComplete={handleLogStudySession} defaultPerQuestionTime={currentUser?.CONFIG.settings.perQuestionTime || 180} onLogResult={handleLogResult} student={currentUser} onUpdateWeaknesses={handleUpdateWeaknesses} onSaveTask={handleSaveTask} />}
+        {isPracticeModalOpen && <CustomPracticeModal initialTask={practiceTask} aiPracticeTest={aiPracticeTest} onClose={() => closeModal('CustomPracticeModal')} onSessionComplete={async (duration, solved, skipped) => {
+            const session = {
+                date: new Date().toISOString().split('T')[0],
+                duration,
+                questions_solved: solved,
+                questions_skipped: skipped,
+            };
+            await handleLogStudySession(session);
+        }} defaultPerQuestionTime={currentUser?.CONFIG.settings.perQuestionTime || 180} onLogResult={handleLogResult} student={currentUser} onUpdateWeaknesses={handleUpdateWeaknesses} onSaveTask={handleSaveTask} />}
         {isSettingsModalOpen && <SettingsModal settings={currentUser?.CONFIG.settings} decks={currentUser?.CONFIG.flashcardDecks || []} onClose={() => closeModal('SettingsModal')} onSave={(s) => handleUpdateConfig({ settings: { ...currentUser?.CONFIG.settings, ...s } as any })} onExportToIcs={handleExportToIcs} googleAuthStatus={googleAuthStatus} onGoogleSignIn={handleGoogleSignIn} onGoogleSignOut={handleGoogleSignOut} onBackupToDrive={handleBackupToDrive} onRestoreFromDrive={handleRestoreFromDrive} onApiKeySet={() => setShowAiChatFab(true)} onOpenAssistantGuide={() => openModal('GoogleAssistantGuideModal', setAssistantGuideOpen)} onOpenAiGuide={() => openModal('AIGuideModal', setAiGuideModalOpen)} onClearAllSchedule={handleClearAllSchedule} onToggleEditLayout={() => handleUpdateConfig({ settings: { ...currentUser?.CONFIG.settings, dashboardLayout: currentUser?.CONFIG.settings.dashboardLayout || [] } })} onTogglePushNotifications={handleTogglePushNotifications} />}
         {isEditWeaknessesModalOpen && <EditWeaknessesModal currentWeaknesses={currentUser?.CONFIG.WEAK || []} onClose={() => closeModal('EditWeaknessesModal')} onSave={handleUpdateWeaknesses} />}
         {isLogResultModalOpen && <LogResultModal onClose={() => closeModal('LogResultModal')} onSave={handleLogResult} initialScore={initialScoreForModal} initialMistakes={initialMistakesForModal} />}
@@ -1144,7 +1118,7 @@ const App: React.FC = () => {
         {isAiDoubtSolverOpen && <AIDoubtSolverModal onClose={() => closeModal('AIDoubtSolverModal')} />}
         {isAiChatOpen && <AIChatPopup history={aiChatHistory} onSendMessage={(p, img) => api.aiChat({ history: aiChatHistory, prompt: p, imageBase64: img, domain: window.location.origin }).then(res => setAiChatHistory(prev => [...prev, res])).catch(e => setAiChatHistory(prev => [...prev, { role: 'model', parts: [{ text: `Error: ${e.message}` }] }]))} onClose={() => closeModal('AIChatPopup')} isLoading={isAiChatLoading} />}
         {viewingReport && <TestReportModal result={viewingReport} onClose={() => closeModal('TestReportModal')} onUpdateWeaknesses={handleUpdateWeaknesses} student={currentUser} onSaveDeck={handleSaveDeck} />}
-        {isMoveModalOpen && <MoveTasksModal onClose={() => closeModal('MoveTasksModal')} onConfirm={handleMoveSelectedTasks} selectedCount={selectedTaskIds.length} />}
+        {isMoveModalOpen && <MoveTasksModal onClose={() => closeModal('MoveTasksModal')} onConfirm={handleMoveSelectedTasks} selectedCount={selectedTaskIds.length} selectedTaskIds={selectedTaskIds} />}
         {isMusicLibraryOpen && <MusicLibraryModal onClose={() => closeModal('MusicLibraryModal')} />}
         {deepLinkAction && <DeepLinkConfirmationModal data={deepLinkAction.data} onClose={() => closeModal('DeepLinkConfirmationModal')} onConfirm={() => handleBatchImport(deepLinkAction.data)} />}
 

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import McqTimer from './McqTimer';
 import Icon from './Icon';
 import { getQuestionNumbersFromRanges } from '../utils/qRangesParser';
-import { HomeworkData, ResultData, StudentData, ScheduleItem, PracticeQuestion } from '../types';
+import { HomeworkData, ResultData, StudentData, ScheduleItem, PracticeQuestion, StudySession } from '../types';
 import AIGenerateAnswerKeyModal from './AIGenerateAnswerKeyModal';
 import AIParserModal from './AIParserModal';
 import { api } from '../api/apiService';
@@ -11,14 +11,14 @@ import { knowledgeBase } from '../data/knowledgeBase'; // Import knowledgeBase f
 
 interface CustomPracticeModalProps {
   onClose: () => void;
-  onSessionComplete: (duration: number, questions_solved: number, questions_skipped: number[]) => void;
+  onSessionComplete: (duration: number, questions_solved: number, questions_skipped: number[]) => Promise<void>;
   initialTask?: HomeworkData | null;
   aiPracticeTest?: { questions: PracticeQuestion[], answers: Record<string, string | string[]> } | null;
   aiInitialTopic?: string | null;
   defaultPerQuestionTime: number;
   onLogResult: (result: ResultData) => void;
   onUpdateWeaknesses: (weaknesses: string[]) => void;
-  student: StudentData;
+  student: StudentData | null;
   onSaveTask: (task: ScheduleItem) => void;
   animationOrigin?: { x: string, y: string };
 }
@@ -83,7 +83,7 @@ const formatAnswers = (answers?: Record<string, string | string[]>): string => {
 export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) => {
   const { onClose, onSessionComplete, initialTask, aiPracticeTest, aiInitialTopic, defaultPerQuestionTime, onLogResult, student, onUpdateWeaknesses, onSaveTask, animationOrigin } = props;
   const { currentUser } = useAuth();
-  const theme = currentUser?.CONFIG.settings.theme;
+  const theme = student?.CONFIG.settings.theme || currentUser?.CONFIG.settings.theme;
 
   const [activeTab, setActiveTab] = useState<'ai' | 'manual' | 'jeeMains'>(initialTask ? 'manual' : 'ai');
   const [qRanges, setQRanges] = useState(initialTask?.Q_RANGES || '');
@@ -164,15 +164,16 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
     setIsLoading(true);
     try {
       // FIX: Pass new AI generation parameters
-      const result = await api.generatePracticeTest({
-        topic: aiTopic,
-        numQuestions: aiNumQuestions,
-        difficulty: aiDifficulty,
-        questionTypes: aiQuestionTypes, // NEW
-        isPYQ: aiIsPYQ, // NEW
-        chapters: aiPYQChapters, // NEW
-      });
-      if (result.questions && result.answers) {
+                const result = await api.generatePracticeTest({
+                  topic: aiTopic,
+                  numQuestions: aiNumQuestions,
+                  difficulty: aiDifficulty,
+                  questionTypes: aiQuestionTypes, // NEW
+                  isPYQ: aiIsPYQ, // NEW
+                  chapters: aiPYQChapters, // NEW
+                  examType: student?.CONFIG.settings.examType, // Pass examType from student config
+                  userId: student?.sid, // Pass userId for context
+                });      if (result.questions && result.answers) {
         setPracticeMode('custom');
         setPracticeQuestions(result.questions);
         setPracticeAnswers(result.answers);
@@ -352,7 +353,15 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
               questions={practiceQuestions || undefined}
               perQuestionTime={perQuestionTime}
               onClose={handleClose}
-              onSessionComplete={onSessionComplete}
+              onSessionComplete={async (duration: number, solved: number, skipped: number[]) => {
+                const session = {
+                    date: new Date().toISOString().split('T')[0],
+                    duration,
+                    questions_solved: solved,
+                    questions_skipped: skipped,
+                };
+                await onSessionComplete(session);
+              }}
               practiceMode={practiceMode}
               subject={subject}
               category={category}
@@ -363,6 +372,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
               correctAnswers={practiceAnswers || correctAnswers}
               onSaveTask={onSaveTask}
               initialTask={initialTask}
+              weaknesses={student?.CONFIG.WEAK || []}
             />
           ) : (
             <div>

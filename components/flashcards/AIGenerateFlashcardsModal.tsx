@@ -4,7 +4,7 @@ import { api } from '../../api/apiService';
 import Icon from '../Icon';
 
 interface AIGenerateFlashcardsModalProps {
-  student: StudentData;
+  student: StudentData | null;
   onClose: () => void;
   onSaveDeck: (deck: FlashcardDeck) => void;
 }
@@ -34,7 +34,7 @@ const AIGenerateFlashcardsModal: React.FC<AIGenerateFlashcardsModalProps> = ({ s
     setGeneratedCards(null);
 
     try {
-      const weaknessesContext = student.CONFIG.WEAK.length > 0 ? `Consider these student weaknesses: ${student.CONFIG.WEAK.join(', ')}.` : '';
+      const weaknessesContext = (student?.CONFIG.WEAK && student.CONFIG.WEAK.length > 0) ? `Consider these student weaknesses: ${student.CONFIG.WEAK.join(', ')}.` : '';
       const fullPrompt = `${topic}. ${weaknessesContext}`;
       
       const result = await api.generateFlashcards({ topic: fullPrompt, syllabus: examSyllabus });
@@ -80,7 +80,7 @@ const AIGenerateFlashcardsModal: React.FC<AIGenerateFlashcardsModalProps> = ({ s
   const contentAnimationClasses = isExiting ? 'modal-content-exit' : 'modal-content-enter';
   const inputClass = "w-full px-4 py-2 mt-1 text-gray-200 bg-gray-900/50 border border-[var(--glass-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500";
   
-  const upcomingExams = student.EXAMS.filter(e => new Date(e.date) >= new Date());
+  const upcomingExams = student?.EXAMS.filter(e => new Date(e.date) >= new Date()) || [];
 
   return (
     <div className={`fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${animationClasses}`} onClick={handleClose}>

@@ -1,61 +1,57 @@
-import React from 'react';
-// @ts-ignore: virtual module types not found in this project
-import { useRegisterSW } from 'virtual:pwa-register/react';
-import Icon from './Icon';
+import React, { useState, useEffect } from 'react';
 
-function ReloadPrompt() {
-  const {
-    offlineReady: [offlineReady, setOfflineReady],
-    needRefresh: [needRefresh, setNeedRefresh],
-    updateServiceWorker,
-  } = useRegisterSW({
-    onRegistered(r) {
-      // console.log('SW Registered:', r);
-    },
-    onRegisterError(error) {
-      console.log('SW registration error:', error);
-    },
-  });
+const ReadingHoursWidget: React.FC = () => {
+  const [totalReadingHours, setTotalReadingHours] = useState<number>(0);
+  const [sessionDuration, setSessionDuration] = useState<string>(''); // Input as string
 
-  const close = () => {
-    setOfflineReady(false);
-    setNeedRefresh(false);
+  useEffect(() => {
+    // Load total reading hours from local storage on component mount
+    const storedHours = localStorage.getItem('totalReadingHours');
+    if (storedHours) {
+      setTotalReadingHours(parseFloat(storedHours));
+    }
+  }, []);
+
+  useEffect(() => {
+    // Save total reading hours to local storage whenever it changes
+    localStorage.setItem('totalReadingHours', totalReadingHours.toString());
+  }, [totalReadingHours]);
+
+  const handleLogReading = () => {
+    const duration = parseFloat(sessionDuration);
+    if (!isNaN(duration) && duration > 0) {
+      setTotalReadingHours((prevHours) => prevHours + duration);
+      setSessionDuration(''); // Clear the input field
+    } else {
+      alert('Please enter a valid positive number for reading duration.');
+    }
   };
 
-  if (needRefresh) {
-    return (
-      <div className="fixed right-4 bottom-24 z-50 p-4 rounded-lg shadow-lg bg-gray-800 border border-gray-600 flex items-center gap-4 animate-scaleIn">
-        <div className="text-white">
-          <div className="font-semibold">New version available!</div>
-          <div className="text-sm text-gray-300">Reload to get the latest updates.</div>
-        </div>
+  return (
+    <div className="p-4 bg-white rounded-lg shadow-md">
+      <h3 className="text-lg font-semibold mb-2">Reading Hours Tracker</h3>
+      <p className="text-gray-700 mb-4">
+        Total Reading Hours: <span className="font-bold">{totalReadingHours.toFixed(2)}</span>
+      </p>
+      <div className="flex items-center space-x-2 mb-4">
+        <input
+          type="number"
+          step="0.1"
+          placeholder="Enter session duration (hours)"
+          className="p-2 border rounded-md w-full"
+          value={sessionDuration}
+          onChange={(e) => setSessionDuration(e.target.value)}
+        />
         <button
-          className="px-4 py-2 text-sm font-semibold rounded-lg bg-cyan-600 text-white hover:bg-cyan-500"
-          onClick={() => updateServiceWorker(true)}
+          onClick={handleLogReading}
+          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus://ring-blue-500 focus:ring-opacity-50"
         >
-          Reload
+          Log Reading
         </button>
       </div>
-    );
-  }
+      {/* You can add more features here, e.g., a list of recent sessions, goals, etc. */}
+    </div>
+  );
+};
 
-  if (offlineReady) {
-    return (
-        <div className="fixed right-4 bottom-24 z-50 p-4 rounded-lg shadow-lg bg-gray-800 border border-gray-600 flex items-center gap-4 animate-scaleIn">
-            <div className="text-white">
-                <div className="font-semibold">App ready to work offline.</div>
-            </div>
-            <button
-                className="p-2 text-gray-300 hover:text-white"
-                onClick={() => close()}
-            >
-                &times;
-            </button>
-        </div>
-    );
-  }
-
-  return null;
-}
-
-export default ReloadPrompt;
+export default ReadingHoursWidget;

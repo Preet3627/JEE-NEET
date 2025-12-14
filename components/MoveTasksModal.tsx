@@ -4,11 +4,12 @@ import Icon from './Icon';
 
 interface MoveTasksModalProps {
   onClose: () => void;
-  onConfirm: (newDate: string) => void;
+  onConfirm: (taskIds: string[], newDate: string) => void;
   selectedCount: number;
+  selectedTaskIds: string[];
 }
 
-const MoveTasksModal: React.FC<MoveTasksModalProps> = ({ onClose, onConfirm, selectedCount }) => {
+const MoveTasksModal: React.FC<MoveTasksModalProps> = ({ onClose, onConfirm, selectedCount, selectedTaskIds }) => {
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
   const [isExiting, setIsExiting] = useState(false);
 
@@ -18,7 +19,7 @@ const MoveTasksModal: React.FC<MoveTasksModalProps> = ({ onClose, onConfirm, sel
   };
 
   const handleConfirm = () => {
-    onConfirm(newDate);
+    onConfirm(selectedTaskIds, newDate);
   };
   
   const animationClasses = isExiting ? 'modal-exit' : 'modal-enter';

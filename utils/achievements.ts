@@ -1,5 +1,4 @@
-import { StudentData, DoubtData } from '../types';
-import { IconName } from '../components/Icon';
+import { StudentData, DoubtData, IconName } from '../types';
 
 export interface Achievement {
     name: string;

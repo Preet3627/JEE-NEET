@@ -24,10 +24,11 @@ interface SettingsModalProps {
   onClearAllSchedule: () => void;
   onToggleEditLayout?: () => void;
   onTogglePushNotifications: (enabled: boolean) => void;
+  pushNotificationsEnabled: boolean;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = (props) => {
-  const { settings, decks, driveLastSync, isCalendarSyncEnabled, calendarLastSync, onClose, onSave, onExportToIcs, googleAuthStatus, onGoogleSignIn, onGoogleSignOut, onBackupToDrive, onRestoreFromDrive, onApiKeySet, onOpenAssistantGuide, onOpenAiGuide, onClearAllSchedule, onToggleEditLayout, onTogglePushNotifications } = props;
+  const { settings, decks, driveLastSync, isCalendarSyncEnabled, calendarLastSync, onClose, onSave, onExportToIcs, googleAuthStatus, onGoogleSignIn, onGoogleSignOut, onBackupToDrive, onRestoreFromDrive, onApiKeySet, onOpenAssistantGuide, onOpenAiGuide, onClearAllSchedule, onToggleEditLayout, onTogglePushNotifications, pushNotificationsEnabled } = props;
   
   const { setNotchSettings, setVisualizerSettings, notchSettings: currentNotch, visualizerSettings: currentVis } = useMusicPlayer();
 
@@ -66,7 +67,7 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
     setVisualizerSettings({ preset: visPreset, colorMode: visColor });
 
     const settingsToSave: Partial<Config['settings'] & { geminiApiKey?: string; isCalendarSyncEnabled?: boolean }> = { 
-        accentColor, 
+        accentColor: accentColor || '#0891b2', 
         blurEnabled, 
         mobileLayout: mobileLayout as 'standard' | 'toolbar', 
         forceOfflineMode, 
@@ -219,7 +220,7 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
 
                     <div className="flex items-center justify-between">
                         <label className="text-sm text-gray-300">Push Notifications</label>
-                        <input type="checkbox" checked={pushNotificationsEnabled} onChange={handlePushNotificationToggle} className="w-4 h-4 rounded text-cyan-600 bg-gray-700 border-gray-600 focus:ring-cyan-500" />
+                        <input type="checkbox" checked={pushNotificationsEnabled} onChange={e => onTogglePushNotifications(e.target.checked)} className="w-4 h-4 rounded text-cyan-600 bg-gray-700 border-gray-600 focus:ring-cyan-500" />
                     </div>
                     
                     <button type="button" onClick={onExportToIcs} className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-gray-800 hover:bg-gray-700 text-white border border-gray-600">

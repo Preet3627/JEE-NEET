@@ -1,7 +1,9 @@
 
 import { useAuth } from './AuthContext';
-import React, { createContext, useState, useEffect, useRef, useCallback, useContext } from 'react';
+import React, { createContext, useState, useEffect, useRef, useCallback, useContext, ReactNode } from 'react';
 import { useServerStatus } from './ServerStatusContext';
+import { Track, NotchSettings, VisualizerSettings, DjDropSettings, LocalPlaylist } from '../types';
+import { api } from '../api/apiService';
 
 interface MusicPlayerContextType {
     audioElement: HTMLAudioElement | null;

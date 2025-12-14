@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Icon from './Icon';
-import { playNextSound, playStopSound, playMarkSound, vibrate } from '../utils/sounds';
+import { playNextSound, playStopSound, playMarkSound, playTimesUpSound, vibrate } from '../utils/sounds';
 import { api } from '../api/apiService';
 import AnswerKeyUploadModal from './AnswerKeyUploadModal';
-import { ResultData, StudentData, HomeworkData, ScheduleItem, ScheduleCardData, PracticeQuestion } from '../types';
+import { ResultData, StudentData, HomeworkData, ScheduleItem, ScheduleCardData, PracticeQuestion, StudySession } from '../types';
 import TestAnalysisReport from './TestAnalysisReport';
 import SpecificMistakeAnalysisModal from './SpecificMistakeAnalysisModal';
 import MusicVisualizerWidget from './widgets/MusicVisualizerWidget';
@@ -18,14 +18,14 @@ interface McqTimerProps {
   questions?: PracticeQuestion[];
   perQuestionTime: number;
   onClose: () => void;
-  onSessionComplete: (duration: number, questions_solved: number, questions_skipped: number[]) => void;
+  onSessionComplete: (session: { duration: number; questions_solved: number; questions_skipped: number[]; }) => Promise<void>;
   onLogResult?: (result: ResultData) => void;
   onUpdateWeaknesses?: (weaknesses: string[]) => void;
   practiceMode: PracticeMode;
   subject: string;
   category: string;
   syllabus: string;
-  student: StudentData;
+  student: StudentData | null;
   // FIX: Updated correctAnswers type to allow string or string[]
   correctAnswers?: Record<string, string | string[]>; // Modified to accept string or array of strings
   onSaveTask?: (task: ScheduleItem) => void;
@@ -78,6 +78,12 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
     const [isFullscreen, setIsFullscreen] = useState(false);
     
     const [analyzingMistake, setAnalyzingMistake] = useState<number | null>(null);
+
+
+
+    // New states for per-MCQ time limit
+    const [perMcqMaxTime, setPerMcqMaxTime] = useState(perQuestionTime); // User settable max time per MCQ
+    const [currentMcqTime, setCurrentMcqTime] = useState(perQuestionTime); // Timer for current MCQ
 
     const questionStartTimeRef = useRef<number | null>(null);
     const timerRef = useRef<HTMLDivElement>(null);
@@ -190,7 +196,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
         return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
     }, []);
 
-    const finishSession = useCallback(() => {
+    const finishSession = useCallback(async () => {
         if (isFinished) return;
         playStopSound(); vibrate('finish');
         setIsActive(false);
@@ -198,18 +204,48 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
         const duration = sessionStartTime ? Math.round((Date.now() - sessionStartTime) / 1000) : 0;
         const solved = Object.keys(answers).filter(k => answers[parseInt(k)] !== '' && (Array.isArray(answers[parseInt(k)]) ? answers[parseInt(k)]?.length > 0 : true));
         const skipped = questionNumbers.filter(q => !solved.includes(q.toString()));
+        
+        const session = {
+            date: new Date().toISOString().split('T')[0],
+            duration,
+            questions_solved: solved.length,
+            questions_skipped: skipped,
+        };
         onSessionComplete(duration, solved.length, skipped);
     }, [isFinished, sessionStartTime, answers, questionNumbers, onSessionComplete]);
 
     useEffect(() => {
-        let interval: ReturnType<typeof setTimeout> | null = null;
-        if (isActive && !isFinished && totalSeconds > 0) {
-            interval = setInterval(() => setTotalSeconds(s => s - 1), 1000);
-        } else if (isActive && !isFinished && totalSeconds <= 0) {
-            finishSession();
+        let overallTimer: ReturnType<typeof setTimeout> | null = null;
+        let mcqTimer: ReturnType<typeof setTimeout> | null = null;
+
+        if (isActive && !isFinished) {
+            // Overall timer
+            if (totalSeconds > 0) {
+                overallTimer = setInterval(() => setTotalSeconds(s => s - 1), 1000);
+            } else {
+                finishSession();
+            }
+
+            // Per MCQ timer
+            if (perMcqMaxTime > 0) { // Only run if a max time is set
+                if (currentMcqTime > 0) {
+                    mcqTimer = setInterval(() => setCurrentMcqTime(t => t - 1), 1000);
+                } else if (currentMcqTime <= 0 && !isNavigating) {
+                    // Time's up for current MCQ
+                    playTimesUpSound();
+                    vibrate('warning');
+                    // Mark this question as skipped/unanswered due to time out
+                    setAnswers(prev => ({ ...prev, [currentQuestionNumber]: '' })); // Mark as unanswered
+                    handleNextQuestion(true); // Auto-skip
+                }
+            }
         }
-        return () => { if (interval) clearInterval(interval); };
-    }, [isActive, isFinished, totalSeconds, finishSession]);
+
+        return () => { 
+            if (overallTimer) clearInterval(overallTimer);
+            if (mcqTimer) clearInterval(mcqTimer);
+        };
+    }, [isActive, isFinished, totalSeconds, currentMcqTime, perMcqMaxTime, finishSession, isNavigating, currentQuestionNumber]); // Added currentQuestionNumber to dependencies to re-evaluate on question change
     
     useEffect(() => {
         if (isFinished) {
@@ -223,6 +259,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
         setSessionStartTime(Date.now());
         questionStartTimeRef.current = Date.now();
         setIsActive(true);
+        setCurrentMcqTime(perMcqMaxTime); // Initialize current MCQ timer
     };
 
     const handleAnswerInput = (value: string | string[]) => {
@@ -271,9 +308,19 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
         }
     };
     
-    const handleNextQuestion = () => {
+    const handleNextQuestion = (fromTimer: boolean = false) => { // Added fromTimer parameter
+        if (questionStartTimeRef.current) {
+            const timeSpent = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
+            setTimings(prev => ({...prev, [currentQuestionNumber]: (prev[currentQuestionNumber] || 0) + timeSpent}));
+        }
+
         if (currentQuestionIndex < totalQuestions - 1) {
-            navigate(currentQuestionIndex + 1);
+            setCurrentQuestionIndex(prev => prev + 1);
+            setCurrentMcqTime(perMcqMaxTime); // Reset MCQ timer for next question
+            questionStartTimeRef.current = Date.now();
+            setFeedback(null);
+            setIsNavigating(false);
+            setIsPaletteOpen(false);
         } else {
             finishSession();
         }
@@ -293,6 +340,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
                 setFeedback(null);
                 questionStartTimeRef.current = Date.now();
                 setCurrentQuestionIndex(newIndex);
+                setCurrentMcqTime(perMcqMaxTime); // Reset MCQ timer on manual navigation
                 setIsPaletteOpen(false);
                 setTimeout(() => setIsNavigating(false), 50);
             }, 300);
@@ -385,7 +433,20 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
               <h3 className="text-xl font-bold text-white mb-4">Ready to Practice?</h3>
               <p className="text-gray-400 mb-2">Total Questions: <span className="font-bold text-white">{totalQuestions}</span></p>
               <p className="text-gray-400 mb-6">Total Time: <span className="font-bold text-white">{formatTime(totalSeconds)}</span></p>
-              <button onClick={handleStart} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-base font-semibold text-white rounded-lg transition-transform hover:scale-105 active:scale-100 shadow-lg bg-gradient-to-r from-[var(--accent-color)] to-[var(--gradient-purple)]">
+              <div className="mt-4">
+                <label htmlFor="perMcqTimeInput" className="block text-gray-400 text-sm font-bold mb-2">
+                    Max Time per MCQ (seconds):
+                </label>
+                <input
+                    id="perMcqTimeInput"
+                    type="number"
+                    value={perMcqMaxTime}
+                    onChange={(e) => setPerMcqMaxTime(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-full max-w-xs px-4 py-2 text-center text-gray-200 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    min="0"
+                />
+              </div>
+              <button onClick={handleStart} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-base font-semibold text-white rounded-lg transition-transform hover:scale-105 active:scale-100 shadow-lg bg-gradient-to-r from-[var(--accent-color)] to-[var(--gradient-purple)] mt-6">
                   <Icon name="play" /> Start Practice
               </button>
           </div>
@@ -441,7 +502,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
                     <SpecificMistakeAnalysisModal 
                         questionNumber={analyzingMistake}
                         onClose={() => setAnalyzingMistake(null)}
-                        onSaveWeakness={(topic) => onUpdateWeaknesses([...new Set([...(student.CONFIG.WEAK || []), topic])])}
+                        onSaveWeakness={(topic: string) => onUpdateWeaknesses([...new Set([...(student?.CONFIG.WEAK || []), topic])].filter(Boolean) as string[])}
                     />
                 )}
             </div>

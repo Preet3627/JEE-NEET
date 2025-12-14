@@ -28,9 +28,11 @@ interface TeacherDashboardProps extends ModalControlProps {
     onDeleteUser: (sid: string) => void;
     onAddTeacher?: (teacherData: any) => void;
     onBroadcastTask: (task: ScheduleItem, examType: 'JEE' | 'NEET' | 'ALL') => void;
+    onClearData: (sid: string) => void;
+    onImpersonate: (sid: string) => Promise<void>;
 }
 
-const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleUnacademySub, onDeleteUser, onAddTeacher, onBroadcastTask, openModal, closeModal, setIsCreateModalOpen, setisAiParserModalOpen, isCreateModalOpen, isAiParserModalOpen, isMessagingModalOpen, setMessagingModalOpen, messagingStudent, setMessagingStudent }) => { // FIX: Destructure messagingStudent and setMessagingStudent from props
+const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleUnacademySub, onDeleteUser, onAddTeacher, onBroadcastTask, onClearData, onImpersonate, openModal, closeModal, setIsCreateModalOpen, setisAiParserModalOpen, isCreateModalOpen, isAiParserModalOpen, isMessagingModalOpen, setMessagingModalOpen, messagingStudent, setMessagingStudent }) => { // FIX: Destructure messagingStudent and setMessagingStudent from props
     const { loginWithToken } = useAuth();
     const { refreshStatus } = useServerStatus(); // Use refreshStatus from context
     const [activeTab, setActiveTab] = useState<'grid' | 'broadcast' | 'guide' | 'settings'>('grid'); // Add 'settings' tab

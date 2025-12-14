@@ -9,7 +9,7 @@ interface DeckViewModalProps {
   onClose: () => void;
   onAddCard: () => void;
   onEditCard: (card: Flashcard) => void;
-  onDeleteCard: (cardId: string) => void;
+  onDeleteCard: (deckId: string, cardId: string) => void;
   onStartReview: () => void;
 }
 
@@ -55,7 +55,7 @@ const DeckViewModal: React.FC<DeckViewModalProps> = ({ deck, onClose, onAddCard,
                         {!deck.isLocked && (
                             <div className="flex-shrink-0 flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button onClick={() => onEditCard(card)} className="p-1 text-gray-400 hover:text-white"><Icon name="edit" className="w-4 h-4" /></button>
-                                <button onClick={() => onDeleteCard(card.id)} className="p-1 text-gray-400 hover:text-red-400"><Icon name="trash" className="w-4 h-4" /></button>
+                                <button onClick={() => onDeleteCard(deck.id, card.id)} className="p-1 text-gray-400 hover:text-red-400"><Icon name="trash" className="w-4 h-4" /></button>
                             </div>
                         )}
                     </div>

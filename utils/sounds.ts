@@ -42,7 +42,7 @@ export const playTimesUpSound = () => {
     setTimeout(() => playTone(880, 0.1, 'sawtooth'), 150);
 };
 
-type VibrationPattern = 'click' | 'error' | 'finish';
+type VibrationPattern = 'click' | 'error' | 'finish' | 'warning';
 
 export const vibrate = (pattern: VibrationPattern) => {
     if ('vibrate' in navigator) {
@@ -55,6 +55,9 @@ export const vibrate = (pattern: VibrationPattern) => {
                 break;
             case 'finish':
                 navigator.vibrate(200);
+                break;
+            case 'warning':
+                navigator.vibrate([100, 50, 100, 50, 100]); // A distinct warning pattern
                 break;
         }
     }

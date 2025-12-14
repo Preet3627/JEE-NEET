@@ -83,6 +83,7 @@ export const api = {
     googleLogin: (credential: string) => publicFetch('/auth/google', { method: 'POST', body: JSON.stringify({ credential }) }),
     register: (formData: any) => publicFetch('/register', { method: 'POST', body: JSON.stringify(formData) }),
     verifyEmail: (email: string, code: string) => publicFetch('/verify-email', { method: 'POST', body: JSON.stringify({ email, code }) }),
+    resendVerificationEmail: (email: string) => publicFetch('/resend-verification-email', { method: 'POST', body: JSON.stringify({ email }) }),
     forgotPassword: (email: string) => publicFetch('/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
     resetPassword: (token: string, password: string) => publicFetch('/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
     

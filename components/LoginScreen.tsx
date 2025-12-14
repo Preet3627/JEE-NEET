@@ -1,9 +1,8 @@
 
-
-
 import React, { useState, useEffect } from 'react';
 import Icon from './Icon';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../api/apiService'; // Import apiService
 
 declare global {
   interface Window {
@@ -15,19 +14,19 @@ interface LoginScreenProps {
     onSwitchToRegister: () => void;
     onSwitchToForgotPassword: () => void;
     backendStatus: 'checking' | 'online' | 'offline' | 'misconfigured';
-    googleClientId: string | null;
 }
 
-const LoginScreen: React.FC<LoginScreenProps> = ({ onSwitchToRegister, onSwitchToForgotPassword, backendStatus, googleClientId }) => {
-    const { login, googleLogin } = useAuth();
+const LoginScreen: React.FC<LoginScreenProps> = ({ onSwitchToRegister, onSwitchToForgotPassword, backendStatus }) => {
+    const { login, googleLogin, googleClientId, googleAuthStatus, setGoogleAuthStatus } = useAuth();
     const [sid, setSid] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+    const [emailToVerify, setEmailToVerify] = useState<string | null>(null); // State to hold email for verification
+    const [resendEmailStatus, setResendEmailStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
     useEffect(() => {
-        if (window.google && backendStatus === 'online' && googleClientId) {
+        if (window.google && googleClientId && googleAuthStatus !== 'loading' && googleAuthStatus !== 'unconfigured' && backendStatus === 'online') {
             try {
                 window.google.accounts.id.initialize({
                     client_id: googleClientId,
@@ -38,38 +37,60 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onSwitchToRegister, onSwitchT
                     { theme: "outline", size: "large", type: 'standard', text: 'continue_with' }
                 );
             } catch (error) {
-                console.error("Google Sign-In initialization error:", error);
+                console.error("Google Sign-In render button error:", error);
+                setGoogleAuthStatus('unconfigured');
             }
         }
-    }, [backendStatus, googleClientId]);
+    }, [googleClientId, googleAuthStatus, backendStatus]);
 
     const handleGoogleCallback = async (response: any) => {
-        setIsGoogleLoading(true);
+        setGoogleAuthStatus('loading');
         setError('');
         try {
             await googleLogin(response.credential);
         } catch (err: any) {
             setError(err.message || 'Google login failed.');
-            setIsGoogleLoading(false);
+            setGoogleAuthStatus('signed_out');
         }
     };
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setEmailToVerify(null); // Clear previous verification email
         setIsLoading(true);
         try {
             await login(sid, password);
         } catch (err: any) {
-            setError(err.message || 'Login failed.');
+            if (err.needsVerification && err.email) {
+                setEmailToVerify(err.email);
+                setError(err.message || 'Login failed. Please verify your email.');
+            } else {
+                setError(err.message || 'Login failed.');
+            }
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleResendVerification = async () => {
+        if (!emailToVerify) return;
+        setResendEmailStatus('loading');
+        try {
+            await api.resendVerificationEmail(emailToVerify);
+            setResendEmailStatus('success');
+            setError('Verification email sent! Check your inbox.');
+        } catch (err: any) {
+            setResendEmailStatus('error');
+            setError(err.message || 'Failed to resend verification email.');
         }
     };
     
     const inputClass = "w-full px-4 py-3 mt-2 text-gray-200 bg-gray-900/50 border border-[var(--glass-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 transition";
     const labelClass = "text-sm font-bold text-gray-400";
     const buttonClass = "w-full flex items-center justify-center gap-2 px-4 py-3 text-base font-semibold text-white rounded-lg transition-transform hover:scale-105 active:scale-100 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none bg-gradient-to-r from-[var(--gradient-cyan)] to-[var(--gradient-purple)]";
+
+    const isGoogleButtonDisabled = backendStatus !== 'online' || !googleClientId || googleAuthStatus === 'loading' || googleAuthStatus === 'unconfigured';
 
     return (
         <div className="min-h-screen flex items-center justify-center p-4">
@@ -81,8 +102,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onSwitchToRegister, onSwitchT
                 </div>
 
                 <div className="space-y-4">
-                    <div id="googleSignInButton" className={`flex justify-center transition-opacity ${backendStatus !== 'online' || isGoogleLoading || !googleClientId ? 'opacity-50 pointer-events-none' : ''}`}></div>
-                    {(isGoogleLoading) && <p className="text-sm text-center text-gray-400 animate-pulse">Verifying...</p>}
+                    {/* Render Google Sign-In button only if configured and ready */}
+                    {googleClientId && googleAuthStatus !== 'unconfigured' && (
+                        <div id="googleSignInButton" className={`flex justify-center transition-opacity ${isGoogleButtonDisabled ? 'opacity-50 pointer-events-none' : ''}`}></div>
+                    )}
+                    {googleAuthStatus === 'loading' && <p className="text-sm text-center text-gray-400 animate-pulse">Verifying Google account...</p>}
                     <div className="relative">
                         <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-600"></div></div>
                         <div className="relative flex justify-center text-sm"><span className="px-2 bg-gray-800/80 text-gray-400 backdrop-blur-sm">Or with Student ID</span></div>
@@ -104,7 +128,22 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onSwitchToRegister, onSwitchT
                         <input id="password" name="password" type="password" required className={inputClass} onChange={(e) => setPassword(e.target.value)} value={password} />
                     </div>
                      {error && <p className="text-sm text-center text-red-400">{error}</p>}
-                     <button type="submit" disabled={isLoading || isGoogleLoading || backendStatus !== 'online'} className={buttonClass}>
+                    {emailToVerify && (
+                        <div className="text-center text-sm mt-2">
+                            <p className="text-yellow-400 mb-2">Your email <span className="font-bold">{emailToVerify}</span> is not verified.</p>
+                            <button 
+                                type="button" 
+                                onClick={handleResendVerification} 
+                                disabled={resendEmailStatus === 'loading'}
+                                className="text-cyan-400 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {resendEmailStatus === 'loading' ? 'Sending...' : 'Resend Verification Email'}
+                            </button>
+                            {resendEmailStatus === 'success' && <p className="text-green-400">Email sent! Check your inbox.</p>}
+                            {resendEmailStatus === 'error' && <p className="text-red-400">Failed to send. Try again.</p>}
+                        </div>
+                    )}
+                     <button type="submit" disabled={isLoading || isGoogleButtonDisabled || backendStatus !== 'online'} className={buttonClass}>
                         {isLoading ? 'Logging in...' : <> <Icon name="login" /> Login </>}
                     </button>
                  </form>

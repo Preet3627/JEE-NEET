@@ -8,7 +8,7 @@ import Icon from './Icon';
 interface TestReportModalProps {
   result: ResultData;
   onClose: () => void;
-  student: StudentData;
+  student: StudentData | null;
   onUpdateWeaknesses: (weaknesses: string[]) => void;
   onSaveDeck: (deck: FlashcardDeck) => void;
 }
@@ -65,7 +65,7 @@ const TestReportModal: React.FC<TestReportModalProps> = ({ result, onClose, stud
                 questionNumber={analyzingMistake}
                 onClose={() => setAnalyzingMistake(null)}
                 onSaveWeakness={(topic) => {
-                    const updatedWeaknesses = [...new Set([...student.CONFIG.WEAK, topic])];
+                    const updatedWeaknesses = [...new Set([...(student?.CONFIG.WEAK || []), topic])];
                     onUpdateWeaknesses(updatedWeaknesses);
                 }}
             />

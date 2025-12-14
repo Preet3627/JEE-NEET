@@ -3,6 +3,7 @@ import Icon from './Icon';
 
 interface ExamTypeSelectionModalProps {
   onSelect: (examType: 'JEE' | 'NEET') => void;
+  onClose: () => void;
 }
 
 const ExamTypeSelectionModal: React.FC<ExamTypeSelectionModalProps> = ({ onSelect }) => {
