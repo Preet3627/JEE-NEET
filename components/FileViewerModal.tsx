@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StudyMaterialItem } from '../types';
 import Icon from './Icon';
 import { api } from '../api/apiService';
+import { getStudyMaterialFromDb } from '../utils/studyMaterialDb'; // Import IndexedDB utility
 
 interface FileViewerModalProps {
   file: StudyMaterialItem | null;
@@ -64,9 +65,17 @@ const FileViewerModal: React.FC<FileViewerModalProps> = ({ file, onClose }) => {
       setObjectUrl(null);
 
       try {
-        const blob = await api.getStudyMaterialContent(file.path);
-        url = URL.createObjectURL(blob);
-        setObjectUrl(url);
+        // Try to load from IndexedDB first
+        const offlineMaterial = await getStudyMaterialFromDb(file.path);
+        if (offlineMaterial) {
+            url = URL.createObjectURL(offlineMaterial.blob);
+            setObjectUrl(url);
+        } else {
+            // Fallback to remote fetch
+            const blob = await api.getStudyMaterialContent(file.path);
+            url = URL.createObjectURL(blob);
+            setObjectUrl(url);
+        }
       } catch (e: any) {
         setError("Could not load file preview. It might be too large or an error occurred.");
         console.error(e);

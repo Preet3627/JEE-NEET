@@ -165,12 +165,14 @@ export interface NotchSettings {
 export interface VisualizerSettings {
   preset: 'bars' | 'wave' | 'circle';
   colorMode: 'rgb' | 'album' | 'mono';
+  albumColor?: string; // New: dominant color from album art
 }
 
 export interface DjDropSettings {
   enabled: boolean;
   autoTrigger: boolean;
   customDropUrl?: string;
+  crossfadeDuration?: number; // New: in seconds
 }
 
 export interface Config {

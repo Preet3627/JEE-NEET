@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import Icon from './Icon';
-import { playNextSound, playStopSound, playMarkSound, vibrate } from '../utils/sounds';
-import { api } from '../api/apiService';
-import AnswerKeyUploadModal from './AnswerKeyUploadModal';
-import { ResultData, StudentData, HomeworkData, ScheduleItem, ScheduleCardData, PracticeQuestion } from '../types';
-import TestAnalysisReport from './TestAnalysisReport';
-import SpecificMistakeAnalysisModal from './SpecificMistakeAnalysisModal';
-import MusicVisualizerWidget from './widgets/MusicVisualizerWidget';
-import { useMusicPlayer } from '../context/MusicPlayerContext'; // Import useMusicPlayer
+import Icon from './components/Icon';
+import { playNextSound, playStopSound, playMarkSound, vibrate } from './utils/sounds';
+import { api } from './api/apiService';
+import AnswerKeyUploadModal from './components/AnswerKeyUploadModal';
+import { ResultData, StudentData, HomeworkData, ScheduleItem, ScheduleCardData, PracticeQuestion } from './types';
+import TestAnalysisReport from './components/TestAnalysisReport';
+import SpecificMistakeAnalysisModal from './components/SpecificMistakeAnalysisModal';
+import MusicVisualizerWidget from './components/widgets/MusicVisualizerWidget';
+import { useMusicPlayer } from './context/MusicPlayerContext'; // Import useMusicPlayer
 
 type PracticeMode = 'custom' | 'jeeMains';
 
@@ -377,7 +377,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
           <div className="text-center">
               {/* MacOS Traffic Light Header */}
               <div className="flex items-center gap-2 px-4 py-3 mb-6 border-b border-white/10 bg-black/20 rounded-t-lg -mt-4 -mx-4">
-                    <button onClick={onClose} className="w-3 h-3 rounded-full bg-[#ff5f56] hover:bg-[#ff5f56]/80 shadow-inner"></button>
+                    <button onClick={onClose} className="w-3 h-3 rounded-full bg-[#ff5f56] hover:bg-[#ff5f56]/80 shadow-inner" title="Close" aria-label="Close"></button>
                     <div className="w-3 h-3 rounded-full bg-[#ffbd2e] hover:bg-[#ffbd2e]/80 shadow-inner"></div>
                     <div className="w-3 h-3 rounded-full bg-[#27c93f] hover:bg-[#27c93f]/80 shadow-inner"></div>
                     <span className="ml-2 text-xs font-medium text-gray-400 tracking-wide">Timer Ready</span>
@@ -500,7 +500,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
             {/* Header */}
             <div className="flex-shrink-0 flex justify-between items-start pb-3 border-b border-gray-700">
                 <div className="flex items-center gap-4">
-                     <button onClick={toggleFullscreen} className="p-2 text-gray-400 hover:text-white">
+                     <button onClick={toggleFullscreen} className="p-2 text-gray-400 hover:text-white" title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"} aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}>
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isFullscreen ? "M4 8V4m0 0h4M4 4l5 5m11 7h-4m0 0v4m0-4l5 5M4 16v4m0 0h4m-4 0l5-5m11-7h-4m0 0v-4m0 4l5-5" : "M4 8V4m0 0h4M4 4l5 5m11-1v4m0 0h-4m4 0l-5-5M4 16v4m0 0h4m-4 0l5-5m11 1v-4m0 0h-4m4 0l-5 5"} /></svg>
                     </button>
                     <div>

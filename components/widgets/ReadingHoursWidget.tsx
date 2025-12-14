@@ -1,4 +1,5 @@
 import React from 'react';
+// @ts-ignore: virtual module types not found in this project
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import Icon from './Icon';
 

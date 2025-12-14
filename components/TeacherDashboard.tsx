@@ -8,6 +8,8 @@ import CreateEditTaskModal from './CreateEditTaskModal';
 import AIParserModal from './AIParserModal';
 import { api } from '../api/apiService';
 import { useAuth } from '../context/AuthContext';
+import GlobalSettings from './admin/GlobalSettings'; // Import the new component
+import { useServerStatus } from '../context/ServerStatusContext'; // Import useServerStatus
 
 interface ModalControlProps { // Define common modal control props
     openModal: (modalId: string, setStateTrue: React.Dispatch<React.SetStateAction<boolean>> | ((val: any) => void), initialValue?: any) => void;
@@ -30,7 +32,8 @@ interface TeacherDashboardProps extends ModalControlProps {
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleUnacademySub, onDeleteUser, onAddTeacher, onBroadcastTask, openModal, closeModal, setIsCreateModalOpen, setisAiParserModalOpen, isCreateModalOpen, isAiParserModalOpen, isMessagingModalOpen, setMessagingModalOpen, messagingStudent, setMessagingStudent }) => { // FIX: Destructure messagingStudent and setMessagingStudent from props
     const { loginWithToken } = useAuth();
-    const [activeTab, setActiveTab] = useState<'grid' | 'broadcast' | 'guide'>('grid');
+    const { refreshStatus } = useServerStatus(); // Use refreshStatus from context
+    const [activeTab, setActiveTab] = useState<'grid' | 'broadcast' | 'guide' | 'settings'>('grid'); // Add 'settings' tab
     const [broadcastTarget, setBroadcastTarget] = useState<'ALL' | 'JEE' | 'NEET'>('ALL');
 
     const TabButton: React.FC<{ tabId: string; children: React.ReactNode; }> = ({ tabId, children }) => (
@@ -150,12 +153,14 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleU
                     <TabButton tabId="grid"><div className="flex items-center gap-2"><Icon name="users" /> Student Grid</div></TabButton>
                     <TabButton tabId="broadcast"><div className="flex items-center gap-2"><Icon name="send" /> Broadcast</div></TabButton>
                     <TabButton tabId="guide"><div className="flex items-center gap-2"><Icon name="book-open" /> AI Guide</div></TabButton>
+                    <TabButton tabId="settings"><div className="flex items-center gap-2"><Icon name="settings" /> Global Settings</div></TabButton> {/* New Tab */}
                 </nav>
             </div>
             <div className="mt-6">
                 {activeTab === 'grid' && <StudentGrid students={students} onToggleSub={()=>{}} onDeleteUser={onDeleteUser} onStartMessage={(student) => { setMessagingStudent(student); openModal('MessagingModal', setMessagingModalOpen, true); }} onClearData={handleClearData} onImpersonate={handleImpersonate} />}
                 {activeTab === 'broadcast' && <BroadcastManager onOpenModal={() => openModal('CreateEditTaskModal', setIsCreateModalOpen, true)} onOpenAIModal={() => openModal('AIParserModal', setisAiParserModalOpen, true)} target={broadcastTarget} setTarget={setBroadcastTarget} />}
                 {activeTab === 'guide' && <AIGuide />}
+                {activeTab === 'settings' && <GlobalSettings refreshServerStatus={refreshStatus} />} {/* New Content */}
             </div>
 
             {/* Modals are handled by App.tsx now */}

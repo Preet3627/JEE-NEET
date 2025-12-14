@@ -1,9 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from './context/AuthContext';
-import { StudentData, ScheduleItem, StudySession, Config, ResultData, ExamData, DoubtData, HomeworkData, PracticeQuestion, FlashcardDeck, Flashcard, StudyMaterialItem } from './types';
-import { studentDatabase } from './data/mockData';
-import { api } from './api/apiService';
+import { urlBase64ToUint8Array } from './utils/push';
 
 import Header from './components/Header';
 import StudentDashboard from './components/StudentDashboard';
@@ -126,7 +124,7 @@ interface ModalControlProps {
 
 const App: React.FC = () => {
   const { currentUser, userRole, isLoading, isDemoMode, enterDemoMode, logout, refreshUser, token, googleAuthStatus, setGoogleAuthStatus, loginWithToken, verificationEmail, setVerificationEmail } = useAuth();
-  const { isFullScreenPlayerOpen, toggleLibrary, isLibraryOpen, currentTrack } = useMusicPlayer(); 
+  const { isFullScreenPlayerOpen, toggleLibrary, isLibraryOpen, currentTrack, analyser, visualizerSettings, notchSettings, play, pause, nextTrack, prevTrack } = useMusicPlayer(); 
     
   const [allStudents, setAllStudents] = useState<StudentData[]>([]);
   const [allDoubts, setAllDoubts] = useState<DoubtData[]>([]);
@@ -182,7 +180,16 @@ const App: React.FC = () => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSpecificMistakeAnalysisModalOpen, setIsSpecificMistakeAnalysisModalOpen] = useState(false);
   const [isAiDoubtSolverOpen, setIsAiDoubtSolverOpen] = useState(false);
-
+  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard'); // State for managing active tab
+  
+  const navigateTab = useCallback((tab: ActiveTab, replace = false) => {
+    setActiveTab(tab);
+    if (replace) {
+        window.history.replaceState({ tab }, '');
+    } else {
+        window.history.pushState({ tab }, '');
+    }
+  }, []);
 
   // General App State
   const [isSyncing, setIsSyncing] = useState(false);
@@ -291,6 +298,8 @@ const App: React.FC = () => {
           modalStackRef.current = [];
           currentModalIdRef.current = null;
         }
+      } else if (event.state && event.state.tab) {
+          setActiveTab(event.state.tab);
       } else {
         if (modalStackRef.current.length > 0) {
           modalStackRef.current.forEach(m => {
@@ -303,12 +312,13 @@ const App: React.FC = () => {
           modalStackRef.current = [];
           currentModalIdRef.current = null;
         }
+        setActiveTab('dashboard'); // Default to dashboard if no tab in history state
       }
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [closeModal]);
+  }, [closeModal, setActiveTab]);
 
 
   const checkBackendStatus = useCallback(async () => {
@@ -384,6 +394,7 @@ const App: React.FC = () => {
     const action = params.get('action');
     const dataStr = params.get('data');
     const resetToken = params.get('reset-token');
+    const tabParam = params.get('tab');
 
     if (resetToken) {
       setResetToken(resetToken);
@@ -391,6 +402,11 @@ const App: React.FC = () => {
       newUrl.searchParams.delete('reset-token');
       window.history.replaceState({}, document.title, newUrl.toString());
       return;
+    }
+
+    if (tabParam && ['dashboard', 'today', 'schedule', 'material', 'flashcards', 'exams', 'performance', 'doubts'].includes(tabParam)) {
+        setActiveTab(tabParam as ActiveTab);
+        window.history.replaceState({ tab: tabParam }, '');
     }
 
     if (action) {
@@ -907,6 +923,43 @@ const App: React.FC = () => {
     }
   }, [userRole, loginWithToken]);
 
+  const handleTogglePushNotifications = useCallback(async (enabled: boolean) => {
+    if (enabled) {
+        // Request permission
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            alert('Permission for notifications was denied.');
+            return;
+        }
+
+        // Register service worker if not already
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (!registration) {
+            alert('Service worker not registered.');
+            return;
+        }
+
+        // Get push subscription
+        const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(process.env.VAPID_PUBLIC_KEY as string),
+        });
+
+        // Send subscription to backend
+        await api.savePushSubscription(subscription);
+        alert('Push notifications enabled!');
+    } else {
+        // Unsubscribe from push notifications
+        const registration = await navigator.serviceWorker.getRegistration();
+        const subscription = await registration?.pushManager.getSubscription();
+        if (subscription) {
+            await subscription.unsubscribe();
+            await api.deletePushSubscription(); // Tell backend to delete
+            alert('Push notifications disabled.');
+        }
+    }
+}, []);
+
   // Group all modal control props for easier passing
   const modalControlProps: ModalControlProps = useMemo(() => ({
     openModal, closeModal,
@@ -961,7 +1014,7 @@ const App: React.FC = () => {
     isAnswerKeyUploadModalOpen, setAnswerKeyUploadModalOpen,
     isProfileModalOpen, setIsProfileModalOpen,
     isSpecificMistakeAnalysisModalOpen, setIsSpecificMistakeAnalysisModalOpen
-  ]), [
+  }), [
     openModal, closeModal, isExamTypeSelectionModalOpen, setIsExamTypeSelectionModalOpen,
     isCreateModalOpen, setIsCreateModalOpen, setisAiParserModalOpen, setIsPracticeModalOpen,
     isSettingsModalOpen, setIsSettingsModalOpen, editingTask, setEditingTask,
@@ -1053,6 +1106,8 @@ const App: React.FC = () => {
               onPostDoubt={handlePostDoubt}
               onPostSolution={handlePostSolution}
               deepLinkAction={deepLinkAction}
+              activeTab={activeTab} // Pass activeTab
+              onTabChange={navigateTab} // Pass navigateTab
               {...modalControlProps}
             />
           ) : userRole === 'admin' && allStudents ? (
@@ -1071,7 +1126,7 @@ const App: React.FC = () => {
         </div>
         
         {isFullScreenPlayerOpen && <FullScreenMusicPlayer />}
-        {currentTrack && <GlobalMusicVisualizer />}
+        {currentTrack && <GlobalMusicVisualizer analyser={analyser} visualizerSettings={visualizerSettings} isPlaying={isPlaying} currentTrack={currentTrack} notchSettings={notchSettings} play={play} pause={pause} nextTrack={nextTrack} prevTrack={prevTrack} />}
         {currentTrack && !isFullScreenPlayerOpen && (window.innerWidth < 768) && <PersistentMusicPlayer />}
         
         {/* Modals - All rendered at the App level, managed by modalControlProps */}
@@ -1079,7 +1134,7 @@ const App: React.FC = () => {
         {isCreateModalOpen && <CreateEditTaskModal task={editingTask || viewingTask} viewOnly={!!viewingTask} onClose={() => closeModal('CreateEditTaskModal')} onSave={handleSaveTask} decks={currentUser?.CONFIG.flashcardDecks || []} />}
         {isAiParserModalOpen && <AIParserModal onClose={() => closeModal('AIParserModal')} onDataReady={setDeepLinkAction} onPracticeTestReady={setAiPracticeTest} onOpenGuide={() => openModal('AIGuideModal', setAiGuideModalOpen)} examType={currentUser?.CONFIG.settings.examType} />}
         {isPracticeModalOpen && <CustomPracticeModal initialTask={practiceTask} aiPracticeTest={aiPracticeTest} onClose={() => closeModal('CustomPracticeModal')} onSessionComplete={handleLogStudySession} defaultPerQuestionTime={currentUser?.CONFIG.settings.perQuestionTime || 180} onLogResult={handleLogResult} student={currentUser} onUpdateWeaknesses={handleUpdateWeaknesses} onSaveTask={handleSaveTask} />}
-        {isSettingsModalOpen && <SettingsModal settings={currentUser?.CONFIG.settings} decks={currentUser?.CONFIG.flashcardDecks || []} onClose={() => closeModal('SettingsModal')} onSave={handleUpdateConfig} onExportToIcs={handleExportToIcs} googleAuthStatus={googleAuthStatus} onGoogleSignIn={handleGoogleSignIn} onGoogleSignOut={handleGoogleSignOut} onBackupToDrive={handleBackupToDrive} onRestoreFromDrive={handleRestoreFromDrive} onApiKeySet={() => setShowAiChatFab(true)} onOpenAssistantGuide={() => openModal('GoogleAssistantGuideModal', setAssistantGuideOpen)} onOpenAiGuide={() => openModal('AIGuideModal', setAiGuideModalOpen)} onClearAllSchedule={handleClearAllSchedule} onToggleEditLayout={() => handleUpdateConfig({ settings: { ...currentUser?.CONFIG.settings, dashboardLayout: currentUser?.CONFIG.settings.dashboardLayout || [] } })} />}
+        {isSettingsModalOpen && <SettingsModal settings={currentUser?.CONFIG.settings} decks={currentUser?.CONFIG.flashcardDecks || []} onClose={() => closeModal('SettingsModal')} onSave={(s) => handleUpdateConfig({ settings: { ...currentUser?.CONFIG.settings, ...s } as any })} onExportToIcs={handleExportToIcs} googleAuthStatus={googleAuthStatus} onGoogleSignIn={handleGoogleSignIn} onGoogleSignOut={handleGoogleSignOut} onBackupToDrive={handleBackupToDrive} onRestoreFromDrive={handleRestoreFromDrive} onApiKeySet={() => setShowAiChatFab(true)} onOpenAssistantGuide={() => openModal('GoogleAssistantGuideModal', setAssistantGuideOpen)} onOpenAiGuide={() => openModal('AIGuideModal', setAiGuideModalOpen)} onClearAllSchedule={handleClearAllSchedule} onToggleEditLayout={() => handleUpdateConfig({ settings: { ...currentUser?.CONFIG.settings, dashboardLayout: currentUser?.CONFIG.settings.dashboardLayout || [] } })} onTogglePushNotifications={handleTogglePushNotifications} />}
         {isEditWeaknessesModalOpen && <EditWeaknessesModal currentWeaknesses={currentUser?.CONFIG.WEAK || []} onClose={() => closeModal('EditWeaknessesModal')} onSave={handleUpdateWeaknesses} />}
         {isLogResultModalOpen && <LogResultModal onClose={() => closeModal('LogResultModal')} onSave={handleLogResult} initialScore={initialScoreForModal} initialMistakes={initialMistakesForModal} />}
         {isEditResultModalOpen && editingResult && <EditResultModal result={editingResult} onClose={() => closeModal('EditResultModal')} onSave={handleLogResult} />}

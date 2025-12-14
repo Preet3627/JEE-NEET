@@ -12,6 +12,7 @@ import crypto from 'crypto';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from 'webdav';
 import { knowledgeBase } from './data/knowledgeBase.js';
+import * as mm from 'music-metadata';
 
 // --- SERVER SETUP ---
 const app = express();
@@ -178,7 +179,9 @@ const initDB = async () => {
                 api_token VARCHAR(255),
                 last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
                 reset_token VARCHAR(255),
-                reset_token_expires_at DATETIME
+                reset_token_expires_at DATETIME,
+                verification_token VARCHAR(255),
+                verification_token_expires_at DATETIME
             )
         `);
         // Other tables... (simplified for brevity in this re-creation, assuming they exist or will be created on first use if needed, typically schema migration is separate)
@@ -235,6 +238,22 @@ const initDB = async () => {
                 content TEXT,
                 is_read BOOLEAN DEFAULT FALSE,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS global_settings (
+                setting_key VARCHAR(255) PRIMARY KEY,
+                setting_value LONGTEXT
+            )
+        `);
+
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS push_subscriptions (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT,
+                subscription JSON,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         `);
         
@@ -338,11 +357,63 @@ const authenticateToken = (req, res, next) => {
 // --- ROUTES ---
 
 // Config Check
-app.get('/api/config/public', (req, res) => {
+app.get('/api/config/public', async (req, res) => {
     if (!isConfiguredBase) return res.status(500).json({ status: 'misconfigured' });
     if (!isDatabaseConnected) return res.status(500).json({ status: 'offline' });
-    res.json({ status: 'online', googleClientId: process.env.GOOGLE_CLIENT_ID });
+
+    const [rows] = await pool.query('SELECT setting_value FROM global_settings WHERE setting_key = ?', ['dj_drop_url']);
+    const djDropUrl = rows[0]?.setting_value;
+
+    res.json({ status: 'online', googleClientId: process.env.GOOGLE_CLIENT_ID, djDropUrl });
 });
+
+app.get('/api/status', (req, res) => {
+    const checks = {
+        database: {
+            configured: !!process.env.DB_HOST,
+            connected: isDatabaseConnected,
+            status: isDatabaseConnected ? 'ok' : 'error',
+        },
+        googleAI: {
+            configured: !!process.env.API_KEY,
+            initialized: !!genAI,
+            status: !!genAI ? 'ok' : 'error',
+        },
+        googleAuth: {
+            configured: !!process.env.GOOGLE_CLIENT_ID,
+            initialized: !!googleClient,
+            status: !!googleClient ? 'ok' : 'misconfigured',
+        },
+        studyMaterialWebDAV: {
+            configured: !!(process.env.NEXTCLOUD_URL && process.env.NEXTCLOUD_SHARE_TOKEN),
+            initialized: !!webdavClient,
+            status: !!webdavClient ? 'ok' : 'error',
+        },
+        musicWebDAV: {
+            configured: !!(process.env.NEXTCLOUD_URL && process.env.NEXTCLOUD_MUSIC_SHARE_TOKEN),
+            initialized: !!musicWebdavClient,
+            status: !!musicWebdavClient ? 'ok' : 'error',
+        },
+        email: {
+            configured: !!process.env.SMTP_HOST,
+            initialized: !!mailer,
+            status: !!mailer ? 'ok' : 'misconfigured',
+        },
+    };
+
+    const isOverallOk = Object.values(checks).every(check => check.status === 'ok' || (check.status === 'misconfigured' && !check.configured));
+
+    const [rows] = await pool.query('SELECT setting_value FROM global_settings WHERE setting_key = ?', ['dj_drop_url']);
+    const djDropUrl = rows[0]?.setting_value;
+
+    res.json({
+        overallStatus: isOverallOk ? 'online' : 'degraded',
+        timestamp: new Date().toISOString(),
+        checks,
+        djDropUrl,
+    });
+});
+
 
 // Login
 app.post('/api/login', async (req, res) => {
@@ -377,9 +448,12 @@ app.post('/api/register', async (req, res) => {
         const passwordHash = await bcrypt.hash(password, 10);
         const profilePhoto = `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(fullName)}`;
         
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        const verificationTokenExpiresAt = new Date(Date.now() + 3600000); // 1 hour
+
         const [result] = await pool.query(
-            'INSERT INTO users (sid, email, full_name, password_hash, profile_photo, is_verified) VALUES (?, ?, ?, ?, ?, ?)',
-            [sid, email, fullName, passwordHash, profilePhoto, true] // Auto-verify for simplicity in this version, or false if email auth needed
+            'INSERT INTO users (sid, email, full_name, password_hash, profile_photo, is_verified, verification_token, verification_token_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [sid, email, fullName, passwordHash, profilePhoto, false, verificationToken, verificationTokenExpiresAt]
         );
         
         // Default Config
@@ -389,8 +463,18 @@ app.post('/api/register', async (req, res) => {
         };
         await pool.query('INSERT INTO user_configs (user_id, config) VALUES (?, ?)', [result.insertId, JSON.stringify(defaultConfig)]);
 
-        const token = jwt.sign({ id: result.insertId, sid, role: 'student' }, JWT_SECRET, { expiresIn: '7d' });
-        res.json({ token });
+        // Send verification email
+        if (mailer) {
+            const verificationUrl = `${req.protocol}://${req.get('host')}/verify-email?token=${verificationToken}`;
+            await mailer.sendMail({
+                from: process.env.SMTP_FROM || 'no-reply@jeescheduler.com',
+                to: email,
+                subject: 'Verify your email for JEE Scheduler Pro',
+                html: `Please click this link to verify your email: <a href="${verificationUrl}">${verificationUrl}</a>`
+            });
+        }
+
+        res.json({ success: true, message: 'Registration successful. Please check your email to verify your account.' });
     } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: "SID or Email already exists" });
         res.status(500).json({ error: error.message });
@@ -435,6 +519,29 @@ app.post('/api/auth/google', async (req, res) => {
     } catch (error) {
         console.error("Google Auth Error", error);
         res.status(401).json({ error: "Google authentication failed" });
+    }
+});
+
+app.post('/api/verify-email', async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database offline" });
+    const { token } = req.body;
+    try {
+        const [rows] = await pool.query('SELECT * FROM users WHERE verification_token = ?', [token]);
+        const user = rows[0];
+
+        if (!user) {
+            return res.status(400).json({ error: 'Invalid verification token.' });
+        }
+
+        if (user.verification_token_expires_at < new Date()) {
+            return res.status(400).json({ error: 'Verification token has expired.' });
+        }
+
+        await pool.query('UPDATE users SET is_verified = TRUE, verification_token = NULL, verification_token_expires_at = NULL WHERE id = ?', [user.id]);
+
+        res.json({ success: true, message: 'Email verified successfully.' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -561,6 +668,30 @@ app.post('/api/config', authenticateToken, async (req, res) => {
     res.json({ success: true });
 });
 
+app.post('/api/push/subscribe', authenticateToken, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database offline" });
+    const subscription = req.body;
+    try {
+        await pool.query('INSERT INTO push_subscriptions (user_id, subscription) VALUES (?, ?) ON DUPLICATE KEY UPDATE subscription = ?', [req.user.id, JSON.stringify(subscription), JSON.stringify(subscription)]);
+        res.json({ success: true, message: 'Push subscription saved.' });
+    } catch (error) {
+        console.error("Failed to save push subscription:", error);
+        res.status(500).json({ error: 'Failed to save push subscription.' });
+    }
+});
+
+app.post('/api/push/unsubscribe', authenticateToken, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database offline" });
+    try {
+        // Assuming subscription is unique per user, or we could pass endpoint to identify
+        await pool.query('DELETE FROM push_subscriptions WHERE user_id = ?', [req.user.id]);
+        res.json({ success: true, message: 'Push subscription deleted.' });
+    } catch (error) {
+        console.error("Failed to delete push subscription:", error);
+        res.status(500).json({ error: 'Failed to delete push subscription.' });
+    }
+});
+
 // Results, Exams, Sessions similar pattern...
 app.put('/api/results', authenticateToken, async (req, res) => {
     const { result } = req.body;
@@ -618,6 +749,20 @@ app.post('/api/admin/impersonate/:sid', authenticateToken, async (req, res) => {
     
     const token = jwt.sign({ id: user.id, sid: user.sid, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
     res.json({ token });
+});
+
+app.get('/api/admin/settings/:key', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    const [rows] = await pool.query('SELECT setting_value FROM global_settings WHERE setting_key = ?', [req.params.key]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Setting not found' });
+    res.json({ value: rows[0].setting_value });
+});
+
+app.post('/api/admin/settings', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    const { key, value } = req.body;
+    await pool.query('INSERT INTO global_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?', [key, value, value]);
+    res.json({ success: true });
 });
 
 // AI Routes
@@ -703,6 +848,32 @@ app.get('/api/music/browse', async (req, res) => {
             size: item.size
         }));
         res.json(items);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/music/metadata/batch', async (req, res) => {
+    if (!musicWebdavClient) return res.status(503).json({ error: "Music Service Unavailable" });
+    const { paths } = req.body;
+    if (!paths || !Array.isArray(paths)) {
+        return res.status(400).json({ error: 'Invalid request body' });
+    }
+
+    try {
+        const metadataPromises = paths.map(async (path) => {
+            try {
+                const stream = musicWebdavClient.createReadStream(path);
+                const metadata = await mm.parseStream(stream, { duration: true });
+                return { path, metadata };
+            } catch (error) {
+                console.error(`Failed to get metadata for ${path}`, error);
+                return { path, error: 'Failed to get metadata' };
+            }
+        });
+
+        const results = await Promise.all(metadataPromises);
+        res.json(results);
     } catch (e) {
         res.status(500).json({ error: e.message });
     }

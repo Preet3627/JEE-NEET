@@ -1,18 +1,21 @@
-
 import React, { useEffect, useState } from 'react';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
 import Icon from './Icon';
+import FullScreenVisualizer from './FullScreenVisualizer'; // Import the new component
+import { getDominantColor } from '../utils/colors';
 
 const FullScreenMusicPlayer: React.FC = () => {
     const { 
         currentTrack, isPlaying, play, pause, nextTrack, prevTrack, toggleFullScreenPlayer,
-        seek, duration, currentTime, isAutoMixEnabled, toggleAutoMix, queue, removeFromQueue, toggleLibrary
-    } = useMusicPlayer();
-    
+        seek, duration, currentTime, isAutoMixEnabled, toggleAutoMix, queue, removeFromQueue, toggleLibrary,
+        analyser, visualizerSettings, notchSettings // Destructure analyser, visualizerSettings and notchSettings
+    } = useMusicPlayer();    
     const [bgGradient, setBgGradient] = useState('from-gray-900 to-black');
     const [localTime, setLocalTime] = useState(currentTime);
     const [isDragging, setIsDragging] = useState(false);
     const [isQueueOpen, setIsQueueOpen] = useState(false);
+    const [blurredBackgroundUrl, setBlurredBackgroundUrl] = useState(''); // New state for blurred background
+    const [dominantAlbumColor, setDominantAlbumColor] = useState('#3b82f6'); // Default blue-ish
 
     useEffect(() => {
         if(!isDragging) setLocalTime(currentTime);
@@ -20,12 +23,28 @@ const FullScreenMusicPlayer: React.FC = () => {
 
     useEffect(() => {
         if(!currentTrack) return;
+        
+        // Use the existing color logic for the main gradient for now
         const colors = [
             'from-slate-900 to-black', 'from-zinc-900 to-black', 'from-stone-900 to-black',
             'from-blue-950 to-black', 'from-indigo-950 to-black', 'from-purple-950 to-black',
         ];
         const colorIndex = currentTrack.title.length % colors.length;
         setBgGradient(colors[colorIndex]);
+
+        // Set blurred background and extract dominant color
+        if (currentTrack.coverArt) {
+            setBlurredBackgroundUrl(currentTrack.coverArt);
+            getDominantColor(currentTrack.coverArt)
+                .then(color => {
+                    setDominantAlbumColor(color);
+                })
+                .catch(e => console.error("Failed to get dominant color", e));
+        } else {
+            setBlurredBackgroundUrl('');
+            setDominantAlbumColor('#3b82f6'); // Reset to default
+        }
+
     }, [currentTrack]);
 
     const formatTime = (seconds: number) => {
@@ -86,7 +105,7 @@ const FullScreenMusicPlayer: React.FC = () => {
                     <>
                         <div className={`relative w-64 h-64 md:w-96 md:h-96 rounded-2xl shadow-2xl transition-transform duration-[800ms] cubic-bezier(0.34, 1.56, 0.64, 1) ${isPlaying ? 'scale-100' : 'scale-90 opacity-80'}`}>
                             <img 
-                                src={currentTrack.coverArtUrl || 'https://via.placeholder.com/400'} 
+                                src={currentTrack.coverArt || 'https://via.placeholder.com/400'} // Use currentTrack.coverArt
                                 alt="Album Art" 
                                 className="w-full h-full object-cover rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] ring-1 ring-white/10"
                             />
@@ -131,7 +150,7 @@ const FullScreenMusicPlayer: React.FC = () => {
                             <button onClick={isPlaying ? pause : play} className="p-7 bg-white text-black rounded-full shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-110 transition-all active:scale-95">
                                 <Icon name={isPlaying ? "pause" : "play"} className="w-8 h-8 fill-current" />
                             </button>
-                            <button onClick={nextTrack} className="p-2 text-white hover:text-gray-300 transition-transform active:scale-90 hover:translate-x-1"><Icon name="arrow-right" className="w-10 h-10" /></button>
+                            <button onClick={nextTrack} className="p-2 text-white hover:text-gray-300 transition-transform active:scale-90 hover:-translate-x-1"><Icon name="arrow-right" className="w-10 h-10" /></button>
                         </div>
 
                         <button className="p-3 text-gray-500 hover:text-white transition-colors"><Icon name="sound-wave" className="w-6 h-6" /></button>

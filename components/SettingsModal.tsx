@@ -23,10 +23,11 @@ interface SettingsModalProps {
   onOpenAiGuide: () => void;
   onClearAllSchedule: () => void;
   onToggleEditLayout?: () => void;
+  onTogglePushNotifications: (enabled: boolean) => void;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = (props) => {
-  const { settings, decks, driveLastSync, isCalendarSyncEnabled, calendarLastSync, onClose, onSave, onExportToIcs, googleAuthStatus, onGoogleSignIn, onGoogleSignOut, onBackupToDrive, onRestoreFromDrive, onApiKeySet, onOpenAssistantGuide, onOpenAiGuide, onClearAllSchedule, onToggleEditLayout } = props;
+  const { settings, decks, driveLastSync, isCalendarSyncEnabled, calendarLastSync, onClose, onSave, onExportToIcs, googleAuthStatus, onGoogleSignIn, onGoogleSignOut, onBackupToDrive, onRestoreFromDrive, onApiKeySet, onOpenAssistantGuide, onOpenAiGuide, onClearAllSchedule, onToggleEditLayout, onTogglePushNotifications } = props;
   
   const { setNotchSettings, setVisualizerSettings, notchSettings: currentNotch, visualizerSettings: currentVis } = useMusicPlayer();
 
@@ -48,25 +49,6 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
   const [visPreset, setVisPreset] = useState<VisualizerSettings['preset']>(currentVis.preset);
   const [visColor, setVisColor] = useState<VisualizerSettings['colorMode']>(currentVis.colorMode);
 
-  const WIDGET_KEYS = ['countdown', 'dailyInsight', 'quote', 'music', 'subjectAllocation', 'scoreTrend', 'flashcards', 'readingHours', 'todaysAgenda', 'upcomingExams', 'homework', 'visualizer', 'weather', 'clock', 'practice'];
-  const LAYOUT_PRESETS: Record<'default' | 'focus' | 'compact', string[]> = {
-    default: WIDGET_KEYS,
-    focus: ['countdown', 'dailyInsight', 'todaysAgenda', 'upcomingExams', 'scoreTrend', 'homework'],
-    compact: ['todaysAgenda', 'scoreTrend', 'subjectAllocation', 'readingHours', 'flashcards', 'upcomingExams'],
-  };
-
-  const getPresetFromLayout = (layout: DashboardWidgetItem[] | undefined): 'default' | 'focus' | 'compact' => {
-    if (!layout) return 'default';
-    const sortedLayoutIds = layout.map(item => item.id).sort();
-    if (JSON.stringify(sortedLayoutIds) === JSON.stringify([...LAYOUT_PRESETS.focus].sort())) return 'focus';
-    if (JSON.stringify(sortedLayoutIds) === JSON.stringify([...LAYOUT_PRESETS.compact].sort())) return 'compact';
-    return 'default';
-  };
-
-  const [dashboardLayoutPreset, setDashboardLayoutPreset] = useState<'default' | 'focus' | 'compact'>(getPresetFromLayout(settings.dashboardLayout));
-  const [dashboardFlashcardDeckIds, setDashboardFlashcardDeckIds] = useState(settings.dashboardFlashcardDeckIds || []);
-  const [musicPlayerLayout, setMusicPlayerLayout] = useState(settings.musicPlayerWidgetLayout || 'minimal');
-  
   const [bgImage, setBgImage] = useState(settings.dashboardBackgroundImage || '');
   const [transparency, setTransparency] = useState(settings.dashboardTransparency ?? 50);
 
@@ -93,9 +75,6 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
         isCalendarSyncEnabled: calendarSync,
         examType: examType as 'JEE' | 'NEET',
         theme: theme as 'default' | 'liquid-glass' | 'midnight',
-        dashboardLayout: LAYOUT_PRESETS[dashboardLayoutPreset].map(id => ({ id })),
-        dashboardFlashcardDeckIds,
-        musicPlayerWidgetLayout: musicPlayerLayout as 'minimal' | 'expanded',
         dashboardBackgroundImage: bgImage,
         dashboardTransparency: transparency,
         notchSettings: { position: notchPos, size: notchSize, width: notchWidth, enabled: notchEnabled },
@@ -236,6 +215,11 @@ const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                     <div className="flex items-center justify-between">
                         <label className="text-sm text-gray-300">Auto-Sync to Google Calendar</label>
                         <input type="checkbox" checked={calendarSync} onChange={e => setCalendarSync(e.target.checked)} className="w-4 h-4 rounded text-cyan-600 bg-gray-700 border-gray-600 focus:ring-cyan-500" />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                        <label className="text-sm text-gray-300">Push Notifications</label>
+                        <input type="checkbox" checked={pushNotificationsEnabled} onChange={handlePushNotificationToggle} className="w-4 h-4 rounded text-cyan-600 bg-gray-700 border-gray-600 focus:ring-cyan-500" />
                     </div>
                     
                     <button type="button" onClick={onExportToIcs} className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-gray-800 hover:bg-gray-700 text-white border border-gray-600">

@@ -4,18 +4,21 @@ import Icon from './Icon';
 import { useAuth } from '../context/AuthContext';
 import { renderMarkdown } from '../utils/markdownParser';
 
+type ChatPart = { text: string } | { [key: string]: any };
+
 interface AIChatPopupProps {
-  history: { role: string; parts: { text: string }[] }[];
+  history: { role: string; parts: ChatPart[] }[];
   onSendMessage: (prompt: string, imageBase64?: string) => void;
   onClose: () => void;
   isLoading: boolean;
 }
 
-const ChatMessage: React.FC<{ message: { role: string, parts: { text: string }[] } }> = ({ message }) => {
+const ChatMessage: React.FC<{ message: { role: string, parts: ChatPart[] } }> = ({ message }) => {
     const { currentUser } = useAuth();
     const isUser = message.role === 'user';
     
-    const messageText = message.parts[0]?.text || '';
+    const textPart = message.parts.find(part => 'text' in part && typeof part.text === 'string') as { text: string } | undefined;
+    const messageText = textPart?.text || '';
 
     return (
         <div className={`flex items-end gap-2 ${isUser ? 'justify-end' : 'justify-start'}`}>

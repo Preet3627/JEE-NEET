@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { ScheduleItem } from '../types';
-import { useLocalization } from '../context/LocalizationContext';
-import Icon from './Icon';
+import { ScheduleItem } from './types';
+import { useLocalization } from './context/LocalizationContext';
+import Icon from './components/Icon';
 
 interface PlannerViewProps {
     items: ScheduleItem[];
@@ -34,7 +34,7 @@ const PlannerView: React.FC<PlannerViewProps> = ({ items, onEdit }) => {
                                         <p className="font-bold text-white">{t(item.CARD_TITLE)}</p>
                                         {'TIME' in item && item.TIME && <p className="text-xs text-gray-400">{item.TIME}</p>}
                                         {(item.type === 'ACTION' || item.type === 'HOMEWORK') && (
-                                            <button onClick={() => onEdit(item)} className="absolute top-1 right-1 p-1 text-gray-500 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => onEdit(item)} className="absolute top-1 right-1 p-1 text-gray-500 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity" title="Edit task" aria-label="Edit task">
                                                 <Icon name="edit" className="w-4 h-4"/>
                                             </button>
                                         )}
@@ -88,7 +88,7 @@ const PlannerView: React.FC<PlannerViewProps> = ({ items, onEdit }) => {
                                      <p className="font-bold text-white">{t(item.CARD_TITLE)}</p>
                                      {'TIME' in item && item.TIME && <p className="text-xs text-gray-400">{item.TIME}</p>}
                                       {(item.type === 'ACTION' || item.type === 'HOMEWORK') && (
-                                        <button onClick={() => onEdit(item)} className="absolute top-1 right-1 p-1 text-gray-500 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => onEdit(item)} className="absolute top-1 right-1 p-1 text-gray-500 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity" title="Edit task" aria-label="Edit task">
                                             <Icon name="edit" className="w-4 h-4"/>
                                         </button>
                                     )}
@@ -125,7 +125,7 @@ const PlannerView: React.FC<PlannerViewProps> = ({ items, onEdit }) => {
                                     {'TIME' in item && item.TIME && <span className="font-mono text-sm text-gray-400 bg-gray-800 px-2 py-1 rounded-md">{item.TIME}</span>}
                                     <span className="flex-grow font-semibold text-white">{t(item.CARD_TITLE)}</span>
                                      {(item.type === 'ACTION' || item.type === 'HOMEWORK') && (
-                                        <button onClick={() => onEdit(item)} className="p-1 text-gray-500 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => onEdit(item)} className="p-1 text-gray-500 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity" title="Edit task" aria-label="Edit task">
                                             <Icon name="edit" className="w-4 h-4"/>
                                         </button>
                                     )}
@@ -158,7 +158,7 @@ const PlannerView: React.FC<PlannerViewProps> = ({ items, onEdit }) => {
                             {'TIME' in item && item.TIME && <span className="font-mono text-sm text-gray-400 bg-gray-800 px-2 py-1 rounded-md">{item.TIME}</span>}
                             <span className="flex-grow font-semibold text-white">{t(item.CARD_TITLE)}</span>
                             {(item.type === 'ACTION' || item.type === 'HOMEWORK') && (
-                                <button onClick={() => onEdit(item)} className="p-1 text-gray-500 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => onEdit(item)} className="p-1 text-gray-500 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity" title="Edit task" aria-label="Edit task">
                                     <Icon name="edit" className="w-4 h-4"/>
                                 </button>
                             )}

@@ -1,61 +1,61 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { StudentData, ScheduleItem, ActivityData, Config, StudySession, HomeworkData, ExamData, ResultData, DoubtData, FlashcardDeck, Flashcard, StudyMaterialItem, ScheduleCardData, PracticeQuestion, ActiveTab, DashboardWidgetItem } from '../types';
-import ScheduleList from './ScheduleList';
-import Icon, { IconName } from './Icon';
-import CommunityDashboard from './CommunityDashboard';
-import PlannerView from './PlannerView';
-import MistakeManager from './MistakeManager';
-import TodaysAgendaWidget from './widgets/TodaysAgendaWidget';
-import ReadingHoursWidget from './widgets/ReadingHoursWidget';
-import ScoreTrendWidget from './widgets/MarksAnalysisWidget';
-import { CustomPracticeModal } from './CustomPracticeModal';
-import HomeworkWidget from './widgets/HomeworkWidget';
-import ActivityTracker from './ActivityTracker';
-import PerformanceMetrics from './PerformanceMetrics';
-import SettingsModal from './SettingsModal';
-import BottomToolbar from './BottomToolbar';
-import CreateEditTaskModal from './CreateEditTaskModal';
-import ExamsView from './ExamsView';
-import CreateEditExamModal from './CreateEditExamModal';
-import LogResultModal from './LogResultModal';
-import EditWeaknessesModal from './EditWeaknessesModal';
-import AchievementsWidget from './widgets/AchievementsWidget';
-import AIMistakeAnalysisModal from './AIMistakeAnalysisModal';
-import AIParserModal from './AIParserModal';
-import DailyInsightWidget from './widgets/DailyInsightWidget';
-import AIChatPopup from './AIChatPopup';
-import AIDoubtSolverModal from './AIDoubtSolverModal';
-import { api } from '../api/apiService';
-import SubjectAllocationWidget from './widgets/SubjectAllocationWidget';
-import UpcomingExamsWidget from './widgets/UpcomingExamsWidget';
-import TestReportModal from './TestReportModal';
-import FlashcardManager from './flashcards/FlashcardManager';
-import CreateEditDeckModal from './flashcards/CreateEditDeckModal';
-import DeckViewModal from './flashcards/DeckViewModal';
-import CreateEditFlashcardModal from './flashcards/CreateEditFlashcardModal';
-import FlashcardReviewModal from './flashcards/FlashcardReviewModal';
-import StudyMaterialView from './StudyMaterialView';
-import FileViewerModal from './FileViewerModal';
-import AIGenerateFlashcardsModal from './flashcards/AIGenerateFlashcardsModal';
-import EditResultModal from './EditResultModal';
-import MusicVisualizerWidget from './widgets/MusicVisualizerWidget';
-import GoogleAssistantGuideModal from './GoogleAssistantGuideModal';
-import DeepLinkConfirmationModal from './DeepLinkConfirmationModal';
-import AIGuideModal from './AIGuideModal';
-import { useAuth } from '../context/AuthContext';
-import MoveTasksModal from './MoveTasksModal';
-import TodayPlanner from './TodayPlanner';
-import CountdownWidget from './widgets/CountdownWidget';
-import InteractiveFlashcardWidget from './widgets/InteractiveFlashcardWidget';
-import MotivationalQuoteWidget from './widgets/MotivationalQuoteWidget';
-import MusicPlayerWidget from './widgets/MusicPlayerWidget';
-import MusicLibraryModal from './MusicLibraryModal';
-import WeatherWidget from './widgets/WeatherWidget';
-import ClockWidget from './widgets/ClockWidget';
-import CustomWidget from './widgets/CustomWidget';
-import PracticeLauncherWidget from './widgets/PracticeLauncherWidget';
-import UniversalSearch from './UniversalSearch';
+import { StudentData, ScheduleItem, ActivityData, Config, StudySession, HomeworkData, ExamData, ResultData, DoubtData, FlashcardDeck, Flashcard, StudyMaterialItem, ScheduleCardData, PracticeQuestion, ActiveTab, DashboardWidgetItem } from './types';
+import ScheduleList from './components/ScheduleList';
+import Icon, { IconName } from './components/Icon';
+import CommunityDashboard from './components/CommunityDashboard';
+import PlannerView from './components/PlannerView';
+import MistakeManager from './components/MistakeManager';
+import TodaysAgendaWidget from './components/widgets/TodaysAgendaWidget';
+import ReadingHoursWidget from './components/widgets/ReadingHoursWidget';
+import ScoreTrendWidget from './components/widgets/MarksAnalysisWidget';
+import { CustomPracticeModal } from './components/CustomPracticeModal';
+import HomeworkWidget from './components/widgets/HomeworkWidget';
+import ActivityTracker from './components/ActivityTracker';
+import PerformanceMetrics from './components/PerformanceMetrics';
+import SettingsModal from './components/SettingsModal';
+import BottomToolbar from './components/BottomToolbar';
+import CreateEditTaskModal from './components/CreateEditTaskModal';
+import ExamsView from './components/ExamsView';
+import CreateEditExamModal from './components/CreateEditExamModal';
+import LogResultModal from './components/LogResultModal';
+import EditWeaknessesModal from './components/EditWeaknessesModal';
+import AchievementsWidget from './components/widgets/AchievementsWidget';
+import AIMistakeAnalysisModal from './components/AIMistakeAnalysisModal';
+import AIParserModal from './components/AIParserModal';
+import DailyInsightWidget from './components/widgets/DailyInsightWidget';
+import AIChatPopup from './components/AIChatPopup';
+import AIDoubtSolverModal from './components/AIDoubtSolverModal';
+import { api } from './api/apiService';
+import SubjectAllocationWidget from './components/widgets/SubjectAllocationWidget';
+import UpcomingExamsWidget from './components/widgets/UpcomingExamsWidget';
+import TestReportModal from './components/TestReportModal';
+import FlashcardManager from './components/flashcards/FlashcardManager';
+import CreateEditDeckModal from './components/flashcards/CreateEditDeckModal';
+import DeckViewModal from './components/flashcards/DeckViewModal';
+import CreateEditFlashcardModal from './components/flashcards/CreateEditFlashcardModal';
+import FlashcardReviewModal from './components/flashcards/FlashcardReviewModal';
+import StudyMaterialView from './components/StudyMaterialView';
+import FileViewerModal from './components/FileViewerModal';
+import AIGenerateFlashcardsModal from './components/flashcards/AIGenerateFlashcardsModal';
+import EditResultModal from './components/EditResultModal';
+import MusicVisualizerWidget from './components/widgets/MusicVisualizerWidget';
+import GoogleAssistantGuideModal from './components/GoogleAssistantGuideModal';
+import DeepLinkConfirmationModal from './components/DeepLinkConfirmationModal';
+import AIGuideModal from './components/AIGuideModal';
+import { useAuth } from './context/AuthContext';
+import MoveTasksModal from './components/MoveTasksModal';
+import TodayPlanner from './components/TodayPlanner';
+import CountdownWidget from './components/widgets/CountdownWidget';
+import InteractiveFlashcardWidget from './components/widgets/InteractiveFlashcardWidget';
+import MotivationalQuoteWidget from './components/widgets/MotivationalQuoteWidget';
+import MusicPlayerWidget from './components/widgets/MusicPlayerWidget';
+import MusicLibraryModal from './components/MusicLibraryModal';
+import WeatherWidget from './components/widgets/WeatherWidget';
+import ClockWidget from './components/widgets/ClockWidget';
+import CustomWidget from './components/widgets/CustomWidget';
+import PracticeLauncherWidget from './components/widgets/PracticeLauncherWidget';
+import UniversalSearch from './components/UniversalSearch';
 
 interface StudentDashboardProps {
     student: StudentData;
@@ -81,12 +81,13 @@ interface StudentDashboardProps {
     onPostDoubt: (question: string, image?: string) => void;
     onPostSolution: (doubtId: string, solution: string, image?: string) => void;
     deepLinkAction: { action: string; data: any } | null;
+    activeTab: ActiveTab; // Added activeTab prop
+    onTabChange: (tab: ActiveTab) => void; // Added onTabChange prop
 }
 
 const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
-    const { student, onSaveTask, onSaveBatchTasks, onDeleteTask, onToggleMistakeFixed, onUpdateConfig, onLogStudySession, onUpdateWeaknesses, onLogResult, onAddExam, onUpdateExam, onDeleteExam, onExportToIcs, onBatchImport, googleAuthStatus, onGoogleSignIn, onGoogleSignOut, onBackupToDrive, onRestoreFromDrive, allDoubts, onPostDoubt, onPostSolution, deepLinkAction } = props;
+    const { student, onSaveTask, onSaveBatchTasks, onDeleteTask, onToggleMistakeFixed, onUpdateConfig, onLogStudySession, onUpdateWeaknesses, onLogResult, onAddExam, onUpdateExam, onDeleteExam, onExportToIcs, onBatchImport, googleAuthStatus, onGoogleSignIn, onGoogleSignOut, onBackupToDrive, onRestoreFromDrive, allDoubts, onPostDoubt, onPostSolution, deepLinkAction, activeTab, onTabChange } = props;
     const { refreshUser } = useAuth();
-    const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
     const [scheduleView, setScheduleView] = useState<'upcoming' | 'past'>('upcoming');
     
     // Modals & Features State
@@ -433,7 +434,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             <Icon name="gemini" className="w-4 h-4" /> AI Import
           </button>
           <button onClick={() => setIsPracticeModalOpen(true)} className="p-2.5 rounded-lg bg-purple-600/50 hover:bg-purple-600" title="Custom Practice"><Icon name="stopwatch" /></button>
-          <button onClick={() => setIsSettingsModalOpen(true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700"><Icon name="settings" /></button>
+          <button onClick={() => setIsSettingsModalOpen(true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700" title="Settings" aria-label="Settings"><Icon name="settings" /></button>
           <button onClick={() => { setEditingTask(null); setIsCreateModalOpen(true); }} className="flex items-center gap-2 px-3 py-2.5 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-[var(--accent-color)] to-[var(--gradient-purple)]">
             <Icon name="plus" /> Create
           </button>
@@ -544,7 +545,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-2xl font-bold capitalize text-white font-sf-display">{activeTab}</h2>
                     <div className="flex items-center gap-2">
-                        <button onClick={() => setIsSettingsModalOpen(true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700"><Icon name="settings" /></button>
+                        <button onClick={() => setIsSettingsModalOpen(true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700" title="Settings" aria-label="Settings"><Icon name="settings" /></button>
                     </div>
                 </div>
             ) : <TopTabBar />}

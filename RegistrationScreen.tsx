@@ -1,9 +1,9 @@
 
 
 import React, { useState, useEffect } from 'react';
-import Icon from './Icon';
-import { useAuth } from '../context/AuthContext';
-import { api } from '../api/apiService';
+import Icon from './components/Icon';
+import { useAuth } from './context/AuthContext';
+import { api } from './api/apiService';
 
 interface RegistrationScreenProps {
     onSwitchToLogin: () => void;

@@ -27,7 +27,10 @@ export default defineConfig({
       devOptions: {
         enabled: true
       },
-      manifest: false // We are using public/manifest.json
+      manifest: false, // We are using public/manifest.json
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}']
+      }
     })
   ],
   server: {

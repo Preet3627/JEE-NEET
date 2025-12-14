@@ -5,6 +5,8 @@ import React, { useState, useEffect } from 'react';
 import { StudyMaterialItem, StudentData, Config } from '../types';
 import { api } from '../api/apiService';
 import Icon from './Icon';
+import { useServerStatus } from '../context/ServerStatusContext';
+import { addStudyMaterialToDb, getStudyMaterialFromDb, getAllStudyMaterialsFromDb, deleteStudyMaterialFromDb } from '../utils/studyMaterialDb';
 
 interface StudyMaterialViewProps {
   student: StudentData;
@@ -12,7 +14,13 @@ interface StudyMaterialViewProps {
   onViewFile: (file: StudyMaterialItem) => void;
 }
 
+const isViewableFileType = (fileName: string) => {
+    const lowerCaseFileName = fileName.toLowerCase();
+    return lowerCaseFileName.endsWith('.pdf') || ['.png', '.jpg', '.jpeg', '.gif', '.webp'].some(ext => lowerCaseFileName.endsWith(ext));
+};
+
 const StudyMaterialView: React.FC<StudyMaterialViewProps> = ({ student, onUpdateConfig, onViewFile }) => {
+  const { status } = useServerStatus();
   const [path, setPath] = useState('/');
   const [items, setItems] = useState<StudyMaterialItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -20,33 +28,47 @@ const StudyMaterialView: React.FC<StudyMaterialViewProps> = ({ student, onUpdate
   
   const [pinnedItems, setPinnedItems] = useState<StudyMaterialItem[]>([]);
   const [pinnedItemsLoading, setPinnedItemsLoading] = useState(true);
+  const [downloadedMaterials, setDownloadedMaterials] = useState<string[]>([]);
+  const [downloadingItems, setDownloadingItems] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const fetchItems = async () => {
+      if (!status) return;
       setIsLoading(true);
       setError('');
+
+      if (!status.studyMaterialWebDAV.configured) {
+          setError("The administrator has not configured the study material library.");
+          setIsLoading(false);
+          return;
+      }
+
       try {
-        // FIX: Ensure `api.getStudyMaterial` exists
         const data = await api.getStudyMaterial(path);
         setItems(data);
-        setError(''); // Clear error if successful
+        setError('');
       } catch (err: any) {
         console.error("Failed to load study materials:", err);
-        setError(err.error || 'Failed to load study materials. Please ensure Nextcloud WebDAV is configured correctly in your server\'s .env file.');
+        setError(err.error || 'Failed to load study materials.');
       } finally {
         setIsLoading(false);
       }
     };
     fetchItems();
-  }, [path]);
+  }, [path, status]);
 
   useEffect(() => {
     const fetchPinnedItems = async () => {
+        if (!status) return;
       const pinnedPaths = student.CONFIG.pinnedMaterials;
       if (pinnedPaths && pinnedPaths.length > 0) {
+        if (!status.studyMaterialWebDAV.configured) {
+            setPinnedItems([]);
+            setPinnedItemsLoading(false);
+            return;
+        }
         try {
           setPinnedItemsLoading(true);
-          // FIX: Ensure `api.getStudyMaterialDetails` exists
           const details = await api.getStudyMaterialDetails(pinnedPaths);
           setPinnedItems(details);
         } catch (e) {
@@ -60,7 +82,16 @@ const StudyMaterialView: React.FC<StudyMaterialViewProps> = ({ student, onUpdate
       }
     };
     fetchPinnedItems();
-  }, [student.CONFIG.pinnedMaterials]);
+  }, [student.CONFIG.pinnedMaterials, status]);
+
+  // Load downloaded materials from IndexedDB
+  useEffect(() => {
+    const loadDownloaded = async () => {
+      const allDownloaded = await getAllStudyMaterialsFromDb();
+      setDownloadedMaterials(allDownloaded.map(m => m.item.path));
+    };
+    loadDownloaded();
+  }, []);
 
   const handleItemClick = (item: StudyMaterialItem) => {
     if (item.type === 'folder') {
@@ -92,6 +123,32 @@ const StudyMaterialView: React.FC<StudyMaterialViewProps> = ({ student, onUpdate
     onUpdateConfig({ pinnedMaterials: newPins });
   };
 
+  const handleDownloadOffline = async (e: React.MouseEvent, item: StudyMaterialItem) => {
+    e.stopPropagation();
+    if (!isViewableFileType(item.name)) {
+        alert("This file type cannot be downloaded for offline viewing.");
+        return;
+    }
+    setDownloadingItems(prev => ({ ...prev, [item.path]: true }));
+    try {
+        const existing = await getStudyMaterialFromDb(item.path);
+        if (existing) {
+            alert('This material is already saved for offline use.');
+            return;
+        }
+
+        const blob = await api.getStudyMaterialContent(item.path);
+        await addStudyMaterialToDb(item, blob);
+        setDownloadedMaterials(prev => [...prev, item.path]);
+        alert(`${item.name} has been saved for offline use.`);
+    } catch (error) {
+        console.error('Error saving study material for offline use:', error);
+        alert('Failed to save study material for offline use.');
+    } finally {
+        setDownloadingItems(prev => ({ ...prev, [item.path]: false }));
+    }
+  };
+
   const breadcrumbs = path.split('/').filter(Boolean);
   const pinnedPaths = student.CONFIG.pinnedMaterials || [];
 
@@ -99,6 +156,10 @@ const StudyMaterialView: React.FC<StudyMaterialViewProps> = ({ student, onUpdate
 
   const ItemCard: React.FC<{ item: StudyMaterialItem; isPinnedSection?: boolean }> = ({ item, isPinnedSection = false }) => {
     const isPinned = pinnedPaths.includes(item.path);
+    const isDownloaded = downloadedMaterials.includes(item.path);
+    const isDownloading = downloadingItems[item.path];
+    const canViewOffline = isViewableFileType(item.name);
+
     return (
         <div 
             key={item.path}
@@ -114,14 +175,29 @@ const StudyMaterialView: React.FC<StudyMaterialViewProps> = ({ student, onUpdate
                         {item.modified && ` • ${new Date(item.modified).toLocaleDateString()}`}
                     </p>
                 </div>
-                {!isPinnedSection && (
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); handlePinToggle(item); }} 
-                        className="p-1.5 rounded-full bg-black/30 text-gray-400 hover:text-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title={isPinned ? 'Unpin' : 'Pin to Dashboard'}
-                    >
-                        <Icon name="pin" className={`w-4 h-4 ${isPinned ? 'text-yellow-400 fill-current' : ''}`} />
-                    </button>
+                {item.type === 'file' && (
+                    <div className="flex items-center gap-2">
+                        {isDownloaded && <Icon name="check-circle" className="w-5 h-5 text-green-500" title="Available Offline" />}
+                        {canViewOffline && !isDownloaded && !isPinnedSection && (
+                            <button 
+                                onClick={(e) => handleDownloadOffline(e, item)} 
+                                className="p-1.5 rounded-full bg-black/30 text-gray-400 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Download for Offline"
+                                disabled={isDownloading}
+                            >
+                                <Icon name={isDownloading ? 'loading' : 'download'} className={`w-4 h-4 ${isDownloading ? 'animate-spin' : ''}`} />
+                            </button>
+                        )}
+                        {!isPinnedSection && (
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handlePinToggle(item); }} 
+                                className="p-1.5 rounded-full bg-black/30 text-gray-400 hover:text-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title={isPinned ? 'Unpin' : 'Pin to Dashboard'}
+                            >
+                                <Icon name="pin" className={`w-4 h-4 ${isPinned ? 'text-yellow-400 fill-current' : ''}`} />
+                            </button>
+                        )}
+                    </div>
                 )}
             </div>
         </div>
@@ -172,8 +248,8 @@ const StudyMaterialView: React.FC<StudyMaterialViewProps> = ({ student, onUpdate
           Loading items...
         </div>
       ) : error ? (
-        <div className="text-center text-red-400 py-10 border-2 border-dashed border-red-500/30 rounded-lg">
-            <p className="font-semibold">Error Loading Material</p>
+        <div className="text-center text-yellow-400 py-10 border-2 border-dashed border-yellow-500/30 rounded-lg mx-4">
+            <p className="font-semibold">Study Material Notice</p>
             <p className="text-sm">{error}</p>
         </div>
       ) : (

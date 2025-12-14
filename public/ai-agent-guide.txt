@@ -116,3 +116,23 @@ You can render common scientific and mathematical symbols using LaTeX-like comma
 | `\Delta`   | Δ          |
 
 **Diagrams:** The system **cannot render image-based diagrams**. However, you can create textual descriptions or ASCII art to represent diagrams (e.g. Free Body Diagrams), which will be rendered in a pre-formatted block.
+
+---
+## 6. New Features and Admin Controls
+
+### 6.1 Email Verification
+User registration now requires email verification. Users will receive a verification link in their email inbox upon registration.
+
+### 6.2 Server Status Endpoint
+The system includes a new `/api/status` endpoint that provides real-time information about the health and configuration of various backend services (e.g., database, AI services, WebDAV connections).
+
+### 6.3 Admin-Configurable DJ Drop Sound
+Administrators can now set a global DJ drop sound URL via the admin dashboard. This sound will be used by all users unless overridden by their personal settings.
+
+### 6.4 Offline Content Access
+Users can now download music and study materials for in-app offline use. This means:
+- **Offline Music**: Tracks downloaded from the music library are stored locally and playable without an internet connection.
+- **Offline Study Materials**: PDF and image study materials can be downloaded for offline viewing within the app.
+
+### 6.5 Persistent Dashboard Layout
+User-customized dashboard layouts (widget arrangement, minimization) are now correctly saved and persist across sessions.

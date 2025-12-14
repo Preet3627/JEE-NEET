@@ -1,8 +1,8 @@
 
 import React, { useState, useRef } from 'react';
-import Icon from './Icon';
-import { api } from '../api/apiService';
-import { useAuth } from '../context/AuthContext';
+import Icon from './components/Icon';
+import { api } from './api/apiService';
+import { useAuth } from './context/AuthContext';
 
 interface AIParserModalProps {
   onClose: () => void;
@@ -94,6 +94,7 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
   const contentAnimationClasses = theme === 'liquid-glass' ? '' : (isExiting ? 'modal-content-exit' : 'modal-content-enter');
 
   return (
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div
       className={`fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${animationClasses}`}
       style={{ '--clip-origin-x': animationOrigin?.x, '--clip-origin-y': animationOrigin?.y } as React.CSSProperties}
@@ -106,7 +107,7 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
         {theme === 'liquid-glass' && (
           <div className="flex-shrink-0 flex items-center p-3 border-b border-[var(--glass-border)]">
             <div className="flex gap-2">
-              <button onClick={handleClose} className="w-3 h-3 rounded-full bg-red-500"></button>
+              <button onClick={handleClose} className="w-3 h-3 rounded-full bg-red-500" title="Close" aria-label="Close"></button>
               <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
               <div className="w-3 h-3 rounded-full bg-green-500"></div>
             </div>

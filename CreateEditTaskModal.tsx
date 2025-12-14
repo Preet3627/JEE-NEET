@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ScheduleItem, ScheduleCardData, HomeworkData, FlashcardDeck } from '../types';
-import Icon from './Icon';
-import AIGenerateAnswerKeyModal from './AIGenerateAnswerKeyModal';
-import { useAuth } from '../context/AuthContext';
+import { ScheduleItem, ScheduleCardData, HomeworkData, FlashcardDeck } from './types';
+import Icon from './components/Icon';
+import AIGenerateAnswerKeyModal from './components/AIGenerateAnswerKeyModal';
+import { useAuth } from './context/AuthContext';
 
 interface CreateEditTaskModalProps {
   task: ScheduleItem | null;
@@ -15,8 +15,8 @@ interface CreateEditTaskModalProps {
 
 type TaskType = 'ACTION' | 'HOMEWORK' | 'FLASHCARD_REVIEW';
 
-const parseAnswers = (text: string): Record<string, string> => {
-    const answers: Record<string, string> = {};
+const parseAnswers = (text: string): Record<string, string | string[]> => {
+    const answers: Record<string, string | string[]> = {};
     if (!text) return answers;
 
     // Check for key-value pair format first
@@ -44,9 +44,14 @@ const parseAnswers = (text: string): Record<string, string> => {
     return answers;
 };
 
-const formatAnswers = (answers?: Record<string, string>): string => {
+const formatAnswers = (answers?: Record<string, string | string[]>): string => {
     if (!answers) return '';
-    return Object.entries(answers).map(([q, a]) => `${q}:${a}`).join('\n');
+    return Object.entries(answers).map(([q, a]) => {
+        if (Array.isArray(a)) {
+            return `${q}:[${a.join(',')}]`;
+        }
+        return `${q}:${a}`;
+    }).join('\n');
 };
 
 const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnly = false, onClose, onSave, decks, animationOrigin }) => {
@@ -83,11 +88,11 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
     subject: task ? task.SUBJECT_TAG.EN : 'PHYSICS',
     time: getInitialTime(),
     day: task ? task.DAY.EN.toUpperCase() : new Date().toLocaleString('en-us', {weekday: 'long'}).toUpperCase(),
-    date: task && 'date' in task ? task.date : '', // New date field
-    qRanges: task?.type === 'HOMEWORK' ? task.Q_RANGES : '',
-    category: task?.type === 'HOMEWORK' ? task.category || 'Custom' : 'Custom',
-    deckId: task?.type === 'ACTION' && task.SUB_TYPE === 'FLASHCARD_REVIEW' ? task.deckId : (decks.length > 0 ? decks[0].id : ''),
-    answers: task?.type === 'HOMEWORK' ? formatAnswers(task.answers) : '',
+    date: task && 'date' in task ? (task as any).date : '', // New date field
+    qRanges: task && task.type === 'HOMEWORK' ? (task as HomeworkData).Q_RANGES : '',
+    category: task && task.type === 'HOMEWORK' ? ((task as HomeworkData).category || 'Custom') : 'Custom',
+    deckId: task && task.type === 'ACTION' && (task as ScheduleCardData).SUB_TYPE === 'FLASHCARD_REVIEW' ? (task as ScheduleCardData).deckId : (decks.length > 0 ? decks[0].id : ''),
+    answers: task && task.type === 'HOMEWORK' ? formatAnswers((task as HomeworkData).answers) : '',
   });
   const [isExiting, setIsExiting] = useState(false);
   const [isAiKeyModalOpen, setIsAiKeyModalOpen] = useState(false);
@@ -110,7 +115,7 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
 
     if (taskType === 'HOMEWORK') {
         finalTask = {
-            ID: isEditing && task.type === 'HOMEWORK' ? task.ID : `H${Date.now()}`,
+            ID: isEditing && task && task.type === 'HOMEWORK' ? (task as HomeworkData).ID : `H${Date.now()}`,
             type: 'HOMEWORK',
             isUserCreated: true,
             DAY: dayData,
@@ -120,14 +125,13 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
             SUBJECT_TAG: { EN: formData.subject.toUpperCase(), GU: "" },
             Q_RANGES: formData.qRanges,
             TIME: formData.time || undefined,
-            // FIX: Cast formData.category to the specific union type required by HomeworkData
             category: formData.category as HomeworkData['category'],
             answers: parseAnswers(formData.answers),
-            googleEventId: isEditing && 'googleEventId' in task ? task.googleEventId : undefined,
+            googleEventId: isEditing && task && 'googleEventId' in task ? (task as any).googleEventId : undefined,
         } as HomeworkData;
     } else { // ACTION or FLASHCARD_REVIEW
         finalTask = {
-            ID: isEditing && task.type === 'ACTION' ? task.ID : `A${Date.now()}`,
+            ID: isEditing && task && task.type === 'ACTION' ? (task as ScheduleCardData).ID : `A${Date.now()}`,
             type: 'ACTION',
             SUB_TYPE: taskType === 'FLASHCARD_REVIEW' ? 'FLASHCARD_REVIEW' : 'DEEP_DIVE',
             isUserCreated: true,
@@ -138,7 +142,7 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
             SUBJECT_TAG: { EN: formData.subject.toUpperCase(), GU: "" },
             TIME: formData.time,
             deckId: taskType === 'FLASHCARD_REVIEW' ? formData.deckId : undefined,
-            googleEventId: isEditing && 'googleEventId' in task ? task.googleEventId : undefined,
+            googleEventId: isEditing && task && 'googleEventId' in task ? (task as any).googleEventId : undefined,
         } as ScheduleCardData;
     }
 
@@ -160,26 +164,32 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
   );
 
   const ModalShell: React.FC<{ children: React.ReactNode, title: string }> = ({ children, title }) => (
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div
       className={`fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${animationClasses}`}
       style={{ '--clip-origin-x': animationOrigin?.x, '--clip-origin-y': animationOrigin?.y } as React.CSSProperties}
       onClick={handleClose}
     >
       <div
-        className={`w-full max-w-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--modal-border-radius)] shadow-[var(--modal-shadow)] ${contentAnimationClasses} max-h-[90vh] overflow-hidden flex flex-col`}
+        className={`w-full max-w-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--modal-border-radius)] shadow-[var(--modal-shadow)] ${contentAnimationClasses} max-h-[90vh] flex flex-col`}
         onClick={(e) => e.stopPropagation()}
       >
         {theme === 'liquid-glass' && (
           <div className="flex-shrink-0 flex items-center p-3 border-b border-[var(--glass-border)]">
             <div className="flex gap-2">
-              <button onClick={handleClose} className="w-3 h-3 rounded-full bg-red-500"></button>
+              <button
+                onClick={handleClose}
+                className="w-3 h-3 rounded-full bg-red-500"
+                title="Close"
+                aria-label="Close"
+              ></button>
               <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
               <div className="w-3 h-3 rounded-full bg-green-500"></div>
             </div>
             <h2 className="text-sm font-semibold text-white text-center flex-grow -ml-12">{title}</h2>
           </div>
         )}
-        <div className={`p-6 ${theme === 'liquid-glass' ? 'overflow-y-auto' : ''}`}>
+        <div className={`p-6 overflow-y-auto`}>
           {theme !== 'liquid-glass' && <h2 className="text-2xl font-bold text-white mb-4">{title}</h2>}
           {children}
         </div>
@@ -194,11 +204,11 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
             <ViewField label="Title" value={task.CARD_TITLE.EN} />
             <ViewField label="Details" value={task.FOCUS_DETAIL.EN} />
             <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Date" value={('date' in task && task.date) ? new Date(task.date).toLocaleDateString() : task.DAY.EN} />
-                {'TIME' in task && <ViewField label="Time" value={task.TIME} />}
+                <ViewField label="Date" value={('date' in task && (task as any).date) ? new Date((task as any).date).toLocaleDateString() : task.DAY.EN} />
+                {'TIME' in task && (task as any).TIME && <ViewField label="Time" value={(task as any).TIME} />}
             </div>
             <ViewField label="Subject" value={task.SUBJECT_TAG.EN} />
-            {task.type === 'HOMEWORK' && <ViewField label="Questions" value={task.Q_RANGES} />}
+            {task.type === 'HOMEWORK' && <ViewField label="Questions" value={(task as HomeworkData).Q_RANGES} />}
             
             <div className="flex justify-end gap-4 pt-4">
                 <button type="button" onClick={handleClose} className="px-5 py-2 text-sm font-semibold rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600">Close</button>
@@ -208,14 +218,18 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
       </ModalShell>
     );
   }
-
   return (
     <>
       <ModalShell title={task ? 'Edit Task' : 'Create New Task'}>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-sm font-bold text-gray-400">Task Type</label>
-              <select value={taskType} onChange={e => setTaskType(e.target.value as TaskType)} className={inputClass}>
+              <label htmlFor="task-type-select" className="text-sm font-bold text-gray-400">Task Type</label>
+              <select
+                id="task-type-select"
+                value={taskType}
+                onChange={e => setTaskType(e.target.value as TaskType)}
+                className={inputClass}
+              >
                   <option value="ACTION">Study Session</option>
                   <option value="HOMEWORK">Homework</option>
                   <option value="FLASHCARD_REVIEW">Flashcard Review</option>
@@ -224,32 +238,39 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
 
             <div>
               <label className="text-sm font-bold text-gray-400">Title</label>
-              <input required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className={inputClass} />
+              <input
+                required
+                value={formData.title}
+                onChange={e => setFormData({...formData, title: e.target.value})}
+                className={inputClass}
+                placeholder="Enter task title"
+                title="Enter task title"
+              />
             </div>
              <div>
               <label className="text-sm font-bold text-gray-400">Details</label>
-              <textarea required value={formData.details} onChange={e => setFormData({...formData, details: e.target.value})} className={inputClass}></textarea>
+              <textarea required value={formData.details} onChange={e => setFormData({...formData, details: e.target.value})} className={inputClass} placeholder="Enter task details" title="Enter task details"></textarea>
             </div>
-             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                 <div>
-                    <label className="text-sm font-bold text-gray-400">Repeating Day</label>
-                    <select required value={formData.day} onChange={e => setFormData({...formData, day: e.target.value, date: ''})} className={`${inputClass} disabled:opacity-50`} disabled={!!formData.date}>
-                       {daysOfWeek.map(d => <option key={d} value={d}>{d.charAt(0) + d.slice(1).toLowerCase()}</option>)}
-                    </select>
-                </div>
-                <div>
-                    <label className="text-sm font-bold text-gray-400">Or Specific Date</label>
-                    <input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className={inputClass} />
-                </div>
-             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-bold text-gray-400">Repeating Day</label>
+                <select required value={formData.day} onChange={e => setFormData({...formData, day: e.target.value, date: ''})} className={`${inputClass} disabled:opacity-50`} disabled={!!formData.date} title="Select a repeating day for the task">
+                  {daysOfWeek.map(d => <option key={d} value={d}>{d.charAt(0) + d.slice(1).toLowerCase()}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-bold text-gray-400">Or Specific Date</label>
+                <input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className={inputClass} title="Select a specific date for the task" />
+              </div>
+            </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                  <div>
                     <label className="text-sm font-bold text-gray-400">Time</label>
-                    <input type="time" required={taskType !== 'HOMEWORK'} value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} className={inputClass} />
+                    <input type="time" required={taskType !== 'HOMEWORK' && !formData.date} value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} className={inputClass} title="Select a time for the task" />
                 </div>
                  <div>
                     <label className="text-sm font-bold text-gray-400">Subject</label>
-                    <select required value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})} className={inputClass}>
+                    <select required value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})} className={inputClass} title="Select a subject for the task">
                         <option value="PHYSICS">Physics</option>
                         <option value="CHEMISTRY">Chemistry</option>
                         <option value="MATHS">Maths</option>
@@ -266,7 +287,7 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
                 </div>
                 <div>
                   <label className="text-sm font-bold text-gray-400">Category</label>
-                  <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value as 'Custom' | 'Level-1' | 'Level-2' | 'Classroom-Discussion' | 'PYQ'})} className={inputClass}>
+                  <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value as 'Custom' | 'Level-1' | 'Level-2' | 'Classroom-Discussion' | 'PYQ'})} className={inputClass} title="Select homework category">
                       <option value="Custom">Custom</option>
                       <option value="Level-1">Level-1</option>
                       <option value="Level-2">Level-2</option>
@@ -289,7 +310,7 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
             {taskType === 'FLASHCARD_REVIEW' && (
               <div>
                 <label className="text-sm font-bold text-gray-400">Flashcard Deck</label>
-                <select required value={formData.deckId} onChange={e => setFormData({...formData, deckId: e.target.value})} className={`${inputClass} disabled:opacity-50`} disabled={decks.length === 0}>
+                <select required value={formData.deckId} onChange={e => setFormData({...formData, deckId: e.target.value})} className={`${inputClass} disabled:opacity-50`} disabled={decks.length === 0} title="Select a flashcard deck for review">
                   {decks.length > 0 ? (
                       decks.map(d => <option key={d.id} value={d.id}>{d.name}</option>)
                   ) : (

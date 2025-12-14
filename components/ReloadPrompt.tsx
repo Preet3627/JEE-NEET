@@ -1,8 +1,15 @@
 import React from 'react';
-import { useRegisterSW } from 'virtual:pwa-register/react';
+// import { useRegisterSW } from 'virtual:pwa-register/react';
 import Icon from './Icon';
 
 function ReloadPrompt() {
+  // Mock useRegisterSW since VitePWA is disabled
+  const useRegisterSW = () => ({
+    offlineReady: [false, () => {}],
+    needRefresh: [false, () => {}],
+    updateServiceWorker: () => {},
+  });
+
   const {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh, setNeedRefresh],

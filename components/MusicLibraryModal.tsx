@@ -5,62 +5,159 @@ import Icon from './Icon';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
 import { Track } from '../types';
 import StaticWaveform from './StaticWaveform';
+import * as mm from 'music-metadata-browser';
+import { addTrackToDb, getAllTracksFromDb, deleteTrackFromDb, getTrackFromDb } from '../utils/musicDb';
+import { useServerStatus } from '../context/ServerStatusContext';
 
 interface MusicLibraryModalProps { onClose: () => void; }
 
 const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
+    const { status } = useServerStatus();
     const [tracks, setTracks] = useState<Track[]>([]);
     const [view, setView] = useState<'tracks' | 'playlists' | 'genres'>('tracks');
     const [searchQuery, setSearchQuery] = useState('');
     const { playTrack, currentTrack, isPlaying, pause, updateTrackMetadata, djDropSettings, setDjDropSettings, playDjDrop, playlists, createPlaylist, addToPlaylist, addToQueue, playNextInQueue } = useMusicPlayer();
     const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState({ title: '', artist: '' });
-    const dropInputRef = useRef<HTMLInputElement>(null);
     const [error, setError] = useState('');
+    const localFilesInputRef = useRef<HTMLInputElement>(null);
+    const localFolderInputRef = useRef<HTMLInputElement>(null);
+    const [isSyncing, setIsSyncing] = useState(false);
 
-    useEffect(() => {
-        api.getMusicFiles('/').then(data => {
-            if(Array.isArray(data)) {
-                setTracks(data.filter(f => f.name.match(/\.(mp3|m4a|wav)$/i)).map(f => {
-                    // Robust filename parsing for Title - Artist or Artist - Title
-                    let title = f.name.replace(/\.[^/.]+$/, "");
-                    let artist = 'Unknown Artist';
-                    
-                    // Try to split by common separators " - ", " – " (en dash)
-                    const separators = [" - ", " – ", "_-_"];
-                    for (const sep of separators) {
-                        if (title.includes(sep)) {
-                            const parts = title.split(sep);
-                            if (parts.length >= 2) {
-                                // Assume Artist - Title structure mostly
-                                artist = parts[0].trim();
-                                title = parts.slice(1).join(sep).trim();
-                                break;
+    const loadTracks = async (syncWithCloud = false) => {
+        setIsSyncing(true);
+        setError('');
+
+        // Load from IndexedDB first
+        const localTracks = await getAllTracksFromDb();
+        const localTrackObjects = localTracks.map(t => ({...t.track, path: URL.createObjectURL(t.blob), isLocal: true}));
+        
+        if (!syncWithCloud) {
+            setTracks(localTrackObjects);
+            setIsSyncing(false);
+            if (!status?.musicWebDAV.configured) {
+                setError("The administrator has not configured the music library. You can still add and play local files.");
+            }
+            return;
+        }
+
+        if (!status?.musicWebDAV.configured) {
+            setError("The administrator has not configured the music library. You can still add and play local files.");
+            setIsSyncing(false);
+            return;
+        }
+
+        // Fetch from remote
+        try {
+            const files = await api.getMusicFiles('/');
+            if (Array.isArray(files)) {
+                const audioFiles = files.filter(f => f.name.match(/\.(mp3|m4a|wav)$/i));
+                const paths = audioFiles.map(f => f.path);
+
+                const metadataResults = await api.getMusicMetadataBatch(paths);
+                
+                const remoteTracks = audioFiles.map(file => {
+                    const metadataResult = metadataResults.find(m => m.path === file.path);
+                    if (metadataResult && !metadataResult.error) {
+                        const metadata = metadataResult.metadata;
+                        return {
+                            id: file.path,
+                            title: metadata.common.title || file.name.replace(/\.[^/.]+$/, ""),
+                            artist: metadata.common.artist || 'Unknown Artist',
+                            album: metadata.common.album || 'Cloud',
+                            genre: metadata.common.genre?.[0] || 'Unclassified',
+                            track: metadata.common.track.no?.toString() || '1',
+                            coverArt: metadata.common.picture?.[0] ? `data:${metadata.common.picture[0].format};base64,${metadata.common.picture[0].data.toString('base64')}` : '',
+                            duration: metadata.format.duration ? metadata.format.duration.toString() : '--:--',
+                            size: file.size.toString(),
+                            path: file.path,
+                            isLocal: false
+                        };
+                    } else {
+                        // Fallback
+                        let title = file.name.replace(/\.[^/.]+$/, "");
+                        let artist = 'Unknown Artist';
+                        const separators = [" - ", " – ", "_-_"];
+                        for (const sep of separators) {
+                            if (title.includes(sep)) {
+                                const parts = title.split(sep);
+                                if (parts.length >= 2) {
+                                    artist = parts[0].trim();
+                                    title = parts.slice(1).join(sep).trim();
+                                    break;
+                                }
                             }
                         }
+                        return {
+                            id: file.path, title, artist, genre: 'Unclassified', album: 'Cloud', track: '1', coverArt: '', duration: '--:--', size: file.size.toString(), path: file.path, isLocal: false
+                        };
                     }
-
-                    return {
-                        id: f.path, 
-                        title, 
-                        artist, 
-                        genre: 'Unclassified',
-                        album: 'Cloud', 
-                        track: '1', 
-                        coverArt: '', 
-                        duration: '--:--', 
-                        size: f.size.toString(), 
-                        path: f.path, 
-                        isLocal: false
-                    };
-                }));
-                setError('');
+                });
+                
+                const allTracks = [...localTrackObjects];
+                remoteTracks.forEach(remoteTrack => {
+                    if (!allTracks.some(localTrack => localTrack.id === remoteTrack.id)) {
+                        allTracks.push(remoteTrack);
+                    }
+                });
+                setTracks(allTracks);
             }
-        }).catch(err => {
+        } catch (err: any) {
             console.error("Failed to load music files:", err);
-            setError(err.error || "Failed to load music files. Please check your Nextcloud configuration in .env.");
-        });
+            setError(err.error || "Failed to sync with cloud music library.");
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    useEffect(() => {
+        loadTracks();
     }, []);
+
+    const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = event.target.files;
+        if (!files) return;
+    
+        const newTracks: Track[] = [];
+        for (const file of Array.from(files)) {
+            if (file.type.startsWith('audio/')) {
+                try {
+                    const metadata = await mm.parseBlob(file);
+                    const newTrack: Track = {
+                        id: `local_${file.name}_${Date.now()}`,
+                        title: metadata.common.title || file.name.replace(/\.[^/.]+$/, ""),
+                        artist: metadata.common.artist || 'Unknown Artist',
+                        album: metadata.common.album || 'Local File',
+                        genre: metadata.common.genre?.[0] || 'Unclassified',
+                        track: metadata.common.track.no?.toString() || '1',
+                        coverArt: metadata.common.picture?.[0] ? URL.createObjectURL(new Blob([metadata.common.picture[0].data], { type: metadata.common.picture[0].format })) : '',
+                        duration: metadata.format.duration ? metadata.format.duration.toString() : '0',
+                        size: file.size.toString(),
+                        path: URL.createObjectURL(file),
+                        isLocal: true
+                    };
+                    newTracks.push(newTrack);
+                } catch (error) {
+                    console.error('Error parsing metadata for', file.name, error);
+                    const newTrack: Track = {
+                        id: `local_${file.name}_${Date.now()}`,
+                        title: file.name.replace(/\.[^/.]+$/, ""),
+                        artist: 'Unknown Artist',
+                        album: 'Local File',
+                        genre: 'Unclassified',
+                        track: '1',
+                        coverArt: '',
+                        duration: '0',
+                        size: file.size.toString(),
+                        path: URL.createObjectURL(file),
+                        isLocal: true
+                    };
+                    newTracks.push(newTrack);
+                }
+            }
+        }
+        setTracks(prev => [...prev, ...newTracks]);
+    };
 
     const handleEditClick = (e: React.MouseEvent, track: Track) => {
         e.stopPropagation();
@@ -105,28 +202,38 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
         addToQueue(track);
     };
     
-    const handleDownload = (e: React.MouseEvent, track: Track) => {
+    const handleSaveOffline = async (e: React.MouseEvent, track: Track) => {
         e.stopPropagation();
-        // Trigger download
-        const link = document.createElement('a');
-        link.href = api.getMusicContentUrl(track.id);
-        link.download = `${track.artist} - ${track.title}.mp3`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        
+        const existing = await getTrackFromDb(track.id);
+        if (existing) {
+            alert('This track is already saved for offline use.');
+            return;
+        }
+
+        try {
+            let blob: Blob;
+            if (track.isLocal) {
+                const response = await fetch(track.path);
+                blob = await response.blob();
+            } else {
+                const response = await fetch(api.getMusicContentUrl(track.path));
+                blob = await response.blob();
+            }
+            await addTrackToDb(track, blob);
+            alert(`${track.title} has been saved for offline use.`);
+            loadTracks();
+        } catch (error) {
+            console.error('Error saving track for offline use:', error);
+            alert('Failed to save track for offline use.');
+        }
     };
 
     const getGradient = (id: string) => {
-        const colors = [
-            'from-[#ff0055] to-[#ff00aa]', 
-            'from-[#00ddff] to-[#0055ff]', 
-            'from-[#00ff88] to-[#00aa44]', 
-            'from-[#ffaa00] to-[#ff5500]', 
-            'from-[#aa00ff] to-[#5500ff]'
-        ];
+        const gradients = ['gradient-1', 'gradient-2', 'gradient-3', 'gradient-4', 'gradient-5'];
         let hash = 0;
         for(let i=0; i<id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
-        return colors[Math.abs(hash) % colors.length];
+        return gradients[Math.abs(hash) % gradients.length];
     };
 
     const filteredTracks = tracks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()) || t.artist.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -134,7 +241,6 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
     return (
         <div className="fixed inset-0 bg-black z-[60] flex flex-col pt-safe-top pb-safe-bottom">
             <div className="w-full h-full md:max-w-6xl md:mx-auto bg-[#111] md:rounded-2xl shadow-2xl flex flex-col overflow-hidden border-none md:border md:border-white/10">
-                
                 <header className="p-4 md:p-6 bg-[#000] border-b border-white/5 flex flex-col gap-4 sticky top-0 z-10">
                     <div className="flex justify-between items-center">
                         <h2 className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 flex items-center gap-3">
@@ -149,25 +255,38 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
                             <button onClick={() => setView('playlists')} className={`flex-1 md:flex-initial text-center md:px-4 py-1.5 rounded-md text-sm font-bold transition-colors ${view === 'playlists' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:text-white'}`}>Playlists</button>
                             <button onClick={() => setView('genres')} className={`flex-1 md:flex-initial text-center md:px-4 py-1.5 rounded-md text-sm font-bold transition-colors ${view === 'genres' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:text-white'}`}>Genres</button>
                         </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => loadTracks(true)} disabled={isSyncing || !status?.musicWebDAV.configured} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 disabled:opacity-50">
+                                <Icon name="sync" className={isSyncing ? 'animate-spin' : ''} /> Sync with Cloud
+                            </button>
+                            <button onClick={() => localFilesInputRef.current?.click()} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2">
+                                <Icon name="plus" /> Add Files
+                            </button>
+                            <button onClick={() => localFolderInputRef.current?.click()} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2">
+                                <Icon name="folder" /> Add Folder
+                            </button>
+                        </div>
                         <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search tracks..." className="bg-[#222] border border-white/10 rounded-full px-5 py-3 text-base text-white w-full md:w-64 focus:border-cyan-500 outline-none transition-colors" />
                     </div>
+                    <input type="file" multiple accept="audio/*" ref={localFilesInputRef} onChange={handleFileSelect} className="hidden" />
+                    <input type="file" webkitdirectory="" directory="" multiple accept="audio/*" ref={localFolderInputRef} onChange={handleFileSelect} className="hidden" />
                 </header>
 
                 <div className="flex-grow overflow-y-auto p-2 md:p-4 custom-scrollbar bg-[#050505] pb-24 md:pb-4">
-                    {error ? (
-                        <div className="text-center text-red-400 py-10 border-2 border-dashed border-red-500/30 rounded-lg mx-4">
-                            <p className="font-semibold">Music Library Unavailable</p>
+                    {error && (
+                        <div className="text-center text-yellow-400 py-10 border-2 border-dashed border-yellow-500/30 rounded-lg mx-4">
+                            <p className="font-semibold">Music Library Notice</p>
                             <p className="text-sm">{error}</p>
-                            <p className="text-xs text-gray-500 mt-2">Please ensure Nextcloud WebDAV is configured correctly in your server's .env file.</p>
                         </div>
-                    ) : (view === 'tracks' && (
+                    )}
+                    {(view === 'tracks' && !error) && (
                         <div className="space-y-2">
                              {filteredTracks.map(track => {
                                 const isCurrent = currentTrack?.id === track.id;
                                 const gradient = getGradient(track.id);
                                 return (
                                     <div key={track.id} className={`group relative flex items-center gap-3 p-2 rounded-xl transition-all duration-300 border border-transparent hover:border-white/10 ${isCurrent ? 'bg-[#1a1a1a] border-l-4 border-l-cyan-500' : 'bg-[#111] hover:bg-[#161616]'}`} onClick={() => isCurrent && isPlaying ? pause() : playTrack(track, tracks)}>
-                                        <div className={`w-12 h-12 md:w-16 md:h-16 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform relative overflow-hidden flex-shrink-0`}>
+                                        <div className={`w-12 h-12 md:w-16 md:h-16 rounded-lg ${gradient} flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform relative overflow-hidden flex-shrink-0`}>
                                              <div className="absolute inset-0 bg-black/20"></div>
                                             <Icon name={isCurrent && isPlaying ? 'pause' : 'play'} className="text-white w-6 h-6 md:w-8 md:h-8 drop-shadow-md z-10" />
                                         </div>
@@ -186,7 +305,7 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
                                             )}
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <button onClick={(e) => handleDownload(e, track)} className="p-2 text-gray-400 hover:text-cyan-400 bg-[#222] rounded-full hover:bg-[#333] transition-colors" title="Download"><Icon name="download" className="w-4 h-4" /></button>
+                                            <button onClick={(e) => handleSaveOffline(e, track)} className="p-2 text-gray-400 hover:text-cyan-400 bg-[#222] rounded-full hover:bg-[#333] transition-colors" title="Save Offline"><Icon name="download" className="w-4 h-4" /></button>
                                             <button onClick={(e) => handlePlayNext(e, track)} className="p-2 text-gray-400 hover:text-green-400 bg-[#222] rounded-full hover:bg-[#333] transition-colors" title="Play Next"><Icon name="forward" className="w-4 h-4" /></button>
                                             <button onClick={(e) => handleAddToQueue(e, track)} className="p-2 text-gray-400 hover:text-cyan-400 bg-[#222] rounded-full hover:bg-[#333] transition-colors" title="Add to Queue"><Icon name="schedule" className="w-4 h-4" /></button>
                                             <button onClick={(e) => handleAddToPlaylist(e, track)} className="p-2 text-gray-400 hover:text-yellow-400 bg-[#222] rounded-full hover:bg-[#333] transition-colors" title="Add to Playlist"><Icon name="plus" className="w-4 h-4" /></button>
@@ -196,7 +315,35 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
                                 )
                             })}
                         </div>
-                    ))}
+                    )}
+                    {(view === 'playlists' && !error) && (
+                        <div className="space-y-4">
+                            <button onClick={() => createPlaylist(prompt("Enter new playlist name:") || "New Playlist")} className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg bg-purple-600 hover:bg-purple-700">
+                                <Icon name="plus" /> Create New Playlist
+                            </button>
+                            {playlists.map(playlist => (
+                                <div key={playlist.id} className="bg-gray-800/50 p-4 rounded-lg border border-gray-700 hover:border-purple-500/50 transition-colors">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <Icon name="playlist" className="w-6 h-6 text-purple-400" />
+                                            <h3 className="font-bold text-white">{playlist.name}</h3>
+                                            <span className="text-sm text-gray-400">({playlist.trackIds.length} tracks)</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={(e) => { e.stopPropagation(); /* Play playlist logic */ }} className="p-2 text-gray-400 hover:text-green-400"><Icon name="play" className="w-4 h-4" /></button>
+                                            <button onClick={(e) => { e.stopPropagation(); /* Edit playlist logic */ }} className="p-2 text-gray-400 hover:text-white"><Icon name="edit" className="w-4 h-4" /></button>
+                                            <button onClick={(e) => { e.stopPropagation(); /* Delete playlist logic */ }} className="p-2 text-gray-400 hover:text-red-400"><Icon name="delete" className="w-4 h-4" /></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    {(view === 'genres' && !error) && (
+                        <div className="space-y-2">
+                            <p className="text-gray-400">Genre view not yet implemented.</p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

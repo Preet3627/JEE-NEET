@@ -1,9 +1,6 @@
 
-import React, { createContext, useState, useContext, ReactNode, useRef, useCallback, useEffect } from 'react';
-import { api } from '../api/apiService';
-import { Track, NotchSettings, VisualizerSettings, DjDropSettings, LocalPlaylist } from '../types';
-import * as musicMetadata from 'music-metadata-browser';
 import { useAuth } from './AuthContext';
+import { useServerStatus } from './ServerStatusContext';
 
 interface MusicPlayerContextType {
     audioElement: HTMLAudioElement | null;
@@ -44,11 +41,13 @@ interface MusicPlayerContextType {
 
 const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(undefined);
 
-const DJ_DROP_URL = '/api/dj-drop';
+const DJ_DROP_URL = 'https://cloud.ponsrischool.in/index.php/s/K8MfJTSBE5zoZNC/download';
 const DEFAULT_ART = 'https://ponsrischool.in/wp-content/uploads/2025/11/Gemini_Generated_Image_mtb6hbmtb6hbmtb6.png';
 
 export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const { currentUser } = useAuth();
+    const { status } = useServerStatus();
+    const globalDjDropUrl = status?.djDropUrl;
 
     const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
     const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
@@ -66,7 +65,7 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
 
     const [notchSettings, setNotchSettings] = useState<NotchSettings>({ position: 'top', size: 'medium', width: 30, enabled: true });
     const [visualizerSettings, setVisualizerSettings] = useState<VisualizerSettings>({ preset: 'bars', colorMode: 'rgb' });
-    const [djDropSettings, setDjDropSettings] = useState<DjDropSettings>({ enabled: true, autoTrigger: true });
+    const [djDropSettings, setDjDropSettings] = useState<DjDropSettings>({ enabled: true, autoTrigger: true, crossfadeDuration: 3 }); // Default to 3 seconds
     
     const [playlists, setPlaylists] = useState<LocalPlaylist[]>([]);
 
@@ -143,7 +142,7 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     const playDjDrop = () => {
         if (djDropSettings.enabled && djDropAudioRef.current && gainNode && audioContext) {
             djDropAudioRef.current.currentTime = 0;
-            const targetSrc = djDropSettings.customDropUrl || DJ_DROP_URL;
+            const targetSrc = djDropSettings.customDropUrl || globalDjDropUrl || DJ_DROP_URL;
             if (djDropAudioRef.current.src !== targetSrc && !djDropAudioRef.current.src.endsWith(targetSrc)) {
                  djDropAudioRef.current.src = targetSrc;
             }
@@ -175,7 +174,7 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
                 artist: track.artist,
                 album: track.album,
                 artwork: [
-                    { src: track.coverArtUrl || DEFAULT_ART, sizes: '512x512', type: 'image/png' }
+                    { src: track.coverArt || DEFAULT_ART, sizes: '512x512', type: 'image/png' }
                 ]
             });
             updateMediaPosition();
@@ -199,17 +198,6 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
     };
 
     const fetchAlbumArt = async (track: Track): Promise<string> => {
-        try {
-             const response = await fetch(`/api/music/album-art?path=${encodeURIComponent(track.path || '')}&token=${localStorage.getItem('token')}`);
-             if (!response.ok) return DEFAULT_ART;
-             const arrayBuffer = await response.arrayBuffer();
-             const metadata = await musicMetadata.parseBlob(new Blob([arrayBuffer]));
-             if (metadata.common.picture && metadata.common.picture.length > 0) {
-                 const picture = metadata.common.picture[0];
-                 const blob = new Blob([picture.data], { type: picture.format });
-                 return URL.createObjectURL(blob);
-             }
-        } catch (e) { console.warn("Album art fetch failed", e); }
         return DEFAULT_ART;
     };
 
@@ -218,46 +206,30 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
         
         // Auto-Mix Crossfade Out
         if (isAutoMixEnabled && isPlaying && gainNode && audioContext) {
+             const crossfadeTime = djDropSettings.crossfadeDuration || 3;
              const now = audioContext.currentTime;
              gainNode.gain.cancelScheduledValues(now);
              gainNode.gain.setValueAtTime(1, now);
-             gainNode.gain.linearRampToValueAtTime(0, now + 3); 
+             gainNode.gain.linearRampToValueAtTime(0, now + crossfadeTime); 
              
              if (djDropSettings.enabled && djDropSettings.autoTrigger) {
-                 setTimeout(() => playDjDrop(), 500); 
+                 setTimeout(() => playDjDrop(), (crossfadeTime * 1000) / 2); // Play drop in the middle of crossfade
              }
-             await new Promise(resolve => setTimeout(resolve, 3000));
+             await new Promise(resolve => setTimeout(resolve, crossfadeTime * 1000));
         }
 
         if (audioElementRef.current) {
             setTracklist(newTracklist);
 
-            let coverArtUrl = DEFAULT_ART;
             let streamUrl = '';
 
-            if (track.isLocal && track.file) {
-                if (currentObjectUrlRef.current) URL.revokeObjectURL(currentObjectUrlRef.current);
-                streamUrl = URL.createObjectURL(track.file);
-                currentObjectUrlRef.current = streamUrl;
-                try {
-                    const metadata = await musicMetadata.parseBlob(track.file);
-                    if (metadata.common.picture?.[0]) {
-                         const pic = metadata.common.picture[0];
-                         coverArtUrl = URL.createObjectURL(new Blob([pic.data], { type: pic.format }));
-                    }
-                } catch(e) {}
+            if (track.isLocal) {
+                streamUrl = track.path;
             } else {
                  streamUrl = api.getMusicContentUrl(track.id);
-                 fetchAlbumArt(track).then(url => {
-                     if (currentTrackIdRef.current === track.id) {
-                         const updatedTrack = { ...track, coverArtUrl: url };
-                         setCurrentTrack(updatedTrack);
-                         updateMediaMetadata(updatedTrack);
-                     }
-                 });
             }
 
-            const trackWithArt = { ...track, coverArtUrl };
+            const trackWithArt = { ...track, coverArt: track.coverArt || DEFAULT_ART };
             setCurrentTrack(trackWithArt);
             currentTrackIdRef.current = track.id;
             
@@ -277,10 +249,11 @@ export const MusicPlayerProvider: React.FC<{ children: ReactNode }> = ({ childre
                 setIsPlaying(true);
                 
                 if (isAutoMixEnabled && gainNode && audioContext) {
+                    const crossfadeTime = djDropSettings.crossfadeDuration || 3;
                     const now = audioContext.currentTime;
                     gainNode.gain.cancelScheduledValues(now);
                     gainNode.gain.setValueAtTime(0, now);
-                    gainNode.gain.linearRampToValueAtTime(1, now + 3);
+                    gainNode.gain.linearRampToValueAtTime(1, now + crossfadeTime);
                 } else if (gainNode && audioContext) {
                     gainNode.gain.setValueAtTime(1, audioContext.currentTime);
                 }

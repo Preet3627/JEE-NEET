@@ -1,20 +1,14 @@
-
 import React, { useRef, useEffect } from 'react';
-import { VisualizerSettings, NotchSettings, Track } from '../types';
+import { VisualizerSettings } from '../types';
 
-interface GlobalMusicVisualizerProps {
+interface FullScreenVisualizerProps {
     analyser: AnalyserNode | null;
     visualizerSettings: VisualizerSettings;
     isPlaying: boolean;
-    currentTrack: Track | null;
-    notchSettings: NotchSettings;
-    play: () => void;
-    pause: () => void;
-    nextTrack: () => void;
-    prevTrack: () => void;
+    albumColor?: string; // Add albumColor prop
 }
 
-const GlobalMusicVisualizer: React.FC<GlobalMusicVisualizerProps> = ({ analyser, visualizerSettings, isPlaying }) => {
+const FullScreenVisualizer: React.FC<FullScreenVisualizerProps> = ({ analyser, visualizerSettings, isPlaying, albumColor }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animationFrameId = useRef<number | null>(null);
     const hueOffsetRef = useRef<number>(0);
@@ -50,7 +44,8 @@ const GlobalMusicVisualizer: React.FC<GlobalMusicVisualizerProps> = ({ analyser,
                 hueOffsetRef.current = (hueOffsetRef.current + 1) % 360;
                 fillStyle = `hsl(${hueOffsetRef.current}, 80%, 60%)`;
             } else if (visualizerSettings.colorMode === 'album') {
-                fillStyle = '#3b82f6'; // Blue-ish fallback for album color
+                // Use passed dominant color if available
+                fillStyle = albumColor || '#3b82f6'; // Blue-ish fallback
             }
 
             switch (visualizerSettings.preset) {
@@ -117,7 +112,7 @@ const GlobalMusicVisualizer: React.FC<GlobalMusicVisualizerProps> = ({ analyser,
                 cancelAnimationFrame(animationFrameId.current);
             }
         };
-    }, [analyser, isPlaying, visualizerSettings]);
+    }, [analyser, isPlaying, visualizerSettings, albumColor]); // Added albumColor to dependency array
 
     if (!isPlaying) return null;
 
@@ -126,4 +121,4 @@ const GlobalMusicVisualizer: React.FC<GlobalMusicVisualizerProps> = ({ analyser,
     );
 };
 
-export default GlobalMusicVisualizer;
+export default FullScreenVisualizer;
