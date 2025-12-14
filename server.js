@@ -184,6 +184,13 @@ const initDB = async () => {
                 verification_token_expires_at DATETIME
             )
         `);
+        // Add missing columns if they don't exist
+        await connection.query(`
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token VARCHAR(255);
+        `);
+        await connection.query(`
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires_at DATETIME;
+        `);
         // Other tables... (simplified for brevity in this re-creation, assuming they exist or will be created on first use if needed, typically schema migration is separate)
         // Ideally we should have the full schema here as in the truncated file, but for repair, ensuring connection is key.
         // Re-adding the tables from the truncated file:
