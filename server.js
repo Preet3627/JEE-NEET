@@ -607,6 +607,39 @@ async function fetchGoogleUserInfo(accessToken) {
 }
 
 
+// Helper to fetch user info from Google (to address potential original error)
+async function fetchGoogleUserInfo(accessToken) {
+    try {
+        const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            }
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Failed to fetch user data from Google:', response.status, errorText);
+            throw new Error('Failed to fetch user data from Google: ' + errorText);
+        }
+        try {
+            return await response.json();
+        } catch (jsonError) {
+            const responseText = await response.text();
+            console.error('Failed to parse Google user data as JSON:', jsonError, 'Response Text:', responseText);
+            throw new Error('Failed to parse Google user data as JSON: ' + responseText);
+        }
+    } catch (error) {
+        console.error('Error in fetchGoogleUserInfo:', error);
+        throw error;
+    }
+}
+
+
+
+
+
+
+
+
 // Protected Routes
 app.get('/api/me', authenticateToken, async (req, res) => {
     try {
