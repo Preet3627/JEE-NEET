@@ -516,14 +516,7 @@ app.post('/api/auth/google', async (req, res) => {
         const token = jwt.sign({ id: user.id, sid: user.sid, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
         const userData = await getUserData(user.id);
 
-        // --- Simulated call to fetchGoogleUserInfo for robustness demonstration ---
-        try {
-            const googleUserInfo = await fetchGoogleUserInfo('DUMMY_ACCESS_TOKEN');
-            console.log('Simulated Google User Info (for robustness test):', googleUserInfo);
-        } catch (simulatedError) {
-            console.warn('Simulated fetchGoogleUserInfo call failed (expected if DUMMY_ACCESS_TOKEN is invalid):', simulatedError.message);
-        }
-        // --- End of simulated call ---
+
 
         res.json({ token, user: userData });
 
@@ -578,59 +571,6 @@ async function getUserData(userId) {
         EXAMS: exams.map(r => decrypt(JSON.parse(r.data))),
         STUDY_SESSIONS: sessions.map(r => decrypt(JSON.parse(r.data)))
     };
-}
-
-// Helper to fetch user info from Google (to address potential original error)
-async function fetchGoogleUserInfo(accessToken) {
-    try {
-        const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`
-            }
-        });
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Failed to fetch user data from Google:', response.status, errorText);
-            throw new Error('Failed to fetch user data from Google: ' + errorText);
-        }
-        try {
-            return await response.json();
-        } catch (jsonError) {
-            const responseText = await response.text();
-            console.error('Failed to parse Google user data as JSON:', jsonError, 'Response Text:', responseText);
-            throw new Error('Failed to parse Google user data as JSON: ' + responseText);
-        }
-    } catch (error) {
-        console.error('Error in fetchGoogleUserInfo:', error);
-        throw error;
-    }
-}
-
-
-// Helper to fetch user info from Google (to address potential original error)
-async function fetchGoogleUserInfo(accessToken) {
-    try {
-        const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`
-            }
-        });
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Failed to fetch user data from Google:', response.status, errorText);
-            throw new Error('Failed to fetch user data from Google: ' + errorText);
-        }
-        try {
-            return await response.json();
-        } catch (jsonError) {
-            const responseText = await response.text();
-            console.error('Failed to parse Google user data as JSON:', jsonError, 'Response Text:', responseText);
-            throw new Error('Failed to parse Google user data as JSON: ' + responseText);
-        }
-    } catch (error) {
-        console.error('Error in fetchGoogleUserInfo:', error);
-        throw error;
-    }
 }
 
 
@@ -820,6 +760,40 @@ app.post('/api/admin/impersonate/:sid', authenticateToken, async (req, res) => {
     
     const token = jwt.sign({ id: user.id, sid: user.sid, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
     res.json({ token });
+});
+
+app.delete('/api/admin/users/:sid', authenticateToken, async (req, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    const { sid } = req.params;
+
+    try {
+        const [userRows] = await pool.query('SELECT id FROM users WHERE sid = ?', [sid]);
+        const userToDelete = userRows[0];
+
+        if (!userToDelete) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Delete user from 'doubts' and 'doubt_solutions' tables
+        // (These tables use 'user_sid' which is a VARCHAR, or INT)
+        // Need to be careful here: doubt_solutions.user_sid is INT, users.sid is VARCHAR.
+        // If doubt_solutions.user_sid is actually users.id, then it needs to be userToDelete.id.
+        // If doubt_solutions.user_sid is actually users.sid (VARCHAR), then it needs to be sid.
+        // Reviewing initDB, doubt_solutions.user_sid is INT. It should refer to users.id.
+        // doubts.user_sid is VARCHAR. It should refer to users.sid.
+        
+        await pool.query('DELETE FROM doubt_solutions WHERE user_sid = ?', [userToDelete.id]); 
+        await pool.query('DELETE FROM doubts WHERE user_sid = ?', [sid]);
+
+        // Delete user from 'users' table, which will trigger ON DELETE CASCADE for
+        // user_configs, schedule_items, results, exams, study_sessions, push_subscriptions
+        await pool.query('DELETE FROM users WHERE id = ?', [userToDelete.id]);
+
+        res.json({ success: true, message: `User ${sid} and all associated data deleted.` });
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        res.status(500).json({ error: 'Failed to delete user.' });
+    }
 });
 
 app.get('/api/admin/settings/:key', authenticateToken, async (req, res) => {
