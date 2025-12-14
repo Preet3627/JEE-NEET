@@ -583,6 +583,74 @@ app.post('/api/verify-email', async (req, res) => {
     }
 });
 
+// Forgot Password
+app.post('/api/forgot-password', async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database offline" });
+    if (!mailer) return res.status(500).json({ error: "Email service not configured" });
+
+    const { email } = req.body;
+    try {
+        const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+        const user = rows[0];
+
+        if (!user) {
+            // Return a generic success message to prevent email enumeration
+            return res.json({ success: true, message: 'If an account with that email exists, a password reset link has been sent.' });
+        }
+
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetTokenExpiresAt = new Date(Date.now() + 3600000); // 1 hour
+
+        await pool.query(
+            'UPDATE users SET reset_token = ?, reset_token_expires_at = ? WHERE id = ?',
+            [resetToken, resetTokenExpiresAt, user.id]
+        );
+
+        const resetUrl = `${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`;
+        await mailer.sendMail({
+            from: process.env.SMTP_FROM || 'no-reply@jeescheduler.com',
+            to: email,
+            subject: 'Password Reset Request for JEE Scheduler Pro',
+            html: `You requested a password reset. Please use this link to reset your password: <a href="${resetUrl}">${resetUrl}</a>. This link is valid for 1 hour.`
+        });
+
+        res.json({ success: true, message: 'If an account with that email exists, a password reset link has been sent.' });
+    } catch (error) {
+        console.error("Error in forgot password:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Reset Password
+app.post('/api/reset-password', async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database offline" });
+    const { token, password } = req.body;
+    try {
+        const [rows] = await pool.query('SELECT * FROM users WHERE reset_token = ?', [token]);
+        const user = rows[0];
+
+        if (!user) {
+            return res.status(400).json({ error: 'Invalid or expired password reset token.' });
+        }
+
+        if (user.reset_token_expires_at < new Date()) {
+            return res.status(400).json({ error: 'Password reset token has expired.' });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 10);
+
+        await pool.query(
+            'UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires_at = NULL WHERE id = ?',
+            [passwordHash, user.id]
+        );
+
+        res.json({ success: true, message: 'Password has been reset successfully.' });
+    } catch (error) {
+        console.error("Error in reset password:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Resend Verification Email
 app.post('/api/resend-verification-email', async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database offline" });
