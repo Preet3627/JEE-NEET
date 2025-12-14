@@ -1,5 +1,6 @@
 
 import { useAuth } from './AuthContext';
+import React, { createContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useServerStatus } from './ServerStatusContext';
 
 interface MusicPlayerContextType {
