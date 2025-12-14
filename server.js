@@ -484,6 +484,7 @@ app.post('/api/register', async (req, res) => {
 // Google Login
 app.post('/api/auth/google', async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database offline" });
+    if (!googleClient) return res.status(500).json({ error: "Google authentication not configured on server" });
     const { credential } = req.body;
     try {
         const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: process.env.GOOGLE_CLIENT_ID });
