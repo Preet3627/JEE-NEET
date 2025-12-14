@@ -629,7 +629,7 @@ async function getUserData(userId) {
     const user = userRows[0];
     
     const [configRows] = await pool.query('SELECT config FROM user_configs WHERE user_id = ?', [userId]);
-    const config = configRows[0] ? JSON.parse(configRows[0].config) : {};
+    const config = configRows[0] ? decrypt(configRows[0].config) : {};
     
     // Encrypted Data Tables
     const [schedule] = await pool.query('SELECT id as ID, data FROM schedule_items WHERE user_id = ?', [userId]);
