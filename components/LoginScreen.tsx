@@ -26,7 +26,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onSwitchToRegister, onSwitchT
     const [resendEmailStatus, setResendEmailStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
     useEffect(() => {
-        if (window.google && googleClientId && googleAuthStatus !== 'loading' && googleAuthStatus !== 'unconfigured' && backendStatus === 'online') {
+        if (window.google && googleClientId && googleAuthStatus !== 'loading' && backendStatus === 'online') {
             try {
                 window.google.accounts.id.initialize({
                     client_id: googleClientId,
@@ -91,7 +91,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onSwitchToRegister, onSwitchT
     const labelClass = "text-sm font-bold text-gray-400";
     const buttonClass = "w-full flex items-center justify-center gap-2 px-4 py-3 text-base font-semibold text-white rounded-lg transition-transform hover:scale-105 active:scale-100 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none bg-gradient-to-r from-[var(--gradient-cyan)] to-[var(--gradient-purple)]";
 
-    const isGoogleButtonDisabled = backendStatus !== 'online' || !googleClientId || googleAuthStatus === 'loading' || googleAuthStatus === 'unconfigured';
+    const isGoogleButtonDisabled = backendStatus !== 'online' || !googleClientId || googleAuthStatus === 'loading';
 
     return (
         <div className="min-h-screen flex items-center justify-center p-4">
@@ -104,9 +104,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onSwitchToRegister, onSwitchT
 
                 <div className="space-y-4">
                     {/* Render Google Sign-In button only if configured and ready */}
-                    {googleClientId && googleAuthStatus !== 'unconfigured' && (
-                        <div id="googleSignInButton" className={`flex justify-center transition-opacity ${isGoogleButtonDisabled ? 'opacity-50 pointer-events-none' : ''}`}></div>
-                    )}
+                    <div id="googleSignInButton" className={`flex justify-center transition-opacity ${isGoogleButtonDisabled ? 'opacity-50 pointer-events-none' : ''}`}></div>
                     {googleAuthStatus === 'loading' && <p className="text-sm text-center text-gray-400 animate-pulse">Verifying Google account...</p>}
                     <div className="relative">
                         <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-600"></div></div>

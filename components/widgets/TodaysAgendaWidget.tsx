@@ -13,14 +13,14 @@ const TodaysAgendaWidget: React.FC<TodaysAgendaWidgetProps> = ({ items, onStar }
   const todayName = new Date().toLocaleString('en-us', { weekday: 'long' }).toUpperCase();
   
   const todaysItems = items
-    .filter(item => item.DAY && item.DAY.EN && item.DAY.EN.toUpperCase() === todayName && (item.type === 'ACTION' || item.type === 'HOMEWORK'))
+    .filter(item => item && item.DAY && item.DAY.EN && item.CARD_TITLE && item.DAY.EN.toUpperCase() === todayName && (item.type === 'ACTION' || item.type === 'HOMEWORK'))
     .sort((a, b) => {
         const aTime = 'TIME' in a && a.TIME ? a.TIME : '23:59';
         const bTime = 'TIME' in b && b.TIME ? b.TIME : '23:59';
         return aTime.localeCompare(bTime);
     });
 
-  const starredItems = items.filter(item => item.isStarred && item.DAY.EN.toUpperCase() !== todayName);
+  const starredItems = items.filter(item => item && item.isStarred && item.DAY && item.DAY.EN && item.CARD_TITLE && item.DAY.EN.toUpperCase() !== todayName);
   const agendaItems = [...todaysItems, ...starredItems];
 
   return (

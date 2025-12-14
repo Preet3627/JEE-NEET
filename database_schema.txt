@@ -60,7 +60,8 @@ CREATE TABLE IF NOT EXISTS doubts (
     created_at DATETIME,
     author_name VARCHAR(255),
     author_photo LONGTEXT,
-    status VARCHAR(50) DEFAULT 'active'
+    status VARCHAR(50) DEFAULT 'active',
+    FOREIGN KEY (user_sid) REFERENCES users(sid) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS doubt_solutions (
@@ -72,7 +73,8 @@ CREATE TABLE IF NOT EXISTS doubt_solutions (
     created_at DATETIME,
     solver_name VARCHAR(255),
     solver_photo LONGTEXT,
-    FOREIGN KEY (doubt_id) REFERENCES doubts(id) ON DELETE CASCADE
+    FOREIGN KEY (doubt_id) REFERENCES doubts(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_sid) REFERENCES users(sid) ON DELETE CASCADE
 );
 
 -- 5. Hardcoded Admin Account

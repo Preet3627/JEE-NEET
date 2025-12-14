@@ -43,7 +43,7 @@ const PieChart: React.FC<{ data: { label: string, value: number, color: string }
 
 const SubjectAllocationWidget: React.FC<SubjectAllocationWidgetProps> = ({ items }) => {
     const subjectCounts = items.reduce((acc, item) => {
-        if (item.SUBJECT_TAG && item.SUBJECT_TAG.EN) { // Add null/undefined check
+        if (item && item.SUBJECT_TAG && item.SUBJECT_TAG.EN) { 
             const subject = item.SUBJECT_TAG.EN.toUpperCase();
             if (['PHYSICS', 'CHEMISTRY', 'MATHS'].includes(subject)) {
                 acc[subject] = (acc[subject] || 0) + 1;

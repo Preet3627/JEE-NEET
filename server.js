@@ -18,8 +18,8 @@ const app = express();
 
 // Fix for Cross-Origin-Opener-Policy blocking Google Sign-In popup
 app.use((req, res, next) => {
-    res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
-    res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
+    res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+    res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
     res.setHeader("Referrer-Policy", "no-referrer-when-downgrade");
     next();
 });
@@ -149,9 +149,11 @@ const decrypt = (text) => {
         try {
             return JSON.parse(decrypted);
         } catch {
-            return decrypted;
+            // If parsing fails, it's not a valid JSON. Return an empty object to prevent crash.
+            return {};
         }
     } catch (error) {
+        // If decryption itself fails, return the original text
         return text; 
     } 
 };
@@ -490,12 +492,14 @@ app.post('/api/register', async (req, res) => {
             [sid, email, fullName, passwordHash, profilePhoto, false, verificationToken, verificationTokenExpiresAt]
         );
         
+        const newUserId = result.insertId;
+
         // Default Config
         const defaultConfig = {
             WAKE: '06:00', SCORE: '0/300', WEAK: [],
             settings: { accentColor: '#0891b2', theme: 'default', examType: 'JEE' }
         };
-        await pool.query('INSERT INTO user_configs (user_id, config) VALUES (?, ?)', [result.insertId, JSON.stringify(defaultConfig)]);
+        await pool.query('INSERT INTO user_configs (user_id, config) VALUES (?, ?)', [newUserId, JSON.stringify(defaultConfig)]);
 
         // Send verification email
         if (mailer) {
@@ -507,8 +511,13 @@ app.post('/api/register', async (req, res) => {
                 html: `Please click this link to verify your email: <a href="${verificationUrl}">${verificationUrl}</a>`
             });
         }
+        
+        // Create token and send back user data, like in Google login
+        const token = jwt.sign({ id: newUserId, sid: sid, role: 'student' }, JWT_SECRET, { expiresIn: '7d' });
+        const userData = await getUserData(newUserId);
+        
+        res.json({ token, user: userData });
 
-        res.json({ success: true, message: 'Registration successful. Please check your email to verify your account.' });
     } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: "SID or Email already exists" });
         res.status(500).json({ error: error.message });

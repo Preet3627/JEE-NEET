@@ -10,7 +10,7 @@ interface HomeworkWidgetProps {
 
 const HomeworkWidget: React.FC<HomeworkWidgetProps> = ({ items, onStartPractice }) => {
   const { t } = useLocalization();
-  const homeworkItems = items.filter(item => item.type === 'HOMEWORK') as HomeworkData[];
+  const homeworkItems = items.filter(item => item && item.type === 'HOMEWORK' && item.CARD_TITLE) as HomeworkData[];
   
   if (homeworkItems.length === 0) {
       return null;
