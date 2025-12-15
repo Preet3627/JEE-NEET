@@ -323,7 +323,28 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             return;
         }
 
-        setDeepLinkData(data); // Trigger modal via local state
+        // Check for schedules/schedule (AI sometimes uses singular)
+        if (data.schedules?.length || data.schedule?.length) {
+            // Normalize to 'schedules' array
+            const normalizedData = {
+                ...data,
+                schedules: data.schedules || data.schedule || [],
+                exams: data.exams || [],
+                results: data.results || [],
+                weaknesses: data.weaknesses || []
+            };
+
+            // Remove singular 'schedule' if it exists
+            delete normalizedData.schedule;
+
+            // Trigger the DeepLinkConfirmationModal via deepLinkAction
+            setDeepLinkAction({ action: 'import_data', data: normalizedData });
+            closeModal('AIParserModal');
+            return;
+        }
+
+        // Fallback for any other data structure
+        setDeepLinkData(data);
         closeModal('AIParserModal');
     };
 

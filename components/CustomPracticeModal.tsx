@@ -42,7 +42,7 @@ const parseAnswers = (text: string): Record<string, string | string[]> => {
   }
 
   // Check for key-value pair format (e.g., "1:A, 2:C")
-  if (/[:=,;\n]/.test(text) && !text.includes(' ') ) { // Allow : or = as separator and newline/semicolon
+  if (/[:=,;\n]/.test(text) && !text.includes(' ')) { // Allow : or = as separator and newline/semicolon
     const entries = text.split(/[,;\n]/);
     entries.forEach(entry => {
       const parts = entry.split(/[:=]/); // Allow : or = as separator
@@ -50,11 +50,11 @@ const parseAnswers = (text: string): Record<string, string | string[]> => {
         const qNum = parts[0].trim();
         const answer = parts[1].trim();
         if (qNum && answer) {
-            if (answer.startsWith('[') && answer.endsWith(']')) {
-                answers[qNum] = answer.slice(1, -1).split(',');
-            } else {
-                answers[qNum] = answer;
-            }
+          if (answer.startsWith('[') && answer.endsWith(']')) {
+            answers[qNum] = answer.slice(1, -1).split(',');
+          } else {
+            answers[qNum] = answer;
+          }
         }
       }
     });
@@ -135,39 +135,37 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
 
   const handleStart = async () => {
     setError('');
-    
+
     // Manual Tab: Generate questions from homework context
     if (activeTab === 'manual') {
       if (totalQuestions > 0 && initialTask) {
         setIsLoading(true);
         try {
-            const result = await api.generatePracticeTest({
-              topic: `Practice questions on ${initialTask.CARD_TITLE.EN} for ${initialTask.SUBJECT_TAG.EN}`,
-              numQuestions: totalQuestions,
-              difficulty: 'Medium',
-              questionTypes: ['MCQ', 'NUM'],
-              isPYQ: false,
-              chapters: [],
-              examType: student?.CONFIG.settings.examType,
-              userId: student?.sid,
-            });
-            if (result.questions && result.answers) {
-                setPracticeMode('custom');
-                setPracticeQuestions(result.questions);
-                setPracticeAnswers(result.answers);
-                setSyllabus(initialTask.CARD_TITLE.EN); // Set syllabus for context
-                setCategory('Homework Practice');
-                setIsTimerStarted(true);
-            } else {
-                throw new Error("AI failed to return a valid test format.");
-            }
+          const result = await api.generatePracticeTest({
+            topic: `Practice questions on ${initialTask.CARD_TITLE.EN} for ${initialTask.SUBJECT_TAG.EN}`,
+            numQuestions: totalQuestions,
+            difficulty: 'Medium',
+            questionTypes: ['MCQ', 'NUM'],
+            isPYQ: false,
+            chapters: [],
+          });
+          if (result.questions && result.answers) {
+            setPracticeMode('custom');
+            setPracticeQuestions(result.questions);
+            setPracticeAnswers(result.answers);
+            setSyllabus(initialTask.CARD_TITLE.EN); // Set syllabus for context
+            setCategory('Homework Practice');
+            setIsTimerStarted(true);
+          } else {
+            throw new Error("AI failed to return a valid test format.");
+          }
         } catch (err: any) {
-            setError(err.error || 'Failed to generate practice questions. You can still practice without question text by using the provided answer key.');
-            setIsLoading(false); // Make sure loading is off
-            alert("Failed to generate questions. Please check your AI/backend configuration and try again. You can still use manual mode with an answer key.");
-            return; // Stay on the modal
+          setError(err.error || 'Failed to generate practice questions. You can still practice without question text by using the provided answer key.');
+          setIsLoading(false); // Make sure loading is off
+          alert("Failed to generate questions. Please check your AI/backend configuration and try again. You can still use manual mode with an answer key.");
+          return; // Stay on the modal
         } finally {
-            setIsLoading(false);
+          setIsLoading(false);
         }
       } else if (totalQuestions === 0) {
         alert('Please enter valid question ranges.');
@@ -194,16 +192,14 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
 
     setIsLoading(true);
     try {
-        const result = await api.generatePracticeTest({
-          topic: aiTopic,
-          numQuestions: aiNumQuestions,
-          difficulty: aiDifficulty,
-          questionTypes: aiQuestionTypes,
-          isPYQ: aiIsPYQ,
-          chapters: aiPYQChapters,
-          examType: student?.CONFIG.settings.examType,
-          userId: student?.sid,
-        });
+      const result = await api.generatePracticeTest({
+        topic: aiTopic,
+        numQuestions: aiNumQuestions,
+        difficulty: aiDifficulty,
+        questionTypes: aiQuestionTypes,
+        isPYQ: aiIsPYQ,
+        chapters: aiPYQChapters,
+      });
       if (result.questions && result.answers) {
         setPracticeMode('custom');
         setPracticeQuestions(result.questions);
@@ -255,7 +251,7 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
         const txt = evt.target?.result as string;
         const json = JSON.parse(txt);
         // Using parseAnswers to handle both string and string[]
-        const formatted = formatAnswers(parseAnswers(JSON.stringify(json))); 
+        const formatted = formatAnswers(parseAnswers(JSON.stringify(json)));
         setCorrectAnswersText(formatted);
       } catch {
         alert("Invalid JSON file.");
@@ -326,19 +322,19 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
   }, [correctAnswersText, jeeMainsCorrectAnswersText, initialTask, activeTab]);
 
   const handleQuestionTypeChange = (type: 'MCQ' | 'NUM' | 'MULTI_CHOICE', isChecked: boolean) => {
-    setAiQuestionTypes(prev => 
+    setAiQuestionTypes(prev =>
       isChecked ? [...prev, type] : prev.filter(t => t !== type)
     );
   };
 
   const handlePYQChapterChange = (chapter: string, isChecked: boolean) => {
-    setAiPYQChapters(prev => 
+    setAiPYQChapters(prev =>
       isChecked ? [...prev, chapter] : prev.filter(c => c !== chapter)
     );
   };
 
 
-   return (
+  return (
     <div
       className={`fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${animationClasses}`}
       style={
@@ -380,20 +376,14 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
                 practiceQuestions
                   ? practiceQuestions.map((q) => q.number)
                   : practiceMode === 'jeeMains'
-                  ? Array.from({ length: 75 }, (_, i) => i + 1)
-                  : questionNumbers
+                    ? Array.from({ length: 75 }, (_, i) => i + 1)
+                    : questionNumbers
               }
               questions={practiceQuestions || undefined}
               perQuestionTime={perQuestionTime}
               onClose={handleClose}
               onSessionComplete={async (duration: number, solved: number, skipped: number[]) => {
-                const session = {
-                    date: new Date().toISOString().split('T')[0],
-                    duration,
-                    questions_solved: solved,
-                    questions_skipped: skipped,
-                };
-                await onSessionComplete(session);
+                await onSessionComplete(duration, solved, skipped);
               }}
               practiceMode={practiceMode}
               subject={subject}
@@ -405,11 +395,224 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
               correctAnswers={practiceAnswers || correctAnswers}
               onSaveTask={onSaveTask}
               initialTask={initialTask}
-              weaknesses={student?.CONFIG.WEAK || []}
             />
           ) : (
-            <div>
-              {/* ALL YOUR TAB CONTENT REMAINS UNCHANGED */}
+            <div className="space-y-6">
+              {/* Tab Navigation */}
+              <div className="flex p-1 bg-gray-900/50 rounded-xl border border-white/10">
+                {(['ai', 'manual', 'jeeMains'] as const).map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${activeTab === tab
+                      ? 'bg-[var(--accent-color)] text-white shadow-lg'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                      }`}
+                  >
+                    {tab === 'ai' ? 'AI Generate' : tab === 'manual' ? 'Manual / Homework' : 'JEE Mains Mock'}
+                  </button>
+                ))}
+              </div>
+
+              {/* AI Tab */}
+              {activeTab === 'ai' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="bg-purple-900/10 border border-purple-500/20 rounded-xl p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-bold text-white flex items-center gap-2">
+                        <Icon name="sparkles" className="text-purple-400" />
+                        AI Test Generator
+                      </h3>
+                      <button onClick={() => setIsAiParserOpen(true)} className="text-xs text-cyan-400 hover:underline">
+                        Import from Text
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 mb-4">
+                      Auto-generate questions based on any topic.
+                    </p>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Topic</label>
+                        <input
+                          value={aiTopic}
+                          onChange={(e) => setAiTopic(e.target.value)}
+                          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:border-purple-500 focus:outline-none"
+                          placeholder="e.g. Rotational Motion, Thermodynamics"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Questions</label>
+                          <select value={aiNumQuestions} onChange={(e) => setAiNumQuestions(Number(e.target.value))} className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                            <option value={5}>5 Questions</option>
+                            <option value={10}>10 Questions</option>
+                            <option value={20}>20 Questions</option>
+                            <option value={30}>30 Questions</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Difficulty</label>
+                          <select value={aiDifficulty} onChange={(e) => setAiDifficulty(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                            <option value="Easy">Easy</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Hard">Hard</option>
+                            <option value="JEE Advanced">JEE Advanced</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-4 pt-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={aiQuestionTypes.includes('MCQ')} onChange={(e) => handleQuestionTypeChange('MCQ', e.target.checked)} className="rounded bg-gray-700 border-gray-600 text-purple-600" />
+                          <span className="text-sm text-gray-300">MCQ</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={aiQuestionTypes.includes('NUM')} onChange={(e) => handleQuestionTypeChange('NUM', e.target.checked)} className="rounded bg-gray-700 border-gray-600 text-purple-600" />
+                          <span className="text-sm text-gray-300">Numerical</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleStart}
+                    disabled={isLoading}
+                    className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white font-bold shadow-lg hover:shadow-purple-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
+                  >
+                    {isLoading ? 'Generating...' : 'Start AI Practice'}
+                  </button>
+                </div>
+              )}
+
+              {/* Manual Tab */}
+              {activeTab === 'manual' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="bg-cyan-900/10 border border-cyan-500/20 rounded-xl p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-bold text-white flex items-center gap-2">
+                        <Icon name="list" className="text-cyan-400" />
+                        Custom / Homework
+                      </h3>
+                    </div>
+                    <p className="text-xs text-gray-400 mb-4">
+                      Practice specific question ranges from your material.
+                    </p>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Subject</label>
+                        <select value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white">
+                          <option value="PHYSICS">Physics</option>
+                          <option value="CHEMISTRY">Chemistry</option>
+                          <option value="MATHS">Maths</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Question Ranges</label>
+                        <input
+                          value={qRanges}
+                          onChange={(e) => setQRanges(e.target.value)}
+                          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white font-mono placeholder-gray-600"
+                          placeholder="e.g. 1-10, 15, 20-25"
+                        />
+                        <p className="text-[10px] text-gray-500 mt-1">
+                          Total Questions: <span className="text-white font-bold">{totalQuestions}</span>
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Per Question Timer</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            value={perQuestionTime}
+                            onChange={(e) => setPerQuestionTime(Number(e.target.value))}
+                            className="w-24 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-center"
+                            min="10"
+                          />
+                          <span className="text-sm text-gray-400">seconds</span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t border-white/5">
+                        <div className="flex justify-between items-center mb-2">
+                          <label className="block text-xs font-bold text-gray-500 uppercase">Answer Key (Optional)</label>
+                          <div className="flex gap-2">
+                            <button onClick={() => setIsAiKeyModalOpen(true)} className="text-[10px] bg-purple-600/20 text-purple-300 px-2 py-0.5 rounded hover:bg-purple-600/40">AI Scan</button>
+                            <button onClick={() => fileInputRef.current?.click()} className="text-[10px] bg-cyan-600/20 text-cyan-300 px-2 py-0.5 rounded hover:bg-cyan-600/40">Upload JSON</button>
+                          </div>
+                          <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".json,.txt" />
+                        </div>
+                        <textarea
+                          value={correctAnswersText}
+                          onChange={(e) => setCorrectAnswersText(e.target.value)}
+                          className="w-full h-24 bg-gray-900 border border-gray-700 rounded-lg p-3 font-mono text-xs focus:border-cyan-500 focus:outline-none"
+                          placeholder="1:A&#10;2:B&#10;3:C..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleStart}
+                    disabled={totalQuestions === 0}
+                    className="w-full py-3 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl text-white font-bold shadow-lg hover:shadow-cyan-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Start Practice Session
+                  </button>
+                </div>
+              )}
+
+              {/* JEE Mains Tab */}
+              {activeTab === 'jeeMains' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="bg-yellow-900/10 border border-yellow-500/20 rounded-xl p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-bold text-white flex items-center gap-2">
+                        <Icon name="trophy" className="text-yellow-400" />
+                        Full Mock Test
+                      </h3>
+                    </div>
+                    <p className="text-xs text-gray-400 mb-4">
+                      Standard 75 Questions (300 Marks) 3-Hour Test pattern.
+                    </p>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Syllabus / Test Name</label>
+                        <input
+                          value={syllabus}
+                          onChange={(e) => setSyllabus(e.target.value)}
+                          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:border-yellow-500 focus:outline-none"
+                          placeholder="e.g. Full Syllabus Mock 5"
+                        />
+                      </div>
+
+                      <div className="pt-2 border-t border-white/5">
+                        <div className="flex justify-between items-center mb-2">
+                          <label className="block text-xs font-bold text-gray-500 uppercase">Answer Key (Optional)</label>
+                          <button onClick={() => jeeMainsFileInputRef.current?.click()} className="text-[10px] bg-yellow-600/20 text-yellow-300 px-2 py-0.5 rounded hover:bg-yellow-600/40">Upload JSON</button>
+                          <input type="file" ref={jeeMainsFileInputRef} onChange={handleJeeMainsFileUpload} className="hidden" accept=".json,.txt" />
+                        </div>
+                        <textarea
+                          value={jeeMainsCorrectAnswersText}
+                          onChange={(e) => setJeeMainsCorrectAnswersText(e.target.value)}
+                          className="w-full h-24 bg-gray-900 border border-gray-700 rounded-lg p-3 font-mono text-xs focus:border-yellow-500 focus:outline-none"
+                          placeholder="1:A&#10;2:B..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleStart}
+                    disabled={!syllabus}
+                    className="w-full py-3 bg-gradient-to-r from-yellow-600 to-orange-600 rounded-xl text-white font-bold shadow-lg hover:shadow-yellow-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Start Mock Test
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -432,8 +635,8 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
         <AIParserModal
           onClose={() => setIsAiParserOpen(false)}
           onDataReady={handleDataFromParser}
-          onPracticeTestReady={() => {}}
-          onOpenGuide={() => {}}
+          onPracticeTestReady={() => { }}
+          onOpenGuide={() => { }}
         />
       )}
     </div>

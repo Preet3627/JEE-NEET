@@ -225,10 +225,14 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
 
     try {
       onSave(finalTask);
-      handleClose();
+      // Use setTimeout to ensure save completes before closing
+      setTimeout(() => handleClose(), 100);
     } catch (error) {
       console.error("Error saving task:", error);
     }
+
+    // Prevent any default form behavior
+    return false;
   };
 
   const handleDeleteTask = () => {
