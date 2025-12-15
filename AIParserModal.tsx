@@ -3,6 +3,7 @@ import React, { useState, useRef } from 'react';
 import Icon from './components/Icon';
 import { api } from './api/apiService';
 import { useAuth } from './context/AuthContext';
+import { tryParseJson, nonAIFallbackCorrection } from '../utils/jsonParser'; // New Import
 
 interface AIParserModalProps {
   onClose: () => void;
@@ -48,54 +49,78 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
         }
     };
 
-    // Attempt 1: Parse as valid JSON (works offline)
-    try {
-      const jsonData = JSON.parse(text);
-      if (jsonData && typeof jsonData === 'object') {
-        // Check if it contains any of our expected top-level keys
-        if (jsonData.flashcard_deck || jsonData.homework_assignment || jsonData.practice_test || jsonData.schedules?.length || jsonData.exams?.length || jsonData.metrics?.length) {
-          handleResult(jsonData);
-          setIsLoading(false);
-          return;
+    let parsedData: any = null;
+    let attemptedCorrection = false;
+
+    // Attempt 1: Pure Offline JSON parse
+    parsedData = tryParseJson(text);
+    if (parsedData) {
+        if (parsedData.flashcard_deck || parsedData.homework_assignment || parsedData.practice_test || parsedData.schedules?.length || parsedData.exams?.length || parsedData.metrics?.length) {
+            handleResult(parsedData);
+            setIsLoading(false);
+            return;
         }
-      }
-    } catch (e) {
-      // Not valid JSON, proceed to AI parsing.
     }
 
-    // Attempt 2: If it looks like broken JSON, try to correct it online
-    if (text.startsWith('{') || text.startsWith('[')) {
-      try {
-        const correctionResult = await api.correctJson(text);
-        const correctedData = JSON.parse(correctionResult.correctedJson);
-        if (correctedData && Object.keys(correctedData).length > 0) {
-            handleResult(correctedData);
-            setIsLoading(false);
-            return;
+    // Attempt 2: Non-AI Heuristic Correction (On-device small AI)
+    // Only try if initial parse failed and it looks like JSON
+    if (!parsedData && (text.startsWith('{') || text.startsWith('['))) {
+        attemptedCorrection = true;
+        const nonAICorrectedText = nonAIFallbackCorrection(text);
+        parsedData = tryParseJson(nonAICorrectedText);
+        if (parsedData) {
+            if (parsedData.flashcard_deck || parsedData.homework_assignment || parsedData.practice_test || parsedData.schedules?.length || parsedData.exams?.length || parsedData.metrics?.length) {
+                handleResult(parsedData);
+                setIsLoading(false);
+                return;
+            }
         }
-      } catch (correctionError: any) {
-        console.warn("AI JSON correction failed, falling back to text parser:", correctionError);
-        if (correctionError && typeof correctionError === 'object' && 'error' in correctionError && correctionError.error === 'AI_QUOTA_EXCEEDED') {
-            setError("AI JSON correction service temporarily unavailable due to quota limits. Please try basic parsing or manual input.");
-            setIsLoading(false);
-            return;
-        }
-      }
     }
     
-    // Attempt 3: Fallback to parsing as unstructured text online
+    // Attempt 3: If it still looks like broken JSON, try to correct it online with AI
+    // Only try if previous attempts failed and it looks like JSON
+    if (!parsedData && (text.startsWith('{') || text.startsWith('['))) {
+        attemptedCorrection = true;
+        try {
+            const correctionResult = await api.correctJson(text); // Pass original text, AI might be better
+            const correctedData = tryParseJson(correctionResult.correctedJson); // Use tryParseJson
+            if (correctedData) { // Check if AI corrected JSON is valid
+                if (correctedData.flashcard_deck || correctedData.homework_assignment || correctedData.practice_test || correctedData.schedules?.length || correctedData.exams?.length || correctedData.metrics?.length) {
+                    handleResult(correctedData);
+                    setIsLoading(false);
+                    return;
+                }
+            }
+             // If AI corrected but no actionable data found, fall through to text parser.
+        } catch (correctionError: any) {
+            console.warn("AI JSON correction failed, falling back to text parser:", correctionError);
+            if (correctionError && typeof correctionError === 'object' && 'error' in correctionError && correctionError.error === 'AI_QUOTA_EXCEEDED') {
+                setError("AI JSON correction service temporarily unavailable due to quota limits. Please try basic parsing or manual input.");
+                setIsLoading(false);
+                return; // Exit here if AI quota is exceeded for this step
+            }
+            // If other error, proceed to next attempt.
+        }
+    }
+    
+    // Attempt 4: Fallback to parsing as unstructured text online with AI
     try {
-      const result = await api.parseText(text, window.location.origin);
-      handleResult(result);
+        const result = await api.parseText(text, window.location.origin);
+        handleResult(result);
     } catch (parseError: any) {
-      console.error("AI Parser error:", parseError);
-      let errorMessage = parseError.error || 'Failed to parse data. The AI service may be unavailable or the format is unrecognized.';
-      if (parseError && typeof parseError === 'object' && 'error' in parseError && parseError.error === 'AI_QUOTA_EXCEEDED') {
-          errorMessage = "AI parsing service temporarily unavailable due to quota limits or maintenance. Please try again later or use JSON input.";
-      }
-      setError(errorMessage);
+        console.error("AI Parser error:", parseError);
+        let errorMessage = parseError.error || 'Failed to parse data. The AI service may be unavailable or the format is unrecognized.';
+        if (parseError && typeof parseError === 'object' && 'error' in parseError && parseError.error === 'AI_QUOTA_EXCEEDED') {
+            errorMessage = "AI parsing service temporarily unavailable due to quota limits or maintenance. Please try again later or use JSON input.";
+        }
+        setError(errorMessage);
     } finally {
       setIsLoading(false);
+    }
+
+    if (!parsedData && !attemptedCorrection) {
+        // If it didn't look like JSON and plain text AI parsing also failed.
+        setError("Could not parse data. Ensure it's valid JSON or natural language description.");
     }
   };
   

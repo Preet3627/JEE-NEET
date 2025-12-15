@@ -74,14 +74,14 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = ({
   const [qRanges, setQRanges] = useState(initialTask?.Q_RANGES || '');
   const [subject] = useState(initialTask?.SUBJECT_TAG.EN || 'PHYSICS');
   const [category] = useState(
-    initialTask ? 'Homework Practice' : 'AI Generated'
+    initialTask ? 'Homework Practice' : (aiPracticeTest ? 'AI Generated' : '') // Adjust category if AI generated test is present
   );
 
-  const [isTimerStarted, setIsTimerStarted] = useState(false);
+  const [isTimerStarted, setIsTimerStarted] = useState(!!aiPracticeTest); // Start timer automatically if aiPracticeTest is provided
   const [practiceQuestions, setPracticeQuestions] =
-    useState<PracticeQuestion[] | null>(null);
-  const [practiceAnswers] =
-    useState<Record<string, string | string[]> | null>(null);
+    useState<PracticeQuestion[] | null>(aiPracticeTest?.questions || null); // Initialize with aiPracticeTest questions
+  const [practiceAnswers, setPracticeAnswers] =
+    useState<Record<string, string | string[]> | null>(aiPracticeTest?.answers || null); // Initialize with aiPracticeTest answers
 
   const [isExiting, setIsExiting] = useState(false);
   const [isAiKeyModalOpen, setIsAiKeyModalOpen] = useState(false);

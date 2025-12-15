@@ -345,7 +345,11 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
             if (onLogResult) onLogResult(newResult);
 
         } catch (error: any) {
-            setGradingError(error.error || "Failed to grade answers. Please try again.");
+            let errorMessage = error.error || "Failed to grade answers. Please try again.";
+            if (error && typeof error === 'object' && 'error' in error && error.error === 'AI_QUOTA_EXCEEDED') {
+                errorMessage = "AI grading service temporarily unavailable due to quota limits or maintenance. Please try again later.";
+            }
+            setGradingError(errorMessage);
         } finally {
             setIsGrading(false);
             setIsUploadingKey(false);

@@ -584,6 +584,7 @@ const App: React.FC = () => {
   const handleUpdateConfig = useCallback(async (config: Partial<Config>) => {
     if (!currentUser) return;
     setIsSyncing(true);
+    console.log('handleUpdateConfig received config:', config); // Debug log
     try {
       await api.updateConfig(config);
       await refreshUser();
