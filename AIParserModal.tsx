@@ -73,8 +73,13 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
             setIsLoading(false);
             return;
         }
-      } catch (correctionError) {
+      } catch (correctionError: any) {
         console.warn("AI JSON correction failed, falling back to text parser:", correctionError);
+        if (correctionError && typeof correctionError === 'object' && 'error' in correctionError && correctionError.error === 'AI_QUOTA_EXCEEDED') {
+            setError("AI JSON correction service temporarily unavailable due to quota limits. Please try basic parsing or manual input.");
+            setIsLoading(false);
+            return;
+        }
       }
     }
     
@@ -84,7 +89,11 @@ const AIParserModal: React.FC<AIParserModalProps> = ({ onClose, onDataReady, onP
       handleResult(result);
     } catch (parseError: any) {
       console.error("AI Parser error:", parseError);
-      setError(parseError.error || 'Failed to parse data. The AI service may be unavailable or the format is unrecognized.');
+      let errorMessage = parseError.error || 'Failed to parse data. The AI service may be unavailable or the format is unrecognized.';
+      if (parseError && typeof parseError === 'object' && 'error' in parseError && parseError.error === 'AI_QUOTA_EXCEEDED') {
+          errorMessage = "AI parsing service temporarily unavailable due to quota limits or maintenance. Please try again later or use JSON input.";
+      }
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

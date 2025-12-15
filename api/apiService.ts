@@ -3,11 +3,15 @@ import { StudentData, ScheduleItem, Config, ResultData, ExamData, DoubtData, Stu
 const API_URL = '/api';
 
 // This function will handle responses, safely parsing JSON or text.
-const handleResponse = async (res: Response) => {
+const handleResponse = async (res: Response, url: string) => {
     const responseText = await res.text();
     if (!res.ok) {
         try {
             const errorJson = JSON.parse(responseText);
+            // Check for AI-specific quota error
+            if (res.status === 429 && url.includes('/ai/')) {
+                return { error: 'AI_QUOTA_EXCEEDED', message: errorJson.error || 'AI service temporarily unavailable due to quota limits.' };
+            }
             throw errorJson; // Throw the whole object
         } catch {
             throw new Error(responseText || `HTTP error! status: ${res.status}`);
@@ -54,7 +58,7 @@ export const authFetch = async (url: string, options: RequestInit = {}) => {
         if ((options as { returnRawResponse?: boolean }).returnRawResponse) { // Custom option to signal raw response needed
             return response;
         }
-        return handleResponse(response);
+        return handleResponse(response, url); // Pass the url here
     } catch (error) {
         console.warn('API call failed, request might be queued. Make sure the backend is running and accessible.', error);
         // Offline queueing logic could be implemented here if needed

@@ -1141,6 +1141,7 @@ const App: React.FC = () => {
           />
           
           {userRole === 'student' && currentUser ? (
+            console.log('currentUser.SCHEDULE_ITEMS:', currentUser.SCHEDULE_ITEMS),
             <StudentDashboard
               student={currentUser}
               onSaveTask={handleSaveTask}
@@ -1208,7 +1209,7 @@ const App: React.FC = () => {
         {isExamModalOpen && <CreateEditExamModal exam={editingExam} onClose={() => closeModal('CreateEditExamModal')} onSave={(exam) => editingExam ? handleUpdateExam(exam) : handleAddExam(exam)} />}
         {isAiMistakeModalOpen && <AIMistakeAnalysisModal onClose={() => closeModal('AIMistakeAnalysisModal')} onSaveWeakness={handleUpdateWeaknesses} />}
         {isAiDoubtSolverOpen && <AIDoubtSolverModal onClose={() => closeModal('AIDoubtSolverModal')} />}
-        {isAiChatOpen && <AIChatPopup history={aiChatHistory} onSendMessage={(p, img) => api.aiChat({ history: aiChatHistory, prompt: p, imageBase64: img, domain: window.location.origin }).then(res => setAiChatHistory(prev => [...prev, res])).catch(e => setAiChatHistory(prev => [...prev, { role: 'model', parts: [{ text: `Error: ${e.message}` }] }]))} onClose={() => closeModal('AIChatPopup')} isLoading={isAiChatLoading} />}
+        {isAiChatOpen && <AIChatPopup history={aiChatHistory} onSendMessage={handleAiChatMessage} onClose={() => closeModal('AIChatPopup')} isLoading={isAiChatLoading} />}
         {viewingReport && <TestReportModal result={viewingReport} onClose={() => closeModal('TestReportModal')} onUpdateWeaknesses={handleUpdateWeaknesses} student={currentUser} onSaveDeck={handleSaveDeck} />}
         {isMoveModalOpen && <MoveTasksModal onClose={() => closeModal('MoveTasksModal')} onConfirm={handleMoveSelectedTasks} selectedCount={selectedTaskIds.length} selectedTaskIds={selectedTaskIds} />}
         {isMusicLibraryOpen && <MusicLibraryModal onClose={() => closeModal('MusicLibraryModal')} />}

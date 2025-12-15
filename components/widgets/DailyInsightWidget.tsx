@@ -32,11 +32,15 @@ const DailyInsightWidget: React.FC<DailyInsightWidgetProps> = ({ weaknesses, exa
             // FIX: Ensure `api.getDailyInsight` exists
             const result = await api.getDailyInsight({ weaknesses, syllabus });
             setInsight(result);
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
             const randomQuote = motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)];
             setInsight({ quote: randomQuote, insight: "Keep pushing forward! Every small step counts towards your big goal." });
-            // setError('Could not load AI insight, showing a quote instead.'); // Error removed as requested
+            if (err && typeof err === 'object' && 'error' in err && err.error === 'AI_QUOTA_EXCEEDED') {
+                setError('AI insight service temporarily unavailable due to quota limits. Showing a quote instead.');
+            } else {
+                setError('Could not load AI insight, showing a quote instead.');
+            }
         } finally {
             setIsLoading(false);
         }
@@ -54,6 +58,7 @@ const DailyInsightWidget: React.FC<DailyInsightWidgetProps> = ({ weaknesses, exa
                     <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 </div>
             )}
+            {error && <p className="text-sm text-red-400 mt-2 text-center">{error}</p>}
             {insight && (
                 <div className="space-y-4">
                     <p className="text-lg font-medium text-gray-300 italic text-center">"{insight.quote}"</p>

@@ -60,7 +60,11 @@ const AIMistakeAnalysisModal: React.FC<AIMistakeAnalysisModalProps> = ({ onClose
       const parsedResult = JSON.parse(result.response);
       setAnalysisResult(parsedResult);
     } catch (err: any) {
-      setError(err.error || 'An error occurred. The AI service may be misconfigured or unavailable.');
+      let errorMessage = err.error || 'An error occurred. The AI service may be misconfigured or unavailable.';
+      if (err && typeof err === 'object' && 'error' in err && err.error === 'AI_QUOTA_EXCEEDED') {
+          errorMessage = "AI mistake analysis service temporarily unavailable due to quota limits or maintenance. Please try again later.";
+      }
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

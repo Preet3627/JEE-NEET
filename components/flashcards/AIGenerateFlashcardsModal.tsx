@@ -48,7 +48,11 @@ const AIGenerateFlashcardsModal: React.FC<AIGenerateFlashcardsModalProps> = ({ s
       setGeneratedCards(cardsWithIds);
     } catch (err: any) {
       console.error(err);
-      setError(err.error || 'Failed to generate flashcards. AI service may be unavailable.');
+      let errorMessage = err.error || 'Failed to generate flashcards. AI service may be unavailable.';
+      if (err && typeof err === 'object' && 'error' in err && err.error === 'AI_QUOTA_EXCEEDED') {
+          errorMessage = "AI flashcard generation service temporarily unavailable due to quota limits or maintenance. Please try again later.";
+      }
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

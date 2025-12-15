@@ -234,8 +234,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             } else {
                 throw new Error("AI failed to return a valid test format.");
             }
-        } catch (error) {
-            alert("Failed to generate a practice test for your weaknesses. Please try again.");
+        } catch (error: any) {
+            let errorMessage = "Failed to generate a practice test for your weaknesses. Please try again.";
+            if (error && typeof error === 'object' && 'error' in error && error.error === 'AI_QUOTA_EXCEEDED') {
+                errorMessage = "AI service temporarily unavailable for practice test generation due to quota limits or maintenance. Please try again later.";
+            }
+            alert(errorMessage);
             console.error(error);
         } finally {
             setIsGeneratingPractice(false);
