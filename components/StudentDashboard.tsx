@@ -57,6 +57,7 @@ import ClockWidget from './widgets/ClockWidget';
 import CustomWidget from './widgets/CustomWidget';
 import PracticeLauncherWidget from './widgets/PracticeLauncherWidget';
 import UniversalSearch from './UniversalSearch';
+import WidgetSelectorModal from './WidgetSelectorModal'; // Import WidgetSelectorModal
 
 interface ModalControlProps {
     openModal: (modalId: string, setter: React.Dispatch<React.SetStateAction<boolean>> | ((val: any) => void), initialValue?: any) => void;
@@ -96,6 +97,7 @@ interface ModalControlProps {
     isCreateDeckModalOpen: boolean; setCreateDeckModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     // FIX: Added missing isAiFlashcardModalOpen and its setter to ModalControlProps
     isAiFlashcardModalOpen: boolean; setAiFlashcardModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isWidgetSelectorModalOpen: boolean; setIsWidgetSelectorModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     editingDeck: FlashcardDeck | null; setEditingDeck: React.Dispatch<React.SetStateAction<FlashcardDeck | null>>;
     viewingDeck: FlashcardDeck | null; setViewingDeck: React.Dispatch<React.SetStateAction<FlashcardDeck | null>>;
     isCreateCardModalOpen: boolean; setCreateCardModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -187,6 +189,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         isMusicLibraryOpen, setIsMusicLibraryOpen,
         analyzingMistake, setAnalyzingMistake,
         handleMoveSelected, handleSaveDeck, handleDeleteCard, handleSaveCard,
+        isWidgetSelectorModalOpen, setIsWidgetSelectorModalOpen,
     } = props;
     const { refreshUser } = useAuth();
     const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
@@ -423,6 +426,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         onUpdateConfig({ settings: { ...student.CONFIG.settings, dashboardLayout: newWidgets } });
     };
 
+    const handleSaveDashboardLayout = (newLayout: DashboardWidgetItem[]) => {
+        setDashboardWidgets(newLayout);
+        onUpdateConfig({ settings: { ...student.CONFIG.settings, dashboardLayout: newLayout } });
+        closeModal('WidgetSelectorModal'); // Close after saving
+    };
+
     const renderDashboardContent = () => {
         const widgetComponents: Record<string, React.ReactNode> = {
             'clock': <ClockWidget items={student.SCHEDULE_ITEMS} />,
@@ -458,6 +467,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             'homework': <HomeworkWidget items={student.SCHEDULE_ITEMS} onStartPractice={handleStartPractice} />,
             'visualizer': <MusicVisualizerWidget />,
             'weather': <WeatherWidget />,
+            'achievements': <AchievementsWidget student={student} allDoubts={allDoubts} />
         };
 
         student.CONFIG.customWidgets?.forEach(cw => {
@@ -476,7 +486,15 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                     />
                 )}
                 
-                <div className="relative z-10 mb-4 flex justify-end">
+                <div className="relative z-10 mb-4 flex justify-end gap-2">
+                    {isEditLayoutMode && (
+                        <button 
+                            onClick={() => openModal('WidgetSelectorModal', setIsWidgetSelectorModalOpen, true)} 
+                            className="px-4 py-1.5 text-xs font-bold rounded-full flex items-center gap-2 transition-colors shadow-lg backdrop-blur-md bg-purple-600/50 text-white hover:bg-purple-700/50"
+                        >
+                            <Icon name="plus-circle" className="w-3 h-3" /> Add/Remove Widgets
+                        </button>
+                    )}
                     <button 
                         onClick={() => setIsEditLayoutMode(!isEditLayoutMode)} 
                         className={`px-4 py-1.5 text-xs font-bold rounded-full flex items-center gap-2 transition-colors shadow-lg backdrop-blur-md ${isEditLayoutMode ? 'bg-green-600 text-white' : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50'}`}
@@ -654,6 +672,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                     results: deepLinkData.results || [],
                     weaknesses: deepLinkData.weaknesses || []
                 })} />
+            )}
+
+            {isWidgetSelectorModalOpen && (
+                <WidgetSelectorModal 
+                    currentLayout={dashboardWidgets}
+                    onSaveLayout={handleSaveDashboardLayout}
+                    onClose={() => closeModal('WidgetSelectorModal')}
+                />
             )}
         </main>
     );

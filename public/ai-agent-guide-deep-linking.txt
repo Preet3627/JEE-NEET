@@ -1,0 +1,170 @@
+# AI Data Import & Deep Linking Guide
+
+This guide details how to integrate the Gemini AI with the JEE Scheduler Pro PWA, enabling voice-driven actions and structured data import through deep linking and function calling.
+
+## 1. Data Import via JSON Parsing
+
+The AI Import modal (accessible via the Gemini icon in the top right of the dashboard) can interpret structured text, including JSON, to create schedule items, practice tests, or flashcard decks.
+
+**Purpose:** To allow users to quickly add complex data using natural language or structured formats.
+
+**How it works:** When you paste text, the PWA sends it to a Gemini model (e.g., `gemini-2.5-flash`) via the `/api/ai/parse-text` endpoint. The model is prompted to extract specific JSON structures.
+
+### Supported JSON Structures (Examples):
+
+#### a) Schedules
+
+**Description:** Define daily study actions or homework.
+**Example (JSON):**
+```json
+{
+  "schedules": [
+    {
+      "day": "Monday",
+      "time": "19:00",
+      "title": "Chemistry Practice",
+      "detail": "Focus on Organic Chemistry name reactions.",
+      "subject": "CHEMISTRY",
+      "type": "ACTION",
+      "sub_type": "DEEP_DIVE"
+    },
+    {
+      "day": "Tuesday",
+      "title": "Physics Homework",
+      "subject": "PHYSICS",
+      "type": "HOMEWORK",
+      "q_ranges": "1-25"
+    }
+  ]
+}
+```
+
+**Example (Plain Text - AI will parse to similar JSON):**
+```
+- Wednesday 9am physics deep dive on rotational motion
+- Friday 8pm solve maths homework, questions 1-20 from chapter on matrices
+```
+
+#### b) Practice Tests
+
+**Description:** Generate or import structured practice questions and answer keys.
+**Example (JSON):**
+```json
+{
+  "practice_test": {
+    "questions": [
+      { "number": 1, "text": "What is the capital of France?", "options": ["Berlin", "Madrid", "Paris", "Rome"], "type": "MCQ" },
+      { "number": 2, "text": "Solve for x: 2x + 3 = 7", "type": "NUM" }
+    ],
+    "answers": {
+      "1": "C",
+      "2": "2"
+    }
+  }
+}
+```
+
+**Example (Plain Text - AI will parse to similar JSON):**
+```
+- Homework: Physics, Circular Motion, questions 1-35. Answers are A, C, B, D...
+- Practice Test: Maths, 10 questions on calculus.
+```
+
+#### c) Flashcard Decks
+
+**Description:** Import or generate flashcards for quick review.
+**Example (JSON):**
+```json
+{
+  "flashcard_deck": {
+    "name": "Key Physics Formulas",
+    "subject": "PHYSICS",
+    "cards": [
+      { "front": "Force equals?", "back": "Mass times Acceleration (F=ma)" },
+      { "front": "Kinetic Energy formula?", "back": "1/2 * mv^2" }
+    ]
+  }
+}
+```
+
+## 2. PWA Deep Linking & Gemini Function Calling
+
+**Purpose:** To integrate AI on Google Search (powered by Gemini models) with the PWA, enabling voice-driven actions and navigation through deep linking.
+
+**How it works:** Gemini can "call" functions defined by the PWA. These function calls are mapped to specific deep link URLs, which the PWA then interprets to perform actions like navigating to a tab, opening a modal, or pre-filling data.
+
+### a) PWA Configuration
+
+*   **Web App Manifest (`manifest.json`):** Includes a `protocol_handlers` entry to register a custom scheme (`web+jeescheduler`).
+    *   **Example (`manifest.json` snippet):**
+        ```json
+        "protocol_handlers": [
+          {
+            "protocol": "web+jeescheduler",
+            "url": "/?url=%s"
+          }
+        ]
+        ```
+*   **Service Worker:** Configured to handle deep-linked URLs offline for a seamless experience. (No direct user action required beyond PWA installation).
+
+### b) Deep Link URL Structure
+
+The PWA understands URLs with a hash (`#`) for internal navigation and actions.
+
+*   **Basic Tab Navigation:**
+    *   `https://jee.ponsrischool.in/#dashboard` (Go to Dashboard tab)
+    *   `https://jee.ponsrischool.in/#schedule` (Go to Schedule tab)
+    *   `https://jee.ponsrischool.in/#flashcards` (Go to Flashcards tab)
+
+*   **Opening Modals with Data:**
+    *   `https://jee.ponsrischool.in/#CustomPracticeModal` (Opens Custom Practice Modal)
+    *   `https://jee.ponsrischool.in/#CreateEditTaskModal?data={"title":"Physics Homework","subject":"PHYSICS"}` (Opens Create Task Modal with pre-filled data)
+    *   `web+jeescheduler://CreateEditTaskModal?data=%7B%22title%22%3A%22Physics%20Homework%22%2C%22subject%22%3A%22PHYSICS%22%7D` (Same as above, but via custom protocol)
+
+    **Note:** The `data` parameter should be a URL-encoded JSON string.
+
+### c) Gemini Function Calling (Conceptual Mapping)
+
+When a user speaks a command to Gemini (e.g., "Open my physics homework" or "Create a new study session for tomorrow"), Gemini can be configured to "call" a function. This PWA defines a mapping for these calls to deep link URLs.
+
+*   **Example Function Declaration (in Gemini's Toolset):**
+    ```javascript
+    // This is defined in your Gemini model's toolset, not in the PWA.
+    {
+      "name": "open_app_section",
+      "description": "Opens a specific section or tab within the JEE Scheduler Pro PWA.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "string",
+            "description": "The name of the section to open (e.g., 'dashboard', 'schedule', 'flashcards', 'practice')."
+          },
+          "data": {
+            "type": "object",
+            "description": "Optional JSON data to pre-fill a form or set context (e.g., {'topic': 'Physics'})")
+          }
+        },
+        "required": ["section"]
+      }
+    }
+    ```
+
+*   **Mapping to Deep Link (PWA interprets this):**
+    If Gemini calls `open_app_section(section='flashcards')`, the PWA would receive a deep link like:
+    `https://jee.ponsrischool.in/#flashcards`
+    Or, if Gemini calls `open_app_section(section='CreateEditTaskModal', data={'title':'Maths Exam Prep', 'subject':'MATHS'})`, the PWA would receive:
+    `https://jee.ponsrischool.in/#CreateEditTaskModal?data=%7B%22title%22%3A%22Maths%20Exam%20Prep%22%2C%22subject%22%3A%22MATHS%22%7D`
+
+    The PWA's `App.tsx` (specifically the deep linking `useEffect`) is responsible for parsing these hash-based URLs and dispatching the correct actions (e.g., calling `navigateTab` or `openModal` with `initialValue`).
+
+### d) Voice Interaction Flow
+
+1.  **User Voice Command:** "Hey Gemini, open my study schedule in JEE Scheduler Pro."
+2.  **Gemini Processes Intent:** Gemini recognizes the intent to open a specific section of the PWA.
+3.  **Gemini Function Call:** Gemini "calls" the `open_app_section(section='schedule')` function.
+4.  **PWA Receives Deep Link:** The operating system launches the PWA with the URL `web+jeescheduler://schedule` (or `https://jee.ponsrischool.in/#schedule`).
+5.  **PWA Interprets Deep Link:** The `useEffect` in `App.tsx` parses the URL, identifies the `schedule` tab, and calls `navigateTab('schedule')`.
+6.  **PWA Displays Section:** The schedule view is displayed to the user.
+
+This enables a powerful, voice-controlled interface for the PWA.

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ScheduleItem } from './types';
 import { useLocalization } from './context/LocalizationContext';
 import Icon from './components/Icon';
+import ScheduleCard from './components/ScheduleCard'; // Import ScheduleCard
 
 interface PlannerViewProps {
     items: ScheduleItem[];
@@ -14,6 +15,14 @@ const PlannerView: React.FC<PlannerViewProps> = ({ items, onEdit }) => {
     const { t } = useLocalization();
     const [viewMode, setViewMode] = useState<ViewMode>('weekly');
     const daysOfWeek = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];
+    
+    // Placeholder functions for ScheduleCard props not directly used in PlannerView
+    const noop = () => {};
+    const defaultOnSelect = () => {};
+    const defaultOnStartPractice = () => {};
+    const defaultOnStartReviewSession = () => {};
+    const defaultOnCompleteTask = () => {};
+    const defaultOnMarkDoubt = () => {};
     
     const renderWeeklyView = () => {
         const scheduleByDay: { [key: string]: ScheduleItem[] } = daysOfWeek.reduce((acc, day) => {
@@ -30,15 +39,23 @@ const PlannerView: React.FC<PlannerViewProps> = ({ items, onEdit }) => {
                         <div className="space-y-3">
                             {scheduleByDay[day] && scheduleByDay[day].length > 0 ? (
                                 scheduleByDay[day].sort((a,b) => ('TIME' in a && a.TIME ? a.TIME : '23:59').localeCompare('TIME' in b && b.TIME ? b.TIME : '23:59')).map(item => (
-                                    <div key={item.ID} className="bg-gray-900/70 p-3 rounded-lg text-sm group relative">
-                                        <p className="font-bold text-white">{t(item.CARD_TITLE)}</p>
-                                        {'TIME' in item && item.TIME && <p className="text-xs text-gray-400">{item.TIME}</p>}
-                                        {(item.type === 'ACTION' || item.type === 'HOMEWORK') && (
-                                            <button onClick={() => onEdit(item)} className="absolute top-1 right-1 p-1 text-gray-500 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity" title="Edit task" aria-label="Edit task">
-                                                <Icon name="edit" className="w-4 h-4"/>
-                                            </button>
-                                        )}
-                                    </div>
+                                    <ScheduleCard
+                                        key={item.ID}
+                                        cardData={item}
+                                        onDelete={noop}
+                                        onEdit={onEdit} // Pass onEdit from PlannerView props
+                                        onMoveToNextDay={noop}
+                                        onStar={noop}
+                                        onStartPractice={defaultOnStartPractice}
+                                        onStartReviewSession={defaultOnStartReviewSession}
+                                        onCompleteTask={defaultOnCompleteTask}
+                                        onMarkDoubt={defaultOnMarkDoubt}
+                                        isSubscribed={false}
+                                        isPast={false}
+                                        isSelectMode={false}
+                                        isSelected={false}
+                                        onSelect={defaultOnSelect}
+                                    />
                                 ))
                             ) : (
                                 <p className="text-center text-xs text-gray-600 pt-8">No tasks scheduled.</p>
@@ -84,15 +101,23 @@ const PlannerView: React.FC<PlannerViewProps> = ({ items, onEdit }) => {
                         </h3>
                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                              {monthlySchedule[dateString].map(item => (
-                                 <div key={item.ID} className="bg-gray-900/70 p-3 rounded-lg text-sm group relative">
-                                     <p className="font-bold text-white">{t(item.CARD_TITLE)}</p>
-                                     {'TIME' in item && item.TIME && <p className="text-xs text-gray-400">{item.TIME}</p>}
-                                      {(item.type === 'ACTION' || item.type === 'HOMEWORK') && (
-                                        <button onClick={() => onEdit(item)} className="absolute top-1 right-1 p-1 text-gray-500 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity" title="Edit task" aria-label="Edit task">
-                                            <Icon name="edit" className="w-4 h-4"/>
-                                        </button>
-                                    )}
-                                 </div>
+                                 <ScheduleCard
+                                    key={item.ID}
+                                    cardData={item}
+                                    onDelete={noop}
+                                    onEdit={onEdit} // Pass onEdit from PlannerView props
+                                    onMoveToNextDay={noop}
+                                    onStar={noop}
+                                    onStartPractice={defaultOnStartPractice}
+                                    onStartReviewSession={defaultOnStartReviewSession}
+                                    onCompleteTask={defaultOnCompleteTask}
+                                    onMarkDoubt={defaultOnMarkDoubt}
+                                    isSubscribed={false}
+                                    isPast={false}
+                                    isSelectMode={false}
+                                    isSelected={false}
+                                    onSelect={defaultOnSelect}
+                                 />
                              ))}
                         </div>
                      </div>
@@ -121,15 +146,23 @@ const PlannerView: React.FC<PlannerViewProps> = ({ items, onEdit }) => {
                         <h3 className="text-lg font-bold text-cyan-400 tracking-wider mb-2 border-b-2 border-cyan-500/30 pb-1">{day}</h3>
                         <div className="space-y-2">
                             {scheduleByDay[day].map(item => (
-                                <div key={item.ID} className="bg-gray-900/70 p-3 rounded-lg flex items-center gap-4 group">
-                                    {'TIME' in item && item.TIME && <span className="font-mono text-sm text-gray-400 bg-gray-800 px-2 py-1 rounded-md">{item.TIME}</span>}
-                                    <span className="flex-grow font-semibold text-white">{t(item.CARD_TITLE)}</span>
-                                     {(item.type === 'ACTION' || item.type === 'HOMEWORK') && (
-                                        <button onClick={() => onEdit(item)} className="p-1 text-gray-500 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity" title="Edit task" aria-label="Edit task">
-                                            <Icon name="edit" className="w-4 h-4"/>
-                                        </button>
-                                    )}
-                                </div>
+                                 <ScheduleCard
+                                    key={item.ID}
+                                    cardData={item}
+                                    onDelete={noop}
+                                    onEdit={onEdit} // Pass onEdit from PlannerView props
+                                    onMoveToNextDay={noop}
+                                    onStar={noop}
+                                    onStartPractice={defaultOnStartPractice}
+                                    onStartReviewSession={defaultOnStartReviewSession}
+                                    onCompleteTask={defaultOnCompleteTask}
+                                    onMarkDoubt={defaultOnMarkDoubt}
+                                    isSubscribed={false}
+                                    isPast={false}
+                                    isSelectMode={false}
+                                    isSelected={false}
+                                    onSelect={defaultOnSelect}
+                                 />
                             ))}
                         </div>
                     </div>
@@ -154,15 +187,23 @@ const PlannerView: React.FC<PlannerViewProps> = ({ items, onEdit }) => {
                  <h3 className="text-xl font-bold text-cyan-400 tracking-wider mb-4">Today's Tasks</h3>
                  <div className="space-y-2">
                     {todaysItems.length > 0 ? todaysItems.map(item => (
-                         <div key={item.ID} className="bg-gray-900/70 p-3 rounded-lg flex items-center gap-4 group">
-                            {'TIME' in item && item.TIME && <span className="font-mono text-sm text-gray-400 bg-gray-800 px-2 py-1 rounded-md">{item.TIME}</span>}
-                            <span className="flex-grow font-semibold text-white">{t(item.CARD_TITLE)}</span>
-                            {(item.type === 'ACTION' || item.type === 'HOMEWORK') && (
-                                <button onClick={() => onEdit(item)} className="p-1 text-gray-500 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity" title="Edit task" aria-label="Edit task">
-                                    <Icon name="edit" className="w-4 h-4"/>
-                                </button>
-                            )}
-                        </div>
+                         <ScheduleCard
+                            key={item.ID}
+                            cardData={item}
+                            onDelete={noop}
+                            onEdit={onEdit} // Pass onEdit from PlannerView props
+                            onMoveToNextDay={noop}
+                            onStar={noop}
+                            onStartPractice={defaultOnStartPractice}
+                            onStartReviewSession={defaultOnStartReviewSession}
+                            onCompleteTask={defaultOnCompleteTask}
+                            onMarkDoubt={defaultOnMarkDoubt}
+                            isSubscribed={false}
+                            isPast={false}
+                            isSelectMode={false}
+                            isSelected={false}
+                            onSelect={defaultOnSelect}
+                         />
                     )) : (
                         <p className="text-center text-gray-500 py-10">No tasks scheduled for today.</p>
                     )}

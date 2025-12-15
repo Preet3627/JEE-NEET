@@ -8,11 +8,32 @@ interface ClockWidgetProps {
 const ClockWidget: React.FC<ClockWidgetProps> = ({ items }) => {
     const [time, setTime] = useState(new Date());
     const [isUrgent, setIsUrgent] = useState(false);
+    const [prevMinutes, setPrevMinutes] = useState(new Date().getMinutes());
+    const [prevHours, setPrevHours] = useState(new Date().getHours());
+    const [minutePulse, setMinutePulse] = useState(false);
+    const [hourPulse, setHourPulse] = useState(false);
 
     useEffect(() => {
         const interval = setInterval(() => {
             const now = new Date();
             setTime(now);
+            
+            const currentMinutes = now.getMinutes();
+            const currentHours = now.getHours();
+
+            // Detect minute change for pulse animation
+            if (currentMinutes !== prevMinutes) {
+                setMinutePulse(true);
+                setTimeout(() => setMinutePulse(false), 500); // Pulse for 0.5 seconds
+                setPrevMinutes(currentMinutes);
+            }
+
+            // Detect hour change for pulse animation
+            if (currentHours !== prevHours) {
+                setHourPulse(true);
+                setTimeout(() => setHourPulse(false), 500); // Pulse for 0.5 seconds
+                setPrevHours(currentHours);
+            }
             
             // Check for urgency: Is there a task within 1 minute?
             if (items) {
@@ -30,7 +51,7 @@ const ClockWidget: React.FC<ClockWidgetProps> = ({ items }) => {
             }
         }, 1000);
         return () => clearInterval(interval);
-    }, [items]);
+    }, [items, prevMinutes, prevHours]);
 
     const seconds = time.getSeconds();
     const minutes = time.getMinutes();
@@ -60,14 +81,13 @@ const ClockWidget: React.FC<ClockWidgetProps> = ({ items }) => {
                     {/* HOURS RING (Outer) */}
                     <circle cx="100" cy="100" r="90" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="6" />
                     <circle cx="100" cy="100" r="90" fill="none" stroke="#0891b2" strokeWidth="6" 
-                            strokeDasharray="565" strokeDashoffset={hourDashOffset} strokeLinecap="round" 
-                            className="transition-[stroke-dashoffset] duration-1000 ease-linear" />
+                            className={`transition-[stroke-dashoffset] duration-1000 ease-linear ${hourPulse ? 'animate-ring-pulse' : ''}`} />
 
                     {/* MINUTES RING (Middle) */}
                     <circle cx="100" cy="100" r="75" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="5" />
                     <circle cx="100" cy="100" r="75" fill="none" stroke="#7c3aed" strokeWidth="5" 
                             strokeDasharray="471" strokeDashoffset={minuteDashOffset} strokeLinecap="round" 
-                            className="transition-[stroke-dashoffset] duration-1000 ease-linear" />
+                            className={`transition-[stroke-dashoffset] duration-1000 ease-linear ${minutePulse ? 'animate-ring-pulse' : ''}`} />
 
                     {/* SECONDS RING (Inner) */}
                     {/* If Urgent: Rotate continuously. Else: Fill progressively */}
@@ -81,7 +101,7 @@ const ClockWidget: React.FC<ClockWidgetProps> = ({ items }) => {
 
                 {/* Digital Display */}
                 <div className="z-10 flex flex-col items-center justify-center text-white">
-                    <h2 className="text-3xl font-bold font-sf-display tracking-wider drop-shadow-lg">
+                    <h2 className={`text-3xl font-bold font-sf-display tracking-wider drop-shadow-lg ${minutePulse || hourPulse ? 'animate-text-pulse' : ''}`}>
                         {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
                     </h2>
                     <p className="text-xs text-gray-400 font-medium uppercase tracking-[0.2em] mt-1">

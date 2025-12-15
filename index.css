@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -14,4 +13,34 @@
   .print-only {
     display: block !important;
   }
+}
+
+@keyframes ring-pulse {
+  0% { stroke-opacity: 1; transform: scale(1); }
+  50% { stroke-opacity: 0.5; transform: scale(1.05); }
+  100% { stroke-opacity: 1; transform: scale(1); }
+}
+
+@keyframes text-pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.8; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-ring-pulse {
+  animation: ring-pulse 0.5s ease-out forwards;
+}
+
+.animate-text-pulse {
+  animation: text-pulse 0.5s ease-out forwards;
+}
+
+@keyframes pulse-border {
+  0% { border-color: rgba(6, 182, 212, 0.4); transform: scale(1); }
+  50% { border-color: rgba(6, 182, 212, 0.8); transform: scale(1.01); }
+  100% { border-color: rgba(6, 182, 212, 0.4); transform: scale(1); }
+}
+
+.animate-pulse-border {
+  animation: pulse-border 1.5s infinite alternate ease-in-out;
 }

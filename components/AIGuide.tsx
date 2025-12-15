@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Icon from './Icon';
 
 interface AIGuideProps {
-  examType?: 'JEE' | 'NEET';
+  // examType?: 'JEE' | 'NEET'; // No longer needed as content is single and dynamic
 }
 
 const GuideRenderer: React.FC<{ content: string }> = ({ content }) => {
@@ -88,167 +88,62 @@ const GuideRenderer: React.FC<{ content: string }> = ({ content }) => {
   return <>{elements}</>;
 };
 
-const jeeGuide = `
-# AI Data Import Guide (JEE)
 
-You can import various types of data by pasting text into the AI Import modal. The AI will understand the structure and format it for you.
 
-## Schedules
+export const AIGuide: React.FC<AIGuideProps> = () => { // Removed examType from props
+  const [guideContent, setGuideContent] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
-### From Plain Text
-Simply describe your schedule. The AI is trained to pick up on keywords.
+  useEffect(() => {
+    const fetchGuide = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/ai-agent-guide-deep-linking.txt'); // Fetch from new file
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const text = await response.text();
+        setGuideContent(text);
+      } catch (e: any) {
+        setError(`Failed to load AI guide: ${e.message}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchGuide();
+  }, []);
 
-\`\`\`
-- Wednesday 9am physics deep dive on rotational motion
-- Friday 8pm solve maths homework, questions 1-20 from chapter on matrices
-- Saturday log my test result 195/300, mistakes were in electrostatics and p-block elements.
-\`\`\`
-
-### From JSON
-You can provide a structured JSON object for precise control.
-
-\`\`\`json
-{
-  "schedules": [
-    {
-      "day": "Monday",
-      "time": "19:00",
-      "title": "Chemistry Practice",
-      "detail": "Focus on Organic Chemistry name reactions.",
-      "subject": "CHEMISTRY",
-      "type": "ACTION",
-      "sub_type": "DEEP_DIVE"
-    },
-    {
-      "day": "Tuesday",
-      "title": "Physics Homework",
-      "subject": "PHYSICS",
-      "type": "HOMEWORK",
-      "q_ranges": "1-25"
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(guideContent); // Copy loaded content
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000); // Reset "Copied!" message after 2 seconds
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
     }
-  ]
-}
-\`\`\`
+  };
 
-## Practice Tests
-
-### From Text
-Describe the homework or test you want to practice. The AI will convert it to a practice session.
-
-\`\`\`
-- Homework: Physics, Circular Motion, questions 1-35. Answers are A, C, B, D...
-- Practice Test: Maths, 10 questions on calculus.
-\`\`\`
-
-### From JSON
-Provide questions and answers for a structured practice session.
-
-\`\`\`json
-{
-  "practice_test": {
-    "questions": [
-      { "number": 1, "text": "What is the capital of France?", "options": ["Berlin", "Madrid", "Paris", "Rome"], "type": "MCQ" },
-      { "number": 2, "text": "Solve for x: 2x + 3 = 7", "type": "NUM" }
-    ],
-    "answers": {
-      "1": "C",
-      "2": "2"
-    }
+  if (loading) {
+    return <div className="text-white text-center py-10">Loading AI Guide...</div>;
   }
-}
-\`\`\`
 
-<h2>Flashcards</h2>
-
-Provide a topic, and the AI will generate cards. Or provide the cards directly in JSON.
-
-\`\`\`json
-{
-  "flashcard_deck": {
-    "name": "Key Physics Formulas",
-    "subject": "PHYSICS",
-    "cards": [
-      { "front": "Force equals?", "back": "Mass times Acceleration (F=ma)" },
-      { "front": "Kinetic Energy formula?", "back": "1/2 * mv^2" }
-    ]
+  if (error) {
+    return <div className="text-red-500 text-center py-10">{error}</div>;
   }
-}
-\`\`\`
-`;
-const neetGuide = `
-# AI Data Import Guide (NEET)
 
-You can import various types of data by pasting text into the AI Import modal. The AI will understand the structure and format it for you.
-
-## Schedules
-
-### From Plain Text
-Simply describe your schedule. The AI is trained to pick up on keywords for Biology, Physics, and Chemistry.
-
-\`\`\`
-- Wednesday 9am Biology deep dive on Cell Cycle and Division.
-- Friday 8pm solve Chemistry homework, questions 1-30 from chapter on Equilibrium.
-- Saturday log my test result 580/720, mistakes were in Plant Kingdom and Work, Energy, Power.
-\`\`\`
-
-### From JSON
-You can provide a structured JSON object for precise control.
-
-\`\`\`json
-{
-  "schedules": [
-    {
-      "day": "Monday",
-      "time": "19:00",
-      "title": "Zoology Practice",
-      "detail": "Focus on Human Physiology - Digestion and Absorption.",
-      "subject": "BIOLOGY",
-      "type": "ACTION",
-      "sub_type": "DEEP_DIVE"
-    }
-  ]
-}
-\`\`\`
-
-<h2>Practice Tests</h2>
-
-<h3>From JSON</h3>
-Provide questions and answers for a structured practice session. Biology questions are typically MCQs.
-
-\`\`\`json
-{
-  "practice_test": {
-    "questions": [
-      { "number": 1, "text": "The powerhouse of the cell is?", "options": ["Nucleus", "Ribosome", "Mitochondrion", "Lysosome"], "type": "MCQ" },
-      { "number": 2, "text": "Which of these is not a part of the digestive system?", "options": ["Stomach", "Liver", "Lungs", "Small Intestine"], "type": "MCQ" }
-    ],
-    "answers": {
-      "1": "C",
-      "2": "C"
-    }
-  }
-}
-\`\`\`
-
-<h2>Flashcards</h2>
-
-Provide a topic, and the AI will generate cards. This is great for Botany, Zoology, and Chemistry definitions.
-
-\`\`\`json
-{
-  "flashcard_deck": {
-    "name": "Key Biological Terms",
-    "subject": "BIOLOGY",
-    "cards": [
-      { "front": "What is Mitosis?", "back": "A type of cell division that results in two daughter cells each having the same number and kind of chromosomes as the parent nucleus." },
-      { "front": "What is the function of xylem?", "back": "Transports water and minerals from roots to other parts of the plant." }
-    ]
-  }
-}
-\`\`\`
-`;
-
-export const AIGuide: React.FC<AIGuideProps> = ({ examType }) => {
-  const content = examType === 'NEET' ? neetGuide : jeeGuide;
-  return <GuideRenderer content={content} />;
+  return (
+    <div className="relative">
+      <button
+        onClick={handleCopy}
+        className="absolute top-2 right-2 px-3 py-1.5 text-sm font-semibold rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600 flex items-center gap-1 z-10"
+        title="Copy guide content"
+      >
+        <Icon name="copy" className="w-4 h-4" />
+        {copied ? 'Copied!' : 'Copy'}
+      </button>
+      <GuideRenderer content={guideContent} />
+    </div>
+  );
 };

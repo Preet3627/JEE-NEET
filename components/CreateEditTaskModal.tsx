@@ -69,22 +69,61 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
     return '20:00';
   };
 
-  const [taskType, setTaskType] = useState<TaskType>(getInitialTaskType());
+  const [taskType, setTaskType] = useState<TaskType>('ACTION');
   const [formData, setFormData] = useState({
-    title: task ? task.CARD_TITLE.EN : '',
-    details: task ? task.FOCUS_DETAIL.EN : '',
-    subject: task ? task.SUBJECT_TAG.EN : 'PHYSICS',
-    time: getInitialTime(),
-    day: task ? task.DAY.EN.toUpperCase() : new Date().toLocaleString('en-us', {weekday: 'long'}).toUpperCase(),
-    date: task && 'date' in task ? task.date : '',
-    qRanges: task?.type === 'HOMEWORK' ? task.Q_RANGES : '',
-    category: task?.type === 'HOMEWORK' ? task.category || 'Custom' : 'Custom',
-    deckId: task?.type === 'ACTION' && task.SUB_TYPE === 'FLASHCARD_REVIEW' ? task.deckId : (decks.length > 0 ? decks[0].id : ''),
-    answers: task?.type === 'HOMEWORK' ? formatAnswers(task.answers) : '',
-    gradient: task && 'gradient' in task && task.gradient ? task.gradient : '',
-    imageUrl: task && 'imageUrl' in task && task.imageUrl ? task.imageUrl : '',
-    externalLink: task && 'externalLink' in task && task.externalLink ? task.externalLink : '',
+    title: '',
+    details: '',
+    subject: 'PHYSICS',
+    time: '20:00',
+    day: new Date().toLocaleString('en-us', {weekday: 'long'}).toUpperCase(),
+    date: '',
+    qRanges: '',
+    category: 'Custom',
+    deckId: '',
+    answers: '',
+    gradient: '',
+    imageUrl: '',
+    externalLink: '',
   });
+
+  useEffect(() => {
+    if (task) {
+      setTaskType(getInitialTaskType());
+      setFormData({
+        title: task.CARD_TITLE.EN,
+        details: task.FOCUS_DETAIL.EN,
+        subject: task.SUBJECT_TAG.EN,
+        time: getInitialTime(),
+        day: task.DAY.EN.toUpperCase(),
+        date: 'date' in task ? task.date : '',
+        qRanges: task.type === 'HOMEWORK' ? task.Q_RANGES : '',
+        category: task.type === 'HOMEWORK' ? task.category || 'Custom' : 'Custom',
+        deckId: task.type === 'ACTION' && task.SUB_TYPE === 'FLASHCARD_REVIEW' ? task.deckId : (decks.length > 0 ? decks[0].id : ''),
+        answers: task.type === 'HOMEWORK' ? formatAnswers(task.answers) : '',
+        gradient: 'gradient' in task && task.gradient ? task.gradient : '',
+        imageUrl: 'imageUrl' in task && task.imageUrl ? task.imageUrl : '',
+        externalLink: 'externalLink' in task && task.externalLink ? task.externalLink : '',
+      });
+    } else {
+      setTaskType('ACTION');
+      setFormData({
+        title: '',
+        details: '',
+        subject: 'PHYSICS',
+        time: '20:00',
+        day: new Date().toLocaleString('en-us', {weekday: 'long'}).toUpperCase(),
+        date: '',
+        qRanges: '',
+        category: 'Custom',
+        deckId: decks.length > 0 ? decks[0].id : '',
+        answers: '',
+        gradient: '',
+        imageUrl: '',
+        externalLink: '',
+      });
+    }
+  }, [task, decks]); // getInitialTaskType and getInitialTime depend on 'task', so include 'task' in dependencies.
+
   const [isExiting, setIsExiting] = useState(false);
   const [isAiKeyModalOpen, setIsAiKeyModalOpen] = useState(false);
   const daysOfWeek = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"];

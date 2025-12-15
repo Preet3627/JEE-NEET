@@ -9,7 +9,7 @@
     9 import path from 'path';
    10 import { fileURLToPath } from 'url';
    11 import crypto from 'crypto';
-   12 import { GoogleGenAI } from '@google/genai';
+   12 import { GoogleGenerativeAI } from '@google/generative-ai';
    13 import { createClient } from 'webdav';
    14 import * as mm from 'music-metadata';
    15  16 // --- SERVER SETUP ---
@@ -299,7 +299,7 @@
               }
 
               if(process.env.API_KEY) {
-                  genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                  genAI = new GoogleGenerativeAI(process.env.API_KEY);
               }
 
               if (process.env.SMTP_HOST) {

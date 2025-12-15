@@ -9,7 +9,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from 'webdav';
 import * as mm from 'music-metadata';
 
@@ -219,20 +219,22 @@ const initDB = async () => {
                 created_at DATETIME,
                 author_name VARCHAR(255),
                 author_photo LONGTEXT,
-                status VARCHAR(50) DEFAULT 'active'
+                status VARCHAR(50) DEFAULT 'active',
+                FOREIGN KEY (user_sid) REFERENCES users(sid) ON DELETE CASCADE
             )
         `);
         await connection.query(`
             CREATE TABLE IF NOT EXISTS doubt_solutions (
                 id VARCHAR(255) PRIMARY KEY,
                 doubt_id VARCHAR(255),
-                user_sid INT,
+                user_sid VARCHAR(255),
                 solution TEXT,
                 solution_image LONGTEXT,
                 created_at DATETIME,
                 solver_name VARCHAR(255),
                 solver_photo LONGTEXT,
-                FOREIGN KEY (doubt_id) REFERENCES doubts(id) ON DELETE CASCADE
+                FOREIGN KEY (doubt_id) REFERENCES doubts(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_sid) REFERENCES users(sid) ON DELETE CASCADE
             )
         `);
         await connection.query(`
@@ -263,6 +265,29 @@ const initDB = async () => {
         `);
         
         console.log("Database tables checked/initialized.");
+
+        // Insert/Update Admin User
+        await connection.query(`
+            INSERT INTO users (sid, email, full_name, password_hash, is_verified, role, profile_photo)
+            VALUES (
+                'ADMIN_001',
+                'patelbhavna107@gmail.com',
+                'System Admin',
+                '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjRZLLnR8lwWcF.APSi/WWJJxsuNB.O',
+                1,
+                'admin',
+                'https://api.dicebear.com/8.x/initials/svg?seed=Admin'
+            ) ON DUPLICATE KEY UPDATE role='admin'
+        `);
+
+        // Insert/Update Admin Default Config
+        await connection.query(`
+            INSERT INTO user_configs (user_id, config)
+            SELECT id, '{"WAKE":"06:00","SCORE":"0/300","WEAK":[],"settings":{"accentColor":"#0891b2","theme":"default","examType":"JEE"}}'
+            FROM users WHERE email = 'patelbhavna107@gmail.com'
+            ON DUPLICATE KEY UPDATE config=VALUES(config)
+        `);
+
         connection.release();
     } catch (error) {
         console.error("Failed to initialize database tables:", error);
@@ -298,7 +323,7 @@ let isDatabaseConnected = false;
             }
             
             if(process.env.API_KEY) {
-                genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                genAI = new GoogleGenerativeAI(process.env.API_KEY);
             }
             
             if (process.env.SMTP_HOST) {

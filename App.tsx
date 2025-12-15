@@ -124,6 +124,7 @@ interface ModalControlProps {
   isAnswerKeyUploadModalOpen: boolean; setAnswerKeyUploadModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   isProfileModalOpen: boolean; setIsProfileModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   isSpecificMistakeAnalysisModalOpen: boolean; setIsSpecificMistakeAnalysisModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  isWidgetSelectorModalOpen: boolean; setIsWidgetSelectorModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 // #endregion Modal State Definition
 
@@ -198,16 +199,19 @@ const App: React.FC = () => {
   const [isAnswerKeyUploadModalOpen, setAnswerKeyUploadModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSpecificMistakeAnalysisModalOpen, setIsSpecificMistakeAnalysisModalOpen] = useState(false);
+  const [isWidgetSelectorModalOpen, setIsWidgetSelectorModalOpen] = useState(false);
   const [isAiDoubtSolverOpen, setIsAiDoubtSolverOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard'); // State for managing active tab
   
   const navigateTab = useCallback((tab: ActiveTab, replace = false) => {
-    setActiveTab(tab);
+    // Update URL hash directly for better browser history integration
+    const newHash = `#${tab}`;
     if (replace) {
-        window.history.replaceState({ tab }, '');
+        window.history.replaceState({ tab }, '', newHash);
     } else {
-        window.history.pushState({ tab }, '');
+        window.history.pushState({ tab }, '', newHash);
     }
+    setActiveTab(tab);
   }, []);
 
   // General App State
@@ -248,6 +252,7 @@ const App: React.FC = () => {
     modalSettersRef.current.set('AnswerKeyUploadModal', setAnswerKeyUploadModalOpen);
     modalSettersRef.current.set('ProfileModal', setIsProfileModalOpen);
     modalSettersRef.current.set('SpecificMistakeAnalysisModal', setIsSpecificMistakeAnalysisModalOpen);
+    modalSettersRef.current.set('WidgetSelectorModal', setIsWidgetSelectorModalOpen);
     modalSettersRef.current.set('UniversalSearch', setIsSearchOpen);
   }, [
     setIsExamTypeSelectionModalOpen, setIsCreateModalOpen, setisAiParserModalOpen, setIsPracticeModalOpen,
@@ -257,6 +262,7 @@ const App: React.FC = () => {
     setAiFlashcardModalOpen, setEditingDeck, setViewingDeck, setCreateCardModalOpen, setEditingCard, 
     setReviewingDeck, setViewingFile, setIsMusicLibraryOpen, setDeepLinkAction, setMessagingModalOpen, 
     setAnswerKeyUploadModalOpen, setIsProfileModalOpen, setIsSpecificMistakeAnalysisModalOpen,
+    setIsWidgetSelectorModalOpen, // Added for WidgetSelectorModal
   ]);
 
   const openModal = useCallback((modalId: string, setter: React.Dispatch<React.SetStateAction<boolean>> | ((val: any) => void), initialValue?: any) => {
@@ -272,7 +278,8 @@ const App: React.FC = () => {
     modalStackRef.current.push(newModalState);
     currentModalIdRef.current = modalId; 
     
-    window.history.pushState({ modal: newModalState.componentId }, '');
+    // Use hash for modal history
+    window.location.hash = `#${modalId}`;
   }, []);
 
   const closeModal = useCallback((modalId: string) => {
@@ -288,37 +295,71 @@ const App: React.FC = () => {
 
     modalStackRef.current = modalStackRef.current.filter(m => m.id !== modalId);
     currentModalIdRef.current = modalStackRef.current.length > 0 ? modalStackRef.current[modalStackRef.current.length - 1].id : null;
+    
+    // Go back in history if modal was opened via hash
+    if (window.location.hash === `#${modalId}`) {
+        window.history.back();
+    }
   }, []);
 
 
   useEffect(() => {
-    const handlePopState = (event: PopStateEvent) => {
-      const state = event.state || {}; // Get the state we pushed, or an empty object
-
-      // Close any modals that are open in the app but not present in the new history state
-      if (modalStackRef.current.length > 0 && modalStackRef.current[modalStackRef.current.length - 1].componentId !== state.modal) {
-        const modalToClose = modalStackRef.current.pop();
-        if (modalToClose) {
-          const setter = modalSettersRef.current.get(modalToClose.id);
-          if (setter) {
-            const isBooleanSetter = String(setter).includes('setIs');
-            if (isBooleanSetter) (setter as React.Dispatch<React.SetStateAction<boolean>>)(false); else (setter as (val: any) => void)(null);
-          }
-        }
+    const handleHashChange = () => {
+      const hash = window.location.hash.substring(1); // Remove '#'
+      // Handle tab navigation from hash
+      const possibleTabs: ActiveTab[] = ['dashboard', 'today', 'schedule', 'planner', 'material', 'flashcards', 'exams', 'performance', 'doubts'];
+      if (possibleTabs.includes(hash as ActiveTab)) {
+        setActiveTab(hash as ActiveTab);
+      } else if (!hash && modalStackRef.current.length === 0) {
+        // If hash is empty and no modals are open, default to dashboard
+        setActiveTab('dashboard');
       }
 
-      // Sync the active tab with the history state, or default to dashboard
-      setActiveTab(state.tab || 'dashboard');
+      // Handle modals from hash
+      const modalIdFromHash = hash.split('?')[0]; // Get modal ID without query params
+      const topModalInStack = modalStackRef.current.length > 0 ? modalStackRef.current[modalStackRef.current.length - 1].id : null;
+
+      if (modalIdFromHash && modalSettersRef.current.has(modalIdFromHash) && modalIdFromHash !== topModalInStack) {
+          // Open modal if it's in the hash and not already the top modal
+          const setter = modalSettersRef.current.get(modalIdFromHash);
+          if (setter) {
+              // Extract initialValue if present in hash query params
+              const query = new URLSearchParams(hash.split('?')[1]);
+              let initialValue = null;
+              if (query.has('data')) {
+                  try {
+                      initialValue = JSON.parse(decodeURIComponent(query.get('data') || ''));
+                  } catch (e) {
+                      console.error("Failed to parse deep link data from modal hash:", e);
+                  }
+              }
+              openModal(modalIdFromHash, setter, initialValue);
+          }
+      } else if (!modalIdFromHash && topModalInStack) {
+          // Close top modal if hash is empty and there's a modal in stack
+          closeModal(topModalInStack);
+      }
     };
 
-    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handleHashChange);
+    // Initial check on load
+    handleHashChange();
+
+    // Set initial active tab based on hash or default to dashboard
+    const initialHashTab = window.location.hash.substring(1).split('?')[0] as ActiveTab;
+    const possibleTabs: ActiveTab[] = ['dashboard', 'today', 'schedule', 'planner', 'material', 'flashcards', 'exams', 'performance', 'doubts'];
+    if (possibleTabs.includes(initialHashTab)) {
+        setActiveTab(initialHashTab);
+    } else {
+        setActiveTab('dashboard');
+    }
 
     // Set the initial state of the app
-    window.history.replaceState({ tab: 'dashboard' }, '');
+    window.history.replaceState({ tab: activeTab }, '', `#${activeTab}`);
 
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [setActiveTab]);
 
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [openModal, closeModal, activeTab, navigateTab]); // Include activeTab to prevent stale closures
 
   const checkBackendStatus = useCallback(async () => {
     try {
@@ -361,9 +402,50 @@ const App: React.FC = () => {
 
 
 
-  // Deep Link Handling
+  // Deep Link Handling (for custom protocol)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const deepLinkUrl = params.get('url'); // For custom protocol handler
+
+    if (deepLinkUrl) {
+      try {
+        const decodedUrl = decodeURIComponent(deepLinkUrl); // e.g., web+jeescheduler://dashboard
+        const urlObj = new URL(decodedUrl);
+        const path = urlObj.pathname.substring(1); // e.g., "dashboard"
+        const queryParams = urlObj.searchParams;
+
+        // Map path to tab or action
+        const possibleTabs: ActiveTab[] = ['dashboard', 'today', 'schedule', 'planner', 'material', 'flashcards', 'exams', 'performance', 'doubts'];
+        if (possibleTabs.includes(path as ActiveTab)) {
+            navigateTab(path as ActiveTab);
+        } else if (path === 'open_modal') {
+            const modalId = queryParams.get('modalId');
+            const modalData = queryParams.get('data');
+            if (modalId && modalSettersRef.current.has(modalId)) {
+                const setter = modalSettersRef.current.get(modalId);
+                let initialValue = null;
+                if (modalData) {
+                    try {
+                        initialValue = JSON.parse(decodeURIComponent(modalData));
+                    } catch (e) {
+                        console.error("Failed to parse deep link modal data:", e);
+                    }
+                }
+                openModal(modalId, setter, initialValue);
+            }
+        }
+        
+        // Clean up URL
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('url');
+        window.history.replaceState({}, document.title, newUrl.toString());
+
+      } catch (error) {
+        console.error("Failed to process custom protocol deep link:", error);
+      }
+    }
+    
+    // Existing deep link handling (from regular URL query params)
     const action = params.get('action');
     const dataStr = params.get('data');
     const resetToken = params.get('reset-token');
@@ -378,8 +460,7 @@ const App: React.FC = () => {
     }
 
     if (tabParam && ['dashboard', 'today', 'schedule', 'material', 'flashcards', 'exams', 'performance', 'doubts'].includes(tabParam)) {
-        setActiveTab(tabParam as ActiveTab);
-        window.history.replaceState({ tab: tabParam }, '');
+        navigateTab(tabParam as ActiveTab, true);
     }
 
     if (action) {
@@ -400,7 +481,7 @@ const App: React.FC = () => {
         newUrl.searchParams.delete('data');
         window.history.replaceState({}, document.title, newUrl.toString());
     }
-  }, []);
+  }, [openModal, navigateTab, setDeepLinkAction]);
 
   // Handlers for specific student data actions
   const handleSaveTask = useCallback(async (task: ScheduleItem) => {
@@ -989,7 +1070,8 @@ const App: React.FC = () => {
     messagingStudent, setMessagingStudent,
     isAnswerKeyUploadModalOpen, setAnswerKeyUploadModalOpen,
     isProfileModalOpen, setIsProfileModalOpen,
-    isSpecificMistakeAnalysisModalOpen, setIsSpecificMistakeAnalysisModalOpen
+    isSpecificMistakeAnalysisModalOpen, setIsSpecificMistakeAnalysisModalOpen,
+    isWidgetSelectorModalOpen, setIsWidgetSelectorModalOpen,
   }), [
     openModal, closeModal, isExamTypeSelectionModalOpen, setIsExamTypeSelectionModalOpen,
     isCreateModalOpen, setIsCreateModalOpen, setisAiParserModalOpen, setIsPracticeModalOpen,
@@ -1014,7 +1096,8 @@ const App: React.FC = () => {
     handleMoveSelectedTasks, handleSaveDeck, handleDeleteCard, handleSaveCard,
     setDeepLinkAction, isMessagingModalOpen, setMessagingModalOpen, messagingStudent, setMessagingStudent,
     isAnswerKeyUploadModalOpen, setAnswerKeyUploadModalOpen, isProfileModalOpen, setIsProfileModalOpen,
-    isSpecificMistakeAnalysisModalOpen, setIsSpecificMistakeAnalysisModalOpen
+    isSpecificMistakeAnalysisModalOpen, setIsSpecificMistakeAnalysisModalOpen,
+    isWidgetSelectorModalOpen, setIsWidgetSelectorModalOpen
   ]);
 
 
@@ -1149,6 +1232,8 @@ const App: React.FC = () => {
         {isProfileModalOpen && <ProfileModal user={currentUser} onClose={() => closeModal('ProfileModal')} />}
         {isSpecificMistakeAnalysisModalOpen && analyzingMistake !== null && <SpecificMistakeAnalysisModal questionNumber={analyzingMistake} onClose={() => closeModal('SpecificMistakeAnalysisModal')} onSaveWeakness={handleUpdateWeaknesses} />}
         {isSearchOpen && <UniversalSearch isOpen={isSearchOpen} onClose={() => closeModal('UniversalSearch')} onNavigate={(tab) => { /* Logic to navigate tabs in StudentDashboard */}} onAction={() => { /* Logic to perform actions */}} scheduleItems={currentUser?.SCHEDULE_ITEMS || []} exams={currentUser?.EXAMS || []} decks={currentUser?.CONFIG.flashcardDecks || []} initialQuery={searchInitialQuery || undefined} />}
+        {isWidgetSelectorModalOpen && <WidgetSelectorModal currentLayout={currentUser?.CONFIG.settings.dashboardLayout || []} onSaveLayout={(layout) => handleUpdateConfig({ settings: { ...currentUser?.CONFIG.settings, dashboardLayout: layout } })} onClose={() => closeModal('WidgetSelectorModal')} />}
+
 
       </div>
     );
