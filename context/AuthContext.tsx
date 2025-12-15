@@ -17,9 +17,23 @@ export const processUserData = (userData: StudentData): StudentData => {
         try {
             processedData.SCHEDULE_ITEMS = JSON.parse(processedData.SCHEDULE_ITEMS) as ScheduleItem[];
         } catch (e) {
-            console.error("Failed to parse SCHEDULE_ITEMS:", e);
+            console.error("Failed to parse SCHEDULE_ITEMS string:", e);
             processedData.SCHEDULE_ITEMS = [];
         }
+    }
+    // Handle case where SCHEDULE_ITEMS is an array of strings (double serialization issue)
+    if (Array.isArray(processedData.SCHEDULE_ITEMS)) {
+        processedData.SCHEDULE_ITEMS = processedData.SCHEDULE_ITEMS.map(item => {
+            if (typeof item === 'string') {
+                try {
+                    return JSON.parse(item);
+                } catch (e) {
+                    console.error("Failed to parse individual SCHEDULE_ITEM:", e);
+                    return null;
+                }
+            }
+            return item;
+        }).filter(item => item !== null) as ScheduleItem[];
     }
 
     // Parse CONFIG.flashcardDecks
@@ -35,7 +49,7 @@ export const processUserData = (userData: StudentData): StudentData => {
     // Parse CONFIG.customWidgets
     if (processedData.CONFIG && typeof processedData.CONFIG.customWidgets === 'string') {
         try {
-            processedData.CONFIG.customWidgets = JSON.parse(processedData.CONFIG.customWidgets) as any[]; // Assuming any[] for customWidgets
+            processedData.CONFIG.customWidgets = JSON.parse(processedData.CONFIG.customWidgets) as any[];
         } catch (e) {
             console.error("Failed to parse CONFIG.customWidgets:", e);
             processedData.CONFIG.customWidgets = [];

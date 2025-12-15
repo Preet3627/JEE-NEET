@@ -60,7 +60,7 @@ const MusicVisualizerWidget: React.FC<MusicVisualizerWidgetProps> = ({ height = 
 
                 // Scale height to fit canvas
                 const percent = value / 255;
-                const barHeight = Math.max(percent * canvas.height, 2); // Ensure at least 2px high
+                const barHeight = Math.max((percent * 0.6) * canvas.height, 2); // Ensure at least 2px high
 
 
                 if (color) {

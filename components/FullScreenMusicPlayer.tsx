@@ -112,14 +112,21 @@ const FullScreenMusicPlayer: React.FC<FullScreenMusicPlayerProps> = ({ onClose }
                     </div>
                 ) : (
                     <>
+                        {/* Album Art */}
                         <div className={`relative w-64 h-64 md:w-96 md:h-96 rounded-2xl shadow-2xl transition-transform duration-[800ms] cubic-bezier(0.34, 1.56, 0.64, 1) ${isPlaying ? 'scale-100' : 'scale-90 opacity-80'}`}>
-                            <img
-                                src={currentTrack.coverArt || 'https://via.placeholder.com/400'} // Use currentTrack.coverArt
-                                alt="Album Art"
-                                className="w-full h-full object-cover rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] ring-1 ring-white/10"
-                            />
+                            {currentTrack.coverArt ? (
+                                <img
+                                    src={currentTrack.coverArt}
+                                    alt="Album Art"
+                                    className="w-full h-full object-cover rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] ring-1 ring-white/10"
+                                />
+                            ) : (
+                                <div className="w-full h-full bg-gradient-to-br from-cyan-800 to-purple-900 rounded-2xl flex items-center justify-center shadow-[0_20px_50px_rgba(0,0,0,0.7)] ring-1 ring-white/10">
+                                    <Icon name="music" className="w-32 h-32 text-white/20" />
+                                </div>
+                            )}
                         </div>
-                        <div className="mt-12 text-center w-full max-w-md">
+                        <div className="mt-12 text-center w-full max-w-md px-4">
                             <h2 className="text-3xl font-bold text-white mb-2 truncate tracking-tight">{currentTrack.title}</h2>
                             <p className="text-lg text-gray-400 truncate font-medium">{currentTrack.artist}</p>
                         </div>
@@ -138,7 +145,7 @@ const FullScreenMusicPlayer: React.FC<FullScreenMusicPlayerProps> = ({ onClose }
                             onChange={handleSeekChange} onMouseUp={handleSeekEnd} onTouchEnd={handleSeekEnd}
                             className="w-full h-1.5 bg-white/20 rounded-full appearance-none cursor-pointer accent-white hover:h-2 transition-all"
                         />
-                        <div className="flex justify-between text-xs font-bold text-gray-400 font-mono tracking-widest">
+                        <div className="flex justify-between text-xs font-bold text-gray-400 font-mono tracking-wide px-1">
                             <span>{formatTime(localTime)}</span>
                             <span>{formatTime(duration)}</span>
                         </div>
