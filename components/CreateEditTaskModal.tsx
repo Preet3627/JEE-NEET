@@ -175,6 +175,11 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    // Safety check for bubbling events in some browsers
+    if (e.nativeEvent) {
+      e.nativeEvent.stopImmediatePropagation();
+    }
 
     const isEditing = !!task;
     let finalTask: ScheduleItem;
@@ -218,8 +223,12 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
       } as ScheduleCardData;
     }
 
-    onSave(finalTask);
-    handleClose();
+    try {
+      onSave(finalTask);
+      handleClose();
+    } catch (error) {
+      console.error("Error saving task:", error);
+    }
   };
 
   const handleDeleteTask = () => {

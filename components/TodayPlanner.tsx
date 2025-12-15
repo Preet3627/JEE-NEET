@@ -13,14 +13,11 @@ const TodayPlanner: React.FC<TodayPlannerProps> = ({ items, onEdit }) => {
     const { t } = useLocalization();
 
     // Derived state for today's date info
-    const { todayName, todayDateString, formattedDate } = useMemo(() => {
-        const date = new Date();
-        return {
-            todayName: date.toLocaleString('en-us', { weekday: 'long' }).toUpperCase(),
-            todayDateString: date.toISOString().split('T')[0],
-            formattedDate: date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-        };
-    }, []);
+    // Derived state for today's date info (calculated on render to ensure freshness)
+    const date = new Date();
+    const todayName = date.toLocaleString('en-us', { weekday: 'long' }).toUpperCase();
+    const todayDateString = date.toISOString().split('T')[0];
+    const formattedDate = date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
     // Robust Memoized Filter
     const todaysItems = useMemo(() => {

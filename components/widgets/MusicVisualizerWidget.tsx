@@ -6,9 +6,10 @@ interface MusicVisualizerWidgetProps {
     height?: number;
     barCount?: number;
     color?: string;
+    gap?: number;
 }
 
-const MusicVisualizerWidget: React.FC<MusicVisualizerWidgetProps> = ({ height = 40, barCount, color }) => {
+const MusicVisualizerWidget: React.FC<MusicVisualizerWidgetProps> = ({ height = 40, barCount, color, gap = 1 }) => {
     const { analyser, isPlaying } = useMusicPlayer();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animationFrameId = useRef<number | null>(null);
@@ -74,7 +75,7 @@ const MusicVisualizerWidget: React.FC<MusicVisualizerWidgetProps> = ({ height = 
 
                 // Center bars vertically for "waveform" look if desired, or bottom aligned.
                 // Let's stick to bottom aligned for now as it's standard.
-                canvasCtx.fillRect(x, canvas.height - barHeight, barWidth - 1, barHeight);
+                canvasCtx.fillRect(x, canvas.height - barHeight, Math.max(0.5, barWidth - gap), barHeight);
 
                 x += barWidth;
             }
@@ -89,7 +90,7 @@ const MusicVisualizerWidget: React.FC<MusicVisualizerWidgetProps> = ({ height = 
                 cancelAnimationFrame(animationFrameId.current);
             }
         };
-    }, [analyser, isPlaying, height, barCount, color]);
+    }, [analyser, isPlaying, height, barCount, color, gap]);
 
     return (
         <canvas
