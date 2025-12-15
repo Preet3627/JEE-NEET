@@ -2,8 +2,8 @@ import { StudentData, ScheduleItem, Config, ResultData, ExamData, DoubtData, Stu
 
 const API_URL = '/api';
 
-// This function will handle responses, safely parsing JSON or text.
-const handleResponse = async (res: Response, url: string) => {
+// This function will handle responses, safely parsing JSON or text, and checking for AI-specific errors.
+const processResponse = async (res: Response, url: string) => {
     const responseText = await res.text();
     if (!res.ok) {
         try {
@@ -58,7 +58,7 @@ export const authFetch = async (url: string, options: RequestInit = {}) => {
         if ((options as { returnRawResponse?: boolean }).returnRawResponse) { // Custom option to signal raw response needed
             return response;
         }
-        return handleResponse(response, url); // Pass the url here
+        return processResponse(response, url); // Use new helper here
     } catch (error) {
         console.warn('API call failed, request might be queued. Make sure the backend is running and accessible.', error);
         // Offline queueing logic could be implemented here if needed
@@ -73,13 +73,13 @@ const publicFetch = (url: string, options: RequestInit = {}) => {
         ...options,
         headers: { 'Content-Type': 'application/json', ...options.headers },
     };
-    return fetch(fullUrl, fetchOptions).then(handleResponse);
+    return fetch(fullUrl, fetchOptions).then(res => processResponse(res, url)); // Use new helper here
 };
 
 // Collection of all API call functions
 export const api = {
     // Config
-    getPublicConfig: () => fetch(`${API_URL}/config/public`).then(handleResponse),
+    getPublicConfig: () => fetch(`${API_URL}/config/public`).then(res => processResponse(res, '/config/public')),
     getStatus: () => publicFetch('/status'),
 
     // Auth

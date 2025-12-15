@@ -1,10 +1,47 @@
 import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback } from 'react';
-import { StudentData } from '../types';
+import { StudentData, ScheduleItem, FlashcardDeck } from '../types'; // Import FlashcardDeck
 // FIX: Corrected import path to point to apiService.
 import { api } from '../api/apiService';
 // FIX: Corrected import path for mockData.
 import { studentDatabase } from '../data/mockData';
 import { initClient, handleSignIn as handleGoogleClientSignIn, handleSignOut as handleGoogleClientSignOut } from '../utils/googleAuth'; // Import initClient and rename functions
+
+// Helper to process user data from API, parsing any stringified JSON fields
+const processUserData = (userData: StudentData): StudentData => {
+    const processedData = { ...userData };
+
+    // Parse SCHEDULE_ITEMS
+    if (typeof processedData.SCHEDULE_ITEMS === 'string') {
+        try {
+            processedData.SCHEDULE_ITEMS = JSON.parse(processedData.SCHEDULE_ITEMS) as ScheduleItem[];
+        } catch (e) {
+            console.error("Failed to parse SCHEDULE_ITEMS:", e);
+            processedData.SCHEDULE_ITEMS = [];
+        }
+    }
+
+    // Parse CONFIG.flashcardDecks
+    if (processedData.CONFIG && typeof processedData.CONFIG.flashcardDecks === 'string') {
+        try {
+            processedData.CONFIG.flashcardDecks = JSON.parse(processedData.CONFIG.flashcardDecks) as FlashcardDeck[];
+        } catch (e) {
+            console.error("Failed to parse CONFIG.flashcardDecks:", e);
+            processedData.CONFIG.flashcardDecks = [];
+        }
+    }
+
+    // Parse CONFIG.customWidgets
+    if (processedData.CONFIG && typeof processedData.CONFIG.customWidgets === 'string') {
+        try {
+            processedData.CONFIG.customWidgets = JSON.parse(processedData.CONFIG.customWidgets) as any[]; // Assuming any[] for customWidgets
+        } catch (e) {
+            console.error("Failed to parse CONFIG.customWidgets:", e);
+            processedData.CONFIG.customWidgets = [];
+        }
+    }
+
+    return processedData;
+};
 
 interface AuthContextType {
     currentUser: StudentData | null;
@@ -58,9 +95,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const handleLoginSuccess = useCallback((data: { token: string; user: StudentData }) => {
         setToken(data.token);
         localStorage.setItem('token', data.token);
-        setCurrentUser(data.user);
-        setUserRole(data.user.role);
-        localStorage.setItem('cachedUser', JSON.stringify(data.user));
+        const processedUser = processUserData(data.user); // Process the user data
+        setCurrentUser(processedUser);
+        setUserRole(processedUser.role);
+        localStorage.setItem('cachedUser', JSON.stringify(processedUser)); // Store processed user data
         setIsDemoMode(false);
         setVerificationEmail(null);
     }, []);
@@ -73,9 +111,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         };
         try {
             const user = await api.getMe();
-            setCurrentUser(user);
-            setUserRole(user.role);
-            localStorage.setItem('cachedUser', JSON.stringify(user));
+            const processedUser = processUserData(user); // Process the user data
+            setCurrentUser(processedUser);
+            setUserRole(processedUser.role);
+            localStorage.setItem('cachedUser', JSON.stringify(processedUser)); // Store processed user data
         } catch (error) {
             console.error("Failed to refresh user. App may be offline.", error);
             // Don't log out on network failure, allow offline mode.
@@ -101,8 +140,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 if (cachedUserStr) {
                     try {
                         const cachedUser = JSON.parse(cachedUserStr);
-                        setCurrentUser(cachedUser);
-                        setUserRole(cachedUser.role);
+                        const processedCachedUser = processUserData(cachedUser); // Process cached user data
+                        setCurrentUser(processedCachedUser);
+                        setUserRole(processedCachedUser.role);
                         setIsLoading(false); // UI can render immediately with cached data
                         await refreshUser(); // Silently refresh data in the background
                     } catch {
