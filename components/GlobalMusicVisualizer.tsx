@@ -106,7 +106,7 @@ const GlobalMusicVisualizer: React.FC<GlobalMusicVisualizerProps> = ({ analyser,
                 default:
                     break;
             }
-            
+
             animationFrameId.current = requestAnimationFrame(draw);
         };
 
@@ -122,7 +122,7 @@ const GlobalMusicVisualizer: React.FC<GlobalMusicVisualizerProps> = ({ analyser,
     if (!isPlaying) return null;
 
     return (
-        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full z-0 opacity-50" />
+        <canvas ref={canvasRef} className="fixed inset-0 w-full h-full z-[5] opacity-30 pointer-events-none" />
     );
 };
 

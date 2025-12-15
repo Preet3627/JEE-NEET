@@ -123,6 +123,8 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
   };
 
 
+  // Initialize form data only when task ID changes (not on every render)
+  // Using task?.ID instead of task to prevent re-initialization when task object reference changes
   useEffect(() => {
     if (task) {
       setTaskType(getInitialTaskType());
@@ -136,7 +138,7 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
         qRanges: task.type === 'HOMEWORK' ? task.Q_RANGES : '',
         category: task.type === 'HOMEWORK' ? task.category || 'Custom' : 'Custom',
         deckId: task.type === 'ACTION' && task.SUB_TYPE === 'FLASHCARD_REVIEW' ? task.deckId || '' : (decks.length > 0 ? decks[0].id : ''),
-        answers: task.type === 'HOMEWORK' ? formatAnswers(task.answers as Record<string, string>) : '', // Cast to expected type or fix formatAnswers
+        answers: task.type === 'HOMEWORK' ? formatAnswers(task.answers as Record<string, string>) : '',
         gradient: 'gradient' in task && task.gradient ? task.gradient : '',
         imageUrl: 'imageUrl' in task && task.imageUrl ? task.imageUrl : '',
         externalLink: 'externalLink' in task && task.externalLink ? task.externalLink : '',
@@ -159,7 +161,8 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
         externalLink: '',
       });
     }
-  }, [task, decks]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task?.ID]);
 
   const [isExiting, setIsExiting] = useState(false);
   const [isAiKeyModalOpen, setIsAiKeyModalOpen] = useState(false);
