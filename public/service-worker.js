@@ -1,4 +1,7 @@
 import { precacheAndRoute } from 'workbox-precaching';
+import { registerRoute } from 'workbox-routing'; // Import registerRoute
+import { StaleWhileRevalidate, NetworkOnly } from 'workbox-strategies'; // Import StaleWhileRevalidate
+import { BackgroundSyncPlugin } from 'workbox-background-sync'; // Import BackgroundSyncPlugin
 
 // self.__WB_MANIFEST is the placeholder filled by workbox-webpack-plugin
 // with a list of all precachable assets.
@@ -13,10 +16,37 @@ self.addEventListener('activate', (event) => {
   });
 });
 
+// Cache API GET requests with a StaleWhileRevalidate strategy
+registerRoute(
+  ({ url, request }) => url.pathname.startsWith('/api/') && request.method === 'GET',
+  new StaleWhileRevalidate({
+    cacheName: 'api-cache',
+    plugins: [
+      // Consider adding cache expiration plugins if needed
+      // new ExpirationPlugin({
+      //   maxEntries: 50, // Limit the number of responses in the cache
+      //   maxAgeSeconds: 5 * 60, // Cache for 5 minutes
+      // }),
+    ],
+  })
+);
+
+// Implement Background Sync for POST/PUT/DELETE API requests
+const bgSyncPlugin = new BackgroundSyncPlugin('api-sync-queue', {
+  maxRetentionTime: 24 * 60, // Retry for a maximum of 24 hours
+});
+
+registerRoute(
+  ({ url, request }) => url.pathname.startsWith('/api/') && ['POST', 'PUT', 'DELETE'].includes(request.method),
+  new NetworkOnly({
+    plugins: [bgSyncPlugin],
+  })
+);
+
 // Custom service worker logic for offline deep linking
 self.addEventListener('fetch', (event) => {
-  // Only handle navigation requests
-  if (event.request.mode === 'navigate') {
+  // Only handle navigation requests that are not already handled by registerRoute
+  if (event.request.mode === 'navigate' && !event.request.url.startsWith(self.location.origin + '/api/')) {
     event.respondWith(
       (async () => {
         try {

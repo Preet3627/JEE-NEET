@@ -5,6 +5,7 @@ import { api } from '../api/apiService';
 // FIX: Corrected import path for mockData.
 import { studentDatabase } from '../data/mockData';
 import { initClient, handleSignIn as handleGoogleClientSignIn, handleSignOut as handleGoogleClientSignOut } from '../utils/googleAuth'; // Import initClient and rename functions
+import { saveUserDataOffline, getUserDataOffline, clearOfflineUserData } from '../utils/offlineDb'; // Import offlineDb functions
 
 // Helper to process user data from API, parsing any stringified JSON fields
 const processUserData = (userData: StudentData): StudentData => {
@@ -86,6 +87,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setIsDemoMode(false);
         setVerificationEmail(null);
         localStorage.clear();
+        clearOfflineUserData(); // Clear offline DB data
         // Also sign out from Google if signed in
         if (googleAuthStatus === 'signed_in') {
             handleGoogleClientSignOut((isSignedIn: boolean) => {
@@ -101,6 +103,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setCurrentUser(processedUser);
         setUserRole(processedUser.role);
         localStorage.setItem('cachedUser', JSON.stringify(processedUser)); // Store processed user data
+        saveUserDataOffline(processedUser); // Save to offline DB
         setIsDemoMode(false);
         setVerificationEmail(null);
     }, []);
@@ -117,6 +120,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setCurrentUser(processedUser);
             setUserRole(processedUser.role);
             localStorage.setItem('cachedUser', JSON.stringify(processedUser)); // Store processed user data
+            saveUserDataOffline(processedUser); // Save to offline DB
         } catch (error) {
             console.error("Failed to refresh user. App may be offline.", error);
             // Don't log out on network failure, allow offline mode.
@@ -136,33 +140,62 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     useEffect(() => {
         const loadInitialState = async () => {
             const storedToken = localStorage.getItem('token');
-            const cachedUserStr = localStorage.getItem('cachedUser');
+            setIsLoading(true);
 
             if (storedToken) {
-                if (cachedUserStr) {
-                    try {
-                        const cachedUser = JSON.parse(cachedUserStr);
-                        const processedCachedUser = processUserData(cachedUser); // Process cached user data
-                        setCurrentUser(processedCachedUser);
-                        setUserRole(processedCachedUser.role);
-                        setIsLoading(false); // UI can render immediately with cached data
-                        await refreshUser(); // Silently refresh data in the background
-                    } catch {
-                        logout(); // Bad cache, clear everything
-                        setIsLoading(false);
+                // 1. Try to refresh from network first
+                let userFetched = false;
+                try {
+                    await refreshUser(); // This will fetch, process, and save to offlineDb and update currentUser
+                    userFetched = true;
+                } catch (networkError) {
+                    console.warn("Failed to refresh user from network, attempting to load from offline DB:", networkError);
+                }
+
+                if (!userFetched) {
+                    // 2. If network refresh failed, try to load from offline DB
+                    const cachedUserFromLocalStorage = localStorage.getItem('cachedUser');
+                    const sid = cachedUserFromLocalStorage ? JSON.parse(cachedUserFromLocalStorage).sid : null; // Get SID from local storage cache
+
+                    if (sid) {
+                        const offlineUser = await getUserDataOffline(sid);
+                        if (offlineUser) {
+                            const processedOfflineUser = processUserData(offlineUser); // Process offline user data
+                            setCurrentUser(processedOfflineUser);
+                            setUserRole(processedOfflineUser.role);
+                            console.log("Loaded user from offline DB.");
+                            setIsLoading(false);
+                            return; // Loaded from offline DB
+                        }
                     }
-                } else {
-                    // Have a token but no user data, must fetch before rendering
-                    await refreshUser();
+                    
+                    // 3. Fallback to localStorage if offline DB is also empty or couldn't retrieve
+                    if (cachedUserFromLocalStorage) {
+                        try {
+                            const cachedUser = JSON.parse(cachedUserFromLocalStorage);
+                            const processedCachedUser = processUserData(cachedUser); // Process cached user data
+                            setCurrentUser(processedCachedUser);
+                            setUserRole(processedCachedUser.role);
+                            console.log("Loaded user from localStorage cache.");
+                            setIsLoading(false);
+                            return;
+                        } catch (e) {
+                            console.error("Failed to parse localStorage cache or offline DB empty:", e);
+                        }
+                    }
+                    // If all offline methods fail, then logout
+                    logout();
                     setIsLoading(false);
+                    return;
                 }
             } else {
                 // No token, not logged in
-                setIsLoading(false);
+                logout(); // Ensure clean state
             }
+            setIsLoading(false); // Ensure isLoading is set to false in all paths
         };
         loadInitialState();
-    }, [refreshUser, logout]); // Added dependencies
+    }, [refreshUser, logout]); // Removed currentUser?.sid as dependency, as refreshUser manages currentUser state directly.
 
     // Effect for Google API initialization
     useEffect(() => {
