@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '../api/apiService';
 import Icon from './Icon';
 import { useMusicPlayer } from '../context/MusicPlayerContext';
@@ -10,10 +10,18 @@ import { useServerStatus } from '../context/ServerStatusContext';
 
 interface MusicLibraryModalProps { onClose: () => void; }
 
+interface FileNode {
+    name: string;
+    path: string;
+    type: 'file' | 'folder';
+    children?: FileNode[];
+    track?: Track;
+}
+
 const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
     const { status } = useServerStatus();
     const [tracks, setTracks] = useState<Track[]>([]);
-    const [view, setView] = useState<'tracks' | 'playlists' | 'genres'>('tracks');
+    const [view, setView] = useState<'tracks' | 'playlists' | 'folders'>('tracks'); // 'genres' replaced/renamed if needed, or added
     const [searchQuery, setSearchQuery] = useState('');
     const { playTrack, currentTrack, isPlaying, pause, updateTrackMetadata, djDropSettings, setDjDropSettings, playDjDrop, playlists, createPlaylist, addToPlaylist, addToQueue, playNextInQueue } = useMusicPlayer();
     const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
@@ -21,10 +29,13 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
     const [error, setError] = useState('');
     const [isSyncing, setIsSyncing] = useState(false);
 
+    // Folder view state
+    const [currentPath, setCurrentPath] = useState<string>('/');
+
     const loadTracks = async (syncWithCloud = false) => {
         setIsSyncing(true);
         setError('');
-        
+
         if (!syncWithCloud) {
             setTracks([]); // No local tracks to load without adding local files
             setIsSyncing(false);
@@ -44,8 +55,8 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
         try {
             const files = await api.getMusicFiles('/');
             if (Array.isArray(files)) {
-                const audioFiles = files.filter(f => f.name.match(/\.(mp3|m4a|wav)$/i));
-                
+                const audioFiles = files.filter(f => f.name.match(/\.(mp3|m4a|wav|flac|ogg)$/i));
+
                 const remoteTracks = audioFiles.map(file => {
                     let title = file.name.replace(/\.[^/.]+$/, "");
                     let artist = 'Unknown Artist';
@@ -60,11 +71,12 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
                             }
                         }
                     }
+                    // Basic metadata extraction from path if available
                     return {
                         id: file.path, title, artist, genre: 'Unclassified', album: 'Cloud', track: '1', coverArt: '', duration: '--:--', size: file.size.toString(), path: file.path, isLocal: false
                     };
                 });
-                
+
                 setTracks(remoteTracks);
             }
         } catch (err: any) {
@@ -83,6 +95,69 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
         }
     }, [status]);
 
+    // Build File Tree for Folder View
+    const fileTree = useMemo(() => {
+        const root: FileNode = { name: 'Root', path: '/', type: 'folder', children: [] };
+
+        tracks.forEach(track => {
+            const currentTrackPath = track.path || '';
+            const parts = currentTrackPath.split('/').filter(p => p); // remove empty strings
+            let currentNode = root;
+
+            for (let i = 0; i < parts.length; i++) {
+                const part = parts[i];
+                const isFile = i === parts.length - 1;
+
+                if (isFile) {
+                    currentNode.children?.push({
+                        name: track.title || part, // Use parsed title if available
+                        path: currentTrackPath,
+                        type: 'file',
+                        track: track
+                    });
+                } else {
+                    let folder = currentNode.children?.find(c => c.name === part && c.type === 'folder');
+                    if (!folder) {
+                        folder = { name: part, path: currentNode.path === '/' ? `/${part}` : `${currentNode.path}/${part}`, type: 'folder', children: [] };
+                        currentNode.children?.push(folder);
+                    }
+                    currentNode = folder;
+                }
+            }
+        });
+        return root;
+    }, [tracks]);
+
+    const getCurrentFolderContents = () => {
+        // Traverse to current path
+        if (currentPath === '/') return fileTree.children || [];
+
+        const parts = currentPath.split('/').filter(p => p);
+        let currentNode = fileTree;
+
+        for (const part of parts) {
+            const nextNode = currentNode.children?.find(c => c.name === part && c.type === 'folder');
+            if (nextNode) {
+                currentNode = nextNode;
+            } else {
+                return []; // Path not found
+            }
+        }
+        return currentNode.children || [];
+    };
+
+    const handleFolderClick = (folderName: string) => {
+        setCurrentPath(prev => prev === '/' ? `/${folderName}` : `${prev}/${folderName}`);
+    };
+
+    const handleBackClick = () => {
+        const parts = currentPath.split('/').filter(p => p);
+        if (parts.length === 0) return;
+        parts.pop();
+        setCurrentPath(parts.length === 0 ? '/' : `/${parts.join('/')}`);
+    };
+
+    // ... Existing handlers ...
     const handleEditClick = (e: React.MouseEvent, track: Track) => {
         e.stopPropagation();
         setEditingTrackId(track.id);
@@ -97,7 +172,7 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
             setEditingTrackId(null);
         }
     };
-    
+
     const handleAddToPlaylist = (e: React.MouseEvent, track: Track) => {
         e.stopPropagation();
         const playlistName = prompt("Enter playlist name to add to (or create new):");
@@ -106,8 +181,8 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
             if (!playlist) {
                 createPlaylist(playlistName);
                 setTimeout(() => {
-                    const newPl = playlists.find(p => p.name === playlistName); 
-                    if(newPl) addToPlaylist(newPl.id, track);
+                    const newPl = playlists.find(p => p.name === playlistName);
+                    if (newPl) addToPlaylist(newPl.id, track);
                 }, 100);
             } else {
                 addToPlaylist(playlist.id, track);
@@ -125,10 +200,15 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
         e.stopPropagation();
         addToQueue(track);
     };
-    
+
     const handleSaveOffline = async (e: React.MouseEvent, track: Track) => {
         e.stopPropagation();
-        
+
+        if (!track.path) {
+            alert('Cannot save this track offline (missing path).');
+            return;
+        }
+
         const existing = await getTrackFromDb(track.id);
         if (existing) {
             alert('This track is already saved for offline use.');
@@ -156,7 +236,7 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
     const getGradient = (id: string) => {
         const gradients = ['gradient-1', 'gradient-2', 'gradient-3', 'gradient-4', 'gradient-5'];
         let hash = 0;
-        for(let i=0; i<id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
+        for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
         return gradients[Math.abs(hash) % gradients.length];
     };
 
@@ -170,23 +250,24 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
                         <h2 className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 flex items-center gap-3">
                             <Icon name="music" className="text-white" /> LIBRARY
                         </h2>
-                        <button onClick={onClose} className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20"><Icon name="arrow-left" className="w-6 h-6"/></button>
+                        <button onClick={onClose} className="p-2 rounded-full bg-white/10 text-white hover:bg-white/20"><Icon name="arrow-left" className="w-6 h-6" /></button>
                     </div>
 
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                         <div className="w-full md:w-auto flex gap-2 bg-[#222] p-1 rounded-lg">
                             <button onClick={() => setView('tracks')} className={`flex-1 md:flex-initial text-center md:px-4 py-1.5 rounded-md text-sm font-bold transition-colors ${view === 'tracks' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:text-white'}`}>Tracks</button>
                             <button onClick={() => setView('playlists')} className={`flex-1 md:flex-initial text-center md:px-4 py-1.5 rounded-md text-sm font-bold transition-colors ${view === 'playlists' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:text-white'}`}>Playlists</button>
-                            <button onClick={() => setView('genres')} className={`flex-1 md:flex-initial text-center md:px-4 py-1.5 rounded-md text-sm font-bold transition-colors ${view === 'genres' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:text-white'}`}>Genres</button>
+                            <button onClick={() => setView('folders')} className={`flex-1 md:flex-initial text-center md:px-4 py-1.5 rounded-md text-sm font-bold transition-colors ${view === 'folders' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:text-white'}`}>Folders</button>
                         </div>
                         <div className="flex gap-2">
                             <button onClick={() => loadTracks(true)} disabled={isSyncing || !status?.musicWebDAV.configured} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 disabled:opacity-50">
-                                <Icon name="sync" className={isSyncing ? 'animate-spin' : ''} /> Sync with Cloud
+                                <Icon name="refresh" className={isSyncing ? 'animate-spin' : ''} /> Sync
                             </button>
                         </div>
                         <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search tracks..." className="bg-[#222] border border-white/10 rounded-full px-5 py-3 text-base text-white w-full md:w-64 focus:border-cyan-500 outline-none transition-colors" />
                     </div>
                 </header>
+
 
                 <div className="flex-grow overflow-y-auto p-2 md:p-4 custom-scrollbar bg-[#050505] pb-24 md:pb-4">
                     {error && (
@@ -197,20 +278,20 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
                     )}
                     {(view === 'tracks' && !error) && (
                         <div className="space-y-2">
-                             {filteredTracks.map(track => {
+                            {filteredTracks.map(track => {
                                 const isCurrent = currentTrack?.id === track.id;
                                 const gradient = getGradient(track.id);
                                 return (
                                     <div key={track.id} className={`group relative flex items-center gap-3 p-2 rounded-xl transition-all duration-300 border border-transparent hover:border-white/10 ${isCurrent ? 'bg-[#1a1a1a] border-l-4 border-l-cyan-500' : 'bg-[#111] hover:bg-[#161616]'}`} onClick={() => isCurrent && isPlaying ? pause() : playTrack(track, tracks)}>
                                         <div className={`w-12 h-12 md:w-16 md:h-16 rounded-lg ${gradient} flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform relative overflow-hidden flex-shrink-0`}>
-                                             <div className="absolute inset-0 bg-black/20"></div>
+                                            <div className="absolute inset-0 bg-black/20"></div>
                                             <Icon name={isCurrent && isPlaying ? 'pause' : 'play'} className="text-white w-6 h-6 md:w-8 md:h-8 drop-shadow-md z-10" />
                                         </div>
                                         <div className="flex-grow min-w-0">
                                             {editingTrackId === track.id ? (
                                                 <div className="flex flex-col md:flex-row gap-2" onClick={e => e.stopPropagation()}>
-                                                    <input value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})} className="bg-[#333] border border-white/20 rounded px-2 py-1 text-base font-bold text-white w-full" />
-                                                    <input value={editForm.artist} onChange={e => setEditForm({...editForm, artist: e.target.value})} className="bg-[#333] border border-white/20 rounded px-2 py-1 text-sm text-gray-300 w-full" />
+                                                    <input value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} className="bg-[#333] border border-white/20 rounded px-2 py-1 text-base font-bold text-white w-full" />
+                                                    <input value={editForm.artist} onChange={e => setEditForm({ ...editForm, artist: e.target.value })} className="bg-[#333] border border-white/20 rounded px-2 py-1 text-sm text-gray-300 w-full" />
                                                     <button onClick={saveEdit} className="px-3 bg-green-600 rounded text-white font-bold text-xs">OK</button>
                                                 </div>
                                             ) : (
@@ -245,19 +326,31 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
                                             <h3 className="font-bold text-white">{playlist.name}</h3>
                                             <span className="text-sm text-gray-400">({playlist.trackIds.length} tracks)</span>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <button onClick={(e) => { e.stopPropagation(); /* Play playlist logic */ }} className="p-2 text-gray-400 hover:text-green-400"><Icon name="play" className="w-4 h-4" /></button>
-                                            <button onClick={(e) => { e.stopPropagation(); /* Edit playlist logic */ }} className="p-2 text-gray-400 hover:text-white"><Icon name="edit" className="w-4 h-4" /></button>
-                                            <button onClick={(e) => { e.stopPropagation(); /* Delete playlist logic */ }} className="p-2 text-gray-400 hover:text-red-400"><Icon name="delete" className="w-4 h-4" /></button>
-                                        </div>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     )}
-                    {(view === 'genres' && !error) && (
+                    {(view === 'folders' && !error) && (
                         <div className="space-y-2">
-                            <p className="text-gray-400">Genre view not yet implemented.</p>
+                            {currentPath !== '/' && (
+                                <button onClick={handleBackClick} className="flex items-center gap-2 p-2 text-cyan-400 hover:text-white mb-2">
+                                    <Icon name="arrow-left" className="w-4 h-4" /> Back
+                                </button>
+                            )}
+                            <p className="text-xs text-gray-500 mb-2 px-2 font-mono">{currentPath}</p>
+
+                            {getCurrentFolderContents().map((node, idx) => (
+                                <div key={idx} className="flex items-center gap-3 p-3 rounded-lg bg-[#111] hover:bg-[#1a1a1a] cursor-pointer border border-transparent hover:border-white/10 transition-all"
+                                    onClick={() => node.type === 'folder' ? handleFolderClick(node.name) : (node.track && playTrack(node.track, tracks))}
+                                >
+                                    <Icon name={node.type === 'folder' ? 'folder' : 'music'} className={`w-6 h-6 ${node.type === 'folder' ? 'text-yellow-400' : 'text-cyan-400'}`} />
+                                    <div className="min-w-0">
+                                        <p className="text-white font-medium truncate">{node.name}</p>
+                                    </div>
+                                </div>
+                            ))}
+                            {getCurrentFolderContents().length === 0 && <p className="text-center text-gray-500 py-10">Empty folder</p>}
                         </div>
                     )}
                 </div>
@@ -266,3 +359,4 @@ const MusicLibraryModal: React.FC<MusicLibraryModalProps> = ({ onClose }) => {
     );
 };
 export default MusicLibraryModal;
+

@@ -1,14 +1,13 @@
-import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback } from 'react';
-import { StudentData, ScheduleItem, FlashcardDeck } from '../types'; // Import FlashcardDeck
-// FIX: Corrected import path to point to apiService.
+import React, { createContext, useEffect, useContext, ReactNode, useCallback } from 'react';
+import { StudentData, Config, ScheduleItem, FlashcardDeck } from '../types';
 import { api } from '../api/apiService';
-// FIX: Corrected import path for mockData.
 import { studentDatabase } from '../data/mockData';
-import { initClient, handleSignIn as handleGoogleClientSignIn, handleSignOut as handleGoogleClientSignOut } from '../utils/googleAuth'; // Import initClient and rename functions
-import { saveUserDataOffline, getUserDataOffline, clearOfflineUserData } from '../utils/offlineDb'; // Import offlineDb functions
+import { initClient, handleSignIn as handleGoogleClientSignIn, handleSignOut as handleGoogleClientSignOut } from '../utils/googleAuth';
+import { saveUserDataOffline, getUserDataOffline, clearOfflineUserData } from '../utils/offlineDb';
+import { useAppStore } from '../store/useAppStore'; // Import the Zustand store
 
 // Helper to process user data from API, parsing any stringified JSON fields
-const processUserData = (userData: StudentData): StudentData => {
+export const processUserData = (userData: StudentData): StudentData => {
     const processedData = { ...userData };
 
     console.log('processUserData: Checking SCHEDULE_ITEMS:', processedData.SCHEDULE_ITEMS, 'Type:', typeof processedData.SCHEDULE_ITEMS); // Debug log
@@ -47,12 +46,7 @@ const processUserData = (userData: StudentData): StudentData => {
 };
 
 interface AuthContextType {
-    currentUser: StudentData | null;
-    userRole: 'student' | 'admin' | null;
-    token: string | null;
-    isDemoMode: boolean;
-    isLoading: boolean;
-    verificationEmail: string | null; // Email that needs verification
+    // Functions that trigger state changes (state itself comes from useAppStore)
     login: (sid: string, password: string) => Promise<void>;
     googleLogin: (credential: string) => Promise<void>;
     logout: () => void;
@@ -60,54 +54,49 @@ interface AuthContextType {
     loginWithToken: (token: string) => void;
     refreshUser: () => Promise<void>;
     updateProfile: (data: { fullName?: string; profilePhoto?: string }) => Promise<void>;
-    setVerificationEmail: (email: string | null) => void;
-    googleAuthStatus: 'signed_in' | 'signed_out' | 'loading' | 'unconfigured';
-    setGoogleAuthStatus: React.Dispatch<React.SetStateAction<'signed_in' | 'signed_out' | 'loading' | 'unconfigured'>>;
-    googleClientId: string | null; // Add googleClientId to context type
-    handleGoogleSignIn: () => void; // Add to interface
-    handleGoogleSignOut: () => void; // Add to interface
+    setVerificationEmail: (email: string | null) => void; // This setter will also become a Zustand action
+    handleGoogleSignIn: () => void;
+    handleGoogleSignOut: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [currentUser, setCurrentUser] = useState<StudentData | null>(null);
-    const [userRole, setUserRole] = useState<'student' | 'admin' | null>(null);
-    const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
-    const [isDemoMode, setIsDemoMode] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
-    const [verificationEmail, setVerificationEmail] = useState<string | null>(null);
-    const [googleAuthStatus, setGoogleAuthStatus] = useState<'signed_in' | 'signed_out' | 'loading' | 'unconfigured'>('unconfigured');
-    const [googleClientId, setGoogleClientId] = useState<string | null>(null); // Add state for googleClientId
+    // Select state and actions from the Zustand store
+    const {
+        currentUser, userRole, token, isDemoMode, isLoading, verificationEmail,
+        googleAuthStatus, googleClientId,
+        setCurrentUser, setUserRole, setToken, setIsDemoMode, setIsLoading,
+        setVerificationEmail, setGoogleAuthStatus, setGoogleClientId
+    } = useAppStore();
+
+    // Removed all useState declarations
 
     const logout = useCallback(() => {
+        setToken(null);
         setCurrentUser(null);
         setUserRole(null);
-        setToken(null);
         setIsDemoMode(false);
         setVerificationEmail(null);
         localStorage.clear();
-        clearOfflineUserData(); // Clear offline DB data
-        // Also sign out from Google if signed in
+        clearOfflineUserData();
         if (googleAuthStatus === 'signed_in') {
             handleGoogleClientSignOut((isSignedIn: boolean) => {
                 setGoogleAuthStatus(isSignedIn ? 'signed_in' : 'signed_out');
             });
         }
-    }, [googleAuthStatus]);
+    }, [googleAuthStatus, setToken, setCurrentUser, setUserRole, setIsDemoMode, setVerificationEmail, setGoogleAuthStatus]);
 
     const handleLoginSuccess = useCallback((data: { token: string; user: StudentData }) => {
         setToken(data.token);
-        localStorage.setItem('token', data.token);
-        const processedUser = processUserData(data.user); // Process the user data
+        const processedUser = processUserData(data.user);
         setCurrentUser(processedUser);
         setUserRole(processedUser.role);
-        localStorage.setItem('cachedUser', JSON.stringify(processedUser)); // Store processed user data
         saveUserDataOffline(processedUser); // Save to offline DB
         setIsDemoMode(false);
         setVerificationEmail(null);
-    }, []);
-    
+    }, [setToken, setCurrentUser, setUserRole, setIsDemoMode, setVerificationEmail]);
+
     const refreshUser = useCallback(async () => {
         const currentToken = localStorage.getItem('token');
         if (!currentToken) {
@@ -116,18 +105,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         };
         try {
             const user = await api.getMe();
-            const processedUser = processUserData(user); // Process the user data
+            const processedUser = processUserData(user);
             setCurrentUser(processedUser);
             setUserRole(processedUser.role);
-            localStorage.setItem('cachedUser', JSON.stringify(processedUser)); // Store processed user data
             saveUserDataOffline(processedUser); // Save to offline DB
         } catch (error) {
             console.error("Failed to refresh user. App may be offline.", error);
-            // Don't log out on network failure, allow offline mode.
-            // The global 'auth-error' event will handle actual 401s.
         }
-    }, [logout]);
-    
+    }, [logout, setCurrentUser, setUserRole]);
+
     useEffect(() => {
         const handleAuthError = () => {
             console.warn('Authentication error detected. Logging out.');
@@ -136,44 +122,41 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         window.addEventListener('auth-error', handleAuthError);
         return () => window.removeEventListener('auth-error', handleAuthError);
     }, [logout]);
-    
+
     useEffect(() => {
         const loadInitialState = async () => {
             const storedToken = localStorage.getItem('token');
             setIsLoading(true);
 
             if (storedToken) {
-                // 1. Try to refresh from network first
                 let userFetched = false;
                 try {
-                    await refreshUser(); // This will fetch, process, and save to offlineDb and update currentUser
+                    await refreshUser();
                     userFetched = true;
                 } catch (networkError) {
                     console.warn("Failed to refresh user from network, attempting to load from offline DB:", networkError);
                 }
 
                 if (!userFetched) {
-                    // 2. If network refresh failed, try to load from offline DB
-                    const cachedUserFromLocalStorage = localStorage.getItem('cachedUser');
-                    const sid = cachedUserFromLocalStorage ? JSON.parse(cachedUserFromLocalStorage).sid : null; // Get SID from local storage cache
+                    const cachedUserFromLocalStorage = localStorage.getItem('cachedUser'); // Still need this to get sid
+                    const sid = cachedUserFromLocalStorage ? JSON.parse(cachedUserFromLocalStorage).sid : null;
 
                     if (sid) {
                         const offlineUser = await getUserDataOffline(sid);
                         if (offlineUser) {
-                            const processedOfflineUser = processUserData(offlineUser); // Process offline user data
+                            const processedOfflineUser = processUserData(offlineUser);
                             setCurrentUser(processedOfflineUser);
                             setUserRole(processedOfflineUser.role);
                             console.log("Loaded user from offline DB.");
                             setIsLoading(false);
-                            return; // Loaded from offline DB
+                            return;
                         }
                     }
-                    
-                    // 3. Fallback to localStorage if offline DB is also empty or couldn't retrieve
+
                     if (cachedUserFromLocalStorage) {
                         try {
                             const cachedUser = JSON.parse(cachedUserFromLocalStorage);
-                            const processedCachedUser = processUserData(cachedUser); // Process cached user data
+                            const processedCachedUser = processUserData(cachedUser);
                             setCurrentUser(processedCachedUser);
                             setUserRole(processedCachedUser.role);
                             console.log("Loaded user from localStorage cache.");
@@ -183,19 +166,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                             console.error("Failed to parse localStorage cache or offline DB empty:", e);
                         }
                     }
-                    // If all offline methods fail, then logout
                     logout();
                     setIsLoading(false);
                     return;
                 }
             } else {
-                // No token, not logged in
-                logout(); // Ensure clean state
+                logout();
             }
-            setIsLoading(false); // Ensure isLoading is set to false in all paths
+            setIsLoading(false);
         };
         loadInitialState();
-    }, [refreshUser, logout]); // Removed currentUser?.sid as dependency, as refreshUser manages currentUser state directly.
+    }, [refreshUser, logout, setIsLoading, setCurrentUser, setUserRole]);
 
     // Effect for Google API initialization
     useEffect(() => {
@@ -212,7 +193,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         },
                         (error) => {
                             console.error("Google Auth Init Error:", error);
-                            setGoogleAuthStatus('unconfigured'); // Or 'error'
+                            setGoogleAuthStatus('unconfigured');
                         }
                     );
                 } else {
@@ -224,11 +205,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
         };
         loadGoogleClient();
-    }, []);
+    }, [setGoogleAuthStatus, setGoogleClientId]);
 
 
     const login = async (sid: string, password: string) => {
         try {
+            setIsLoading(true); // Set loading explicitly before API call
             const data = await api.login(sid, password);
             handleLoginSuccess(data);
             setIsLoading(false);
@@ -236,6 +218,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (error.needsVerification) {
                 setVerificationEmail(error.email);
             }
+            setIsLoading(false); // Ensure loading is reset on error
             throw new Error(error.error || 'Login failed');
         }
     };
@@ -243,13 +226,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const googleLogin = async (credential: string) => {
         try {
             setGoogleAuthStatus('loading');
+            setIsLoading(true); // Set loading explicitly
             const data = await api.googleLogin(credential);
             handleLoginSuccess(data);
             setGoogleAuthStatus('signed_in');
             setIsLoading(false);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Google Login failed:", error);
             setGoogleAuthStatus('signed_out');
+            setIsLoading(false); // Ensure loading is reset on error
             throw error;
         }
     };
@@ -257,7 +242,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const loginWithToken = useCallback(async (newToken: string) => {
         setIsLoading(true);
         setToken(newToken);
-        localStorage.setItem('token', newToken);
+        localStorage.setItem('token', newToken); // Keep localStorage token for persist middleware in Zustand
         try {
             const user = await api.getMe();
             handleLoginSuccess({ token: newToken, user });
@@ -267,11 +252,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } finally {
             setIsLoading(false);
         }
-    }, [handleLoginSuccess, logout]);
-    
+    }, [handleLoginSuccess, logout, setIsLoading, setToken]);
+
     const updateProfile = async (data: { fullName?: string; profilePhoto?: string }) => {
-        if(!currentUser) return;
+        // currentUser comes from Zustand now, so no need for if(!currentUser) return;
         try {
+            // No need to set isLoading here, refreshUser will handle updating the global state
             await api.updateProfile(data);
             await refreshUser();
         } catch (error) {
@@ -280,18 +266,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
-    const enterDemoMode = (role: 'student' | 'admin') => {
+    const enterDemoMode = useCallback((role: 'student' | 'admin') => {
         setIsDemoMode(true);
         setUserRole(role);
         if (role === 'student') {
-            setCurrentUser(studentDatabase[0]);
+            setCurrentUser(studentDatabase[0]); // studentDatabase[0] might need to be processed
         } else {
             setCurrentUser(null);
         }
         setIsLoading(false);
-    };
+    }, [setIsDemoMode, setUserRole, setCurrentUser, setIsLoading]);
 
-    const value = { currentUser, userRole, token, isDemoMode, isLoading, verificationEmail, login, googleLogin, logout, enterDemoMode, loginWithToken, refreshUser, updateProfile, setVerificationEmail, googleAuthStatus, setGoogleAuthStatus, googleClientId, handleGoogleSignIn: handleGoogleClientSignIn, handleGoogleSignOut: () => handleGoogleClientSignOut((isSignedIn: boolean) => setGoogleAuthStatus(isSignedIn ? 'signed_in' : 'signed_out')) };
+    const value = {
+        login, googleLogin, logout, enterDemoMode, loginWithToken, refreshUser,
+        updateProfile, setVerificationEmail, handleGoogleSignIn: handleGoogleClientSignIn,
+        handleGoogleSignOut: () => handleGoogleClientSignOut((isSignedIn: boolean) => setGoogleAuthStatus(isSignedIn ? 'signed_in' : 'signed_out'))
+    };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
@@ -301,5 +291,22 @@ export const useAuth = () => {
     if (context === undefined) {
         throw new Error('useAuth must be used within an AuthProvider');
     }
-    return context;
+    // Access Zustand store directly via a custom hook or directly in components
+    const {
+        currentUser, userRole, token, isDemoMode, isLoading, verificationEmail,
+        googleAuthStatus, googleClientId, allStudents, allDoubts, backendStatus, isSyncing,
+        setCurrentUser, setUserRole, setToken, setIsDemoMode, setIsLoading,
+        setVerificationEmail, setGoogleAuthStatus, setGoogleClientId,
+        setBackendStatus, setIsSyncing, setAllStudents, setAllDoubts, updateUserConfig, updateUserSettings
+    } = useAppStore(); // Select all relevant state and actions from the store
+
+    // Return the AuthContext functions merged with the Zustand state/actions
+    return {
+        ...context,
+        currentUser, userRole, token, isDemoMode, isLoading, verificationEmail,
+        googleAuthStatus, googleClientId, allStudents, allDoubts, backendStatus, isSyncing,
+        setCurrentUser, setUserRole, setToken, setIsDemoMode, setIsLoading,
+        setVerificationEmail, setGoogleAuthStatus, setGoogleClientId,
+        setBackendStatus, setIsSyncing, setAllStudents, setAllDoubts, updateUserConfig, updateUserSettings
+    };
 };

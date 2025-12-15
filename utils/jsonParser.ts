@@ -5,74 +5,87 @@
  */
 export const tryParseJson = (text: string): any | null => {
     try {
+        // First try standard parse
         const parsed = JSON.parse(text);
-        // Ensure it's a valid JSON object/array, not just a primitive like "null" or "123"
         if (parsed !== null && (typeof parsed === 'object' || Array.isArray(parsed))) {
             return parsed;
         }
     } catch (e) {
-        // Ignore parsing errors, we'll return null
+        // If strict parse fails, we might try to relax it slightly if it's very close
+        // But main correction logic is in nonAIFallbackCorrection
     }
     return null;
 };
 
 /**
- * Attempts to perform non-AI, heuristic-based auto-correction on a potentially broken JSON string.
- * Fixes common issues like missing quotes, trailing commas, missing brackets, etc.
+ * Advanced Non-AI heuristic-based auto-correction for broken JSON.
+ * Significantly improved to handle:
+ * - Missing quotes around keys
+ * - Missing quotes around string values
+ * - Trailing commas
+ * - Single quotes instead of double
+ * - Missing commas between key-values
+ * - JS-style comments
  * @param text The potentially broken JSON string.
  * @returns A string with heuristic corrections applied.
  */
 export const nonAIFallbackCorrection = (text: string): string => {
-    let correctedText = text.trim();
+    if (!text) return '{}';
+    let json = text.trim();
 
-    // 1. Add missing outer brackets/braces if they seem to be missing
-    if (!correctedText.startsWith('[') && !correctedText.startsWith('{')) {
-        correctedText = `{${correctedText}`;
-    }
-    if (!correctedText.endsWith(']') && !correctedText.endsWith('}')) {
-        correctedText = `${correctedText}}`;
-    }
-    
-    // 2. Replace single quotes with double quotes
-    correctedText = correctedText.replace(/'/g, '"');
+    // 0. Remove markdown code blocks if present
+    json = json.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
 
-    // 3. Add missing double quotes around keys (basic attempt, handles simple cases)
-    // This regex looks for:
-    // - start of object/comma (non-capturing group)
-    // - optional whitespace
-    // - an unquoted word (key) that is NOT a number (to avoid quoting numbers)
-    // - optional whitespace
-    // - a colon
-    correctedText = correctedText.replace(/([,{]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
+    // 1. Strip comments (//... and /*...*/)
+    json = json.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
 
-    // 4. Remove trailing commas (e.g., in objects or arrays like {"a":1,})
-    correctedText = correctedText.replace(/,(\s*[}\]])/g, '$1');
-
-    // 5. Add missing commas between key-value pairs or array elements (simple cases)
-    // This is tricky and can introduce errors. A simple heuristic: if a '}' or ']' is immediately
-    // followed by a '{' or '[', or if a quoted string/number is followed by a quoted string/number,
-    // and there's no comma, add one. This is very basic and prone to false positives.
-    // For now, let's focus on less risky corrections.
-
-    // 6. Handle unescaped newlines in string values (JSON doesn't allow raw newlines)
-    correctedText = correctedText.replace(/"(.*?)\n(.*?)"/gs, (match, p1, p2) => {
-        // Only replace if not already escaped
-        if (!p1.endsWith('\\')) {
-            return `"${p1}\\n${p2}"`;
+    // 2. Ensure outer brackets exist
+    if (!json.startsWith('{') && !json.startsWith('[')) {
+        // Heuristic: if it looks like a list, wrap in [], else {}
+        if (json.includes('"') || json.includes(':')) {
+            // likely object or list content
+            if (json.trim().startsWith('"') && json.includes(':')) {
+                json = `{${json}}`;
+            } else {
+                // default to object if ambiguous, or list if valid items
+                json = `{${json}}`;
+            }
         }
-        return match;
+    }
+    // Simple verification for closing
+    if (json.startsWith('{') && !json.endsWith('}')) json += '}';
+    if (json.startsWith('[') && !json.endsWith(']')) json += ']';
+
+    // 3. Replace single quotes with double quotes, but preserve ' within text
+    // This is tricky. We'll replace ' that are likely delimiters.
+    // Replace 'key': 'value' -> "key": "value"
+    json = json.replace(/'([^']+)':/g, '"$1":'); // Keys
+    json = json.replace(/: '([^']+)'/g, ': "$1"'); // Values
+
+    // 4. Add quotes to unquoted keys
+    // Match word followed by colon, not already quoted
+    json = json.replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3');
+    // Handle first key if not covered above
+    json = json.replace(/^(\s*){(\s*)([a-zA-Z0-9_]+)(\s*:)/, '$1{$2"$3"$4');
+
+    // 5. Remove trailing commas
+    json = json.replace(/,(\s*[}\]])/g, '$1');
+
+    // 6. Fix missing commas between properties
+    // Look for "value" "nextKey": or number "nextKey":
+    // This regex matches: (quote/number/bool/null) (whitespace/newline) (quote)
+    json = json.replace(/("|\d+|true|false|null)(\s+)(?=")/g, '$1,$2');
+
+    // 7. Escape unescaped newlines in strings
+    json = json.replace(/"(.*?)"/gs, (match) => {
+        return match.replace(/\n/g, '\\n');
     });
 
-    // 7. Try to fix unclosed strings (very basic)
-    correctedText = correctedText.replace(/"([^ vital"]*)$/, '"$1"');
+    // 8. Replace JS-specifics commonly hallucinated
+    json = json.replace(/undefined/g, 'null');
+    json = json.replace(/Math\.floor\(([^)]+)\)/g, '$1'); // Unwrap Math.floor
+    json = json.replace(/Number\(([^)]+)\)/g, '$1'); // Unwrap Number()
 
-    // Attempt to pretty print (can help reveal syntax issues by re-indenting)
-    try {
-        const parsed = JSON.parse(correctedText);
-        correctedText = JSON.stringify(parsed, null, 2);
-    } catch (e) {
-        // If pretty-printing fails, just keep the best-effort corrected text
-    }
-
-    return correctedText;
+    return json;
 };
+

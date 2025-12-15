@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Icon from './components/Icon';
 import { playNextSound, playStopSound, playMarkSound, vibrate } from './utils/sounds';
@@ -7,30 +8,28 @@ import { ResultData, StudentData, HomeworkData, ScheduleItem, ScheduleCardData, 
 import TestAnalysisReport from './components/TestAnalysisReport';
 import SpecificMistakeAnalysisModal from './components/SpecificMistakeAnalysisModal';
 import MusicVisualizerWidget from './components/widgets/MusicVisualizerWidget';
-import { useMusicPlayer } from './context/MusicPlayerContext'; // Import useMusicPlayer
+import { useMusicPlayer } from './context/MusicPlayerContext';
 
 type PracticeMode = 'custom' | 'jeeMains';
 
 interface McqTimerProps {
-  questionNumbers: number[];
-  questions?: PracticeQuestion[];
-  perQuestionTime: number;
-  onClose: () => void;
-  onSessionComplete: (duration: number, questions_solved: number, questions_skipped: number[]) => void;
-  onLogResult?: (result: ResultData) => void;
-  onUpdateWeaknesses?: (weaknesses: string[]) => void;
-  practiceMode: PracticeMode;
-  subject: string;
-  category: string;
-  syllabus: string;
-  student: StudentData;
-  // FIX: Updated correctAnswers type to allow string or string[]
-  correctAnswers?: Record<string, string | string[]>; // Modified to accept string or array of strings
-  onSaveTask?: (task: ScheduleItem) => void;
-  initialTask?: HomeworkData | null;
+    questionNumbers: number[];
+    questions?: PracticeQuestion[];
+    perQuestionTime: number;
+    onClose: () => void;
+    onSessionComplete: (duration: number, questions_solved: number, questions_skipped: number[]) => void;
+    onLogResult?: (result: ResultData) => void;
+    onUpdateWeaknesses?: (weaknesses: string[]) => void;
+    practiceMode: PracticeMode;
+    subject: string;
+    category: string;
+    syllabus: string;
+    student: StudentData;
+    correctAnswers?: Record<string, string | string[]>;
+    onSaveTask?: (task: ScheduleItem) => void;
+    initialTask?: HomeworkData | null;
 }
 
-// FIX: Updated normalizeAnswer to accept string | string[]
 const normalizeAnswer = (answer?: string | string[]): string | string[] => {
     if (!answer) return '';
     if (Array.isArray(answer)) {
@@ -48,19 +47,18 @@ const normalizeAnswer = (answer?: string | string[]): string | string[] => {
 
 
 const McqTimer: React.FC<McqTimerProps> = (props) => {
-    const { 
-        questionNumbers, questions, perQuestionTime, onClose, onSessionComplete, 
-        onLogResult, onUpdateWeaknesses, practiceMode, subject, category, 
-        syllabus, student, correctAnswers, onSaveTask, initialTask 
+    const {
+        questionNumbers, questions, perQuestionTime, onClose, onSessionComplete,
+        onLogResult, onUpdateWeaknesses, practiceMode, subject, category,
+        syllabus, student, correctAnswers, onSaveTask, initialTask
     } = props;
 
-    const { isPlaying, play, pause, currentTrack, nextTrack } = useMusicPlayer(); // Use music player context
+    const { isPlaying } = useMusicPlayer();
 
     const [isActive, setIsActive] = useState(false);
     const [totalSeconds, setTotalSeconds] = useState(practiceMode === 'jeeMains' ? 180 * 60 : perQuestionTime * questionNumbers.length);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-    // FIX: Updated answers state to allow string or string[]
-    const [answers, setAnswers] = useState<Record<number, string | string[]>>({}); // Updated to string | string[]
+    const [answers, setAnswers] = useState<Record<number, string | string[]>>({});
     const [timings, setTimings] = useState<Record<number, number>>({});
     const [markedForReview, setMarkedForReview] = useState<number[]>([]);
     const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
@@ -70,17 +68,17 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
     const [testResult, setTestResult] = useState<ResultData | null>(null);
     const [gradingError, setGradingError] = useState('');
     const [isGrading, setIsGrading] = useState(false);
-    // FIX: Updated feedback state to allow string or string[] for correctAnswer
     const [feedback, setFeedback] = useState<{ status: 'correct' | 'incorrect' | 'answered', correctAnswer?: string | string[] } | null>(null);
     const [isNavigating, setIsNavigating] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    
+    const [focusMode, setFocusMode] = useState(false);
+
     const [analyzingMistake, setAnalyzingMistake] = useState<number | null>(null);
 
     const questionStartTimeRef = useRef<number | null>(null);
     const timerRef = useRef<HTMLDivElement>(null);
     const totalQuestions = questions ? questions.length : questionNumbers.length;
-    
+
     const currentQuestion = questions ? questions[currentQuestionIndex] : null;
     const currentQuestionNumber = useMemo(() => {
         return questions ? questions[currentQuestionIndex].number : questionNumbers[currentQuestionIndex];
@@ -95,7 +93,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
     };
 
     const toggleFullscreen = () => {
-        const elem = timerRef.current?.closest('.modal-content-enter');
+        const elem = timerRef.current?.closest('.modal-content-enter') || timerRef.current;
         if (!elem) return;
         if (!document.fullscreenElement) {
             elem.requestFullscreen().catch(err => console.error(err));
@@ -105,14 +103,12 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
     };
 
     const getQuestionInfo = useCallback((index: number) => {
-        // If questions array is provided, use its type. Otherwise, fallback logic.
         if (questions && questions[index]) {
             return { subject: subject, type: questions[index].type };
         }
         if (practiceMode !== 'jeeMains') {
             return { subject: subject, type: 'MCQ' as 'MCQ' | 'NUM' | 'MULTI_CHOICE' };
         }
-        // JEE Mains specific question type distribution (example, adjust as needed)
         if (index < 20) return { subject: 'Physics', type: 'MCQ' as const };
         if (index < 25) return { subject: 'Physics', type: 'NUM' as const };
         if (index < 45) return { subject: 'Chemistry', type: 'MCQ' as const };
@@ -124,21 +120,19 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
 
     const gradeTest = useCallback(() => {
         if (!correctAnswers || Object.keys(correctAnswers).length === 0) return;
-    
+
         let score = 0;
         const incorrectQuestionNumbers: number[] = [];
-        
         const totalMarks = practiceMode === 'jeeMains' ? 300 : questionNumbers.length * 4;
-    
+
         questionNumbers.forEach((qNum, index) => {
             const userAnswer = answers[qNum];
             const correctAnswer = correctAnswers[qNum.toString()];
-            const questionType = currentQuestion?.type || getQuestionInfo(index).type; // Get question type
-    
-            if (!userAnswer) { // Skipped or not answered
+            const questionType = currentQuestion?.type || getQuestionInfo(index).type;
+
+            if (!userAnswer) {
                 incorrectQuestionNumbers.push(qNum);
-                // Do not deduct for skipped numerical/multi-choice, only for MCQ as per JEE standard
-                if (questionType === 'MCQ' && practiceMode === 'jeeMains') { // Only deduct if MCQ in JEE Mains
+                if (questionType === 'MCQ' && practiceMode === 'jeeMains') {
                     score -= 1;
                 }
                 return;
@@ -146,28 +140,26 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
 
             const normalizedUserAnswer = normalizeAnswer(userAnswer);
             const normalizedCorrectAnswer = normalizeAnswer(correctAnswer);
-    
+
             let isCorrect = false;
             if (questionType === 'MULTI_CHOICE') {
-                // For multiple correct, both should be arrays. Compare sorted arrays.
                 if (Array.isArray(normalizedUserAnswer) && Array.isArray(normalizedCorrectAnswer)) {
                     isCorrect = JSON.stringify(normalizedUserAnswer) === JSON.stringify(normalizedCorrectAnswer);
                 }
-            } else { // MCQ or NUM
+            } else {
                 isCorrect = normalizedUserAnswer === normalizedCorrectAnswer;
             }
-    
+
             if (isCorrect) {
                 score += 4;
-            } else { // Answered but incorrect
+            } else {
                 incorrectQuestionNumbers.push(qNum);
-                // Deduct 1 mark only for MCQs in JEE Mains. Numerical/Multi-choice usually no negative.
-                if (questionType === 'MCQ' && practiceMode === 'jeeMains') { 
+                if (questionType === 'MCQ' && practiceMode === 'jeeMains') {
                     score -= 1;
                 }
             }
         });
-    
+
         const newResult: ResultData = {
             ID: `R${Date.now()}`,
             DATE: new Date().toISOString().split('T')[0],
@@ -176,11 +168,11 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
             syllabus: syllabus,
             timings: timings,
         };
-        
+
         setTestResult(newResult);
         if (onLogResult) onLogResult(newResult);
     }, [answers, correctAnswers, questionNumbers, practiceMode, syllabus, timings, onLogResult, getQuestionInfo, currentQuestion]);
-    
+
 
     useEffect(() => {
         const onFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -208,7 +200,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
         }
         return () => { if (interval) clearInterval(interval); };
     }, [isActive, isFinished, totalSeconds, finishSession]);
-    
+
     useEffect(() => {
         if (isFinished) {
             gradeTest();
@@ -224,24 +216,21 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
     };
 
     const handleAnswerInput = (value: string | string[]) => {
-        if (isNavigating || (feedback && practiceMode !== 'jeeMains')) return; // No input if feedback is shown in quick practice
+        if (isNavigating || (feedback && practiceMode !== 'jeeMains')) return;
 
         playNextSound();
-
-        // For MULTI_CHOICE, value is already an array of selected options
         setAnswers(prev => ({ ...prev, [currentQuestionNumber]: value }));
 
-        if (practiceMode === 'jeeMains') return; // No instant feedback in JEE Mains mode
+        if (practiceMode === 'jeeMains') return;
 
         if (correctAnswers) {
             const correctAnswer = correctAnswers[currentQuestionNumber.toString()];
-            // FIX: Ensure normalizeAnswer can handle string | string[] for both arguments
             const isCorrect = JSON.stringify(normalizeAnswer(value)) === JSON.stringify(normalizeAnswer(correctAnswer));
             setFeedback({
                 status: isCorrect ? 'correct' : 'incorrect',
                 correctAnswer: correctAnswer,
             });
-            
+
             setIsNavigating(true);
             setTimeout(() => handleNextQuestion(), 1500);
 
@@ -254,7 +243,6 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
                     const reattemptTask: ScheduleCardData = {
                         ID: `A${Date.now()}${currentQuestionNumber}`, type: 'ACTION', isUserCreated: true,
                         DAY: { EN: nextDay, GU: '' }, TIME: '21:00',
-                        // FIX: Cast correctAnswer to string if it's an array for the FOCUS_DETAIL.
                         FOCUS_DETAIL: { EN: `You got this question wrong. Try solving it again. Correct answer was: ${Array.isArray(correctAnswer) ? correctAnswer.join(', ') : correctAnswer}.`, GU: '' },
                         CARD_TITLE: { EN: `[RE-ATTEMPT] Q.${currentQuestionNumber} of: ${initialTask.CARD_TITLE.EN}`, GU: '' },
                         SUBJECT_TAG: initialTask.SUBJECT_TAG, SUB_TYPE: 'ANALYSIS'
@@ -268,7 +256,7 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
             setTimeout(() => handleNextQuestion(), 1000);
         }
     };
-    
+
     const handleNextQuestion = () => {
         if (currentQuestionIndex < totalQuestions - 1) {
             navigate(currentQuestionIndex + 1);
@@ -284,9 +272,9 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
         if (newIndex >= 0 && newIndex < totalQuestions) {
             if (questionStartTimeRef.current) {
                 const timeSpent = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
-                setTimings(prev => ({...prev, [currentQuestionNumber]: (prev[currentQuestionNumber] || 0) + timeSpent}));
+                setTimings(prev => ({ ...prev, [currentQuestionNumber]: (prev[currentQuestionNumber] || 0) + timeSpent }));
             }
-            
+
             setTimeout(() => {
                 setFeedback(null);
                 questionStartTimeRef.current = Date.now();
@@ -301,9 +289,9 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
 
     const handleMarkForReview = () => {
         playMarkSound();
-        setMarkedForReview(prev => 
-            prev.includes(currentQuestionNumber) 
-                ? prev.filter(q => q !== currentQuestionNumber) 
+        setMarkedForReview(prev =>
+            prev.includes(currentQuestionNumber)
+                ? prev.filter(q => q !== currentQuestionNumber)
                 : [...prev, currentQuestionNumber]
         );
         handleNextQuestion();
@@ -313,33 +301,31 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
         setIsGrading(true);
         setGradingError('');
         try {
-            // Convert answers to a compatible format for the API if needed
             const userAnswersForApi: Record<string, string | string[]> = {};
             for (const qNum in answers) {
                 const answer = answers[qNum];
                 if (Array.isArray(answer)) {
-                    userAnswersForApi[qNum] = answer.sort().join(','); // Send multi-choice as comma-separated string
+                    userAnswersForApi[qNum] = answer.sort().join(',');
                 } else {
                     userAnswersForApi[qNum] = answer;
                 }
             }
 
-            // FIX: Pass userAnswersForApi to api.analyzeTestResults
             const resultAnalysis = await api.analyzeTestResults({ imageBase64, userAnswers: userAnswersForApi, timings, syllabus });
-            
+
             const newResult: ResultData = {
-              ID: `R${Date.now()}`,
-              DATE: new Date().toISOString().split('T')[0],
-              SCORE: `${resultAnalysis.score}/${resultAnalysis.totalMarks}`,
-              MISTAKES: resultAnalysis.incorrectQuestionNumbers.map(String),
-              syllabus: syllabus,
-              timings: timings,
-              analysis: {
-                  subjectTimings: resultAnalysis.subjectTimings,
-                  chapterScores: resultAnalysis.chapterScores,
-                  aiSuggestions: resultAnalysis.aiSuggestions,
-                  incorrectQuestionNumbers: resultAnalysis.incorrectQuestionNumbers,
-              },
+                ID: `R${Date.now()}`,
+                DATE: new Date().toISOString().split('T')[0],
+                SCORE: `${resultAnalysis.score}/${resultAnalysis.totalMarks}`,
+                MISTAKES: resultAnalysis.incorrectQuestionNumbers.map(String),
+                syllabus: syllabus,
+                timings: timings,
+                analysis: {
+                    subjectTimings: resultAnalysis.subjectTimings,
+                    chapterScores: resultAnalysis.chapterScores,
+                    aiSuggestions: resultAnalysis.aiSuggestions,
+                    incorrectQuestionNumbers: resultAnalysis.incorrectQuestionNumbers,
+                },
             };
             setTestResult(newResult);
             if (onLogResult) onLogResult(newResult);
@@ -358,102 +344,24 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
 
     const currentQuestionType = useMemo(() => {
         if (currentQuestion) return currentQuestion.type;
-        // Fallback if `questions` array is not provided (e.g. manual JEE Mains mode)
         if (correctAnswers && correctAnswers[currentQuestionNumber.toString()]) {
             const answer = correctAnswers[currentQuestionNumber.toString()];
             if (Array.isArray(answer)) return 'MULTI_CHOICE';
-            // Simple check: if answer contains only A-D, it's likely MCQ. Otherwise, NUM.
-            if (typeof answer === 'string') { // Ensure answer is string before .toUpperCase()
+            if (typeof answer === 'string') {
                 return ['A', 'B', 'C', 'D'].includes(answer.toUpperCase().trim()) ? 'MCQ' : 'NUM';
             }
         }
         if (practiceMode === 'jeeMains') {
             return getQuestionInfo(currentQuestionIndex).type;
         }
-        return 'MCQ'; // Default to MCQ
+        return 'MCQ';
     }, [currentQuestion, correctAnswers, currentQuestionNumber, practiceMode, currentQuestionIndex, getQuestionInfo]);
 
 
     const { subject: currentSubject } = getQuestionInfo(currentQuestionIndex);
-    
-    if (!isActive) {
-      return (
-          <div className="text-center">
-              {/* MacOS Traffic Light Header */}
-              <div className="flex items-center gap-2 px-4 py-3 mb-6 border-b border-white/10 bg-black/20 rounded-t-lg -mt-4 -mx-4">
-                    <button onClick={onClose} className="w-3 h-3 rounded-full bg-[#ff5f56] hover:bg-[#ff5f56]/80 shadow-inner" title="Close" aria-label="Close"></button>
-                    <div className="w-3 h-3 rounded-full bg-[#ffbd2e] hover:bg-[#ffbd2e]/80 shadow-inner"></div>
-                    <div className="w-3 h-3 rounded-full bg-[#27c93f] hover:bg-[#27c93f]/80 shadow-inner"></div>
-                    <span className="ml-2 text-xs font-medium text-gray-400 tracking-wide">Timer Ready</span>
-              </div>
-              <h3 className="text-xl font-bold text-white mb-4">Ready to Practice?</h3>
-              <p className="text-gray-400 mb-2">Total Questions: <span className="font-bold text-white">{totalQuestions}</span></p>
-              <p className="text-gray-400 mb-6">Total Time: <span className="font-bold text-white">{formatTime(totalSeconds)}</span></p>
-              <button onClick={handleStart} className="w-full flex items-center justify-center gap-2 px-4 py-3 text-base font-semibold text-white rounded-lg transition-transform hover:scale-105 active:scale-100 shadow-lg bg-gradient-to-r from-[var(--accent-color)] to-[var(--gradient-purple)]">
-                  <Icon name="play" /> Start Practice
-              </button>
-          </div>
-      )
-    }
 
-    if (isFinished) {
-        return (
-            <div className="text-center space-y-4 max-h-[75vh] overflow-y-auto">
-                <h3 className="text-2xl font-bold text-white">Session Finished!</h3>
-
-                {testResult && !testResult.analysis && (
-                    <div className="bg-gray-900/50 p-4 rounded-lg">
-                        <p className="text-lg font-semibold">Your Score:</p>
-                        <p className="text-4xl font-bold text-cyan-400">{testResult.SCORE}</p>
-                        <p className="text-sm text-gray-400">Mistakes: {testResult.MISTAKES.length}</p>
-                    </div>
-                )}
-
-                {(practiceMode === 'jeeMains' || (questions && onLogResult)) ? (
-                    testResult && testResult.analysis ? (
-                        <TestAnalysisReport 
-                          result={testResult} 
-                          onAnalyzeMistake={(qNum) => setAnalyzingMistake(qNum)}
-                        />
-                    ) : (
-                        <>
-                            <p className="text-sm text-gray-400">
-                                {testResult ? "For a detailed chapter-wise analysis, use the AI grader." : "Upload the answer key to get your score and detailed analysis instantly."}
-                            </p>
-                            <button onClick={() => setIsUploadingKey(true)} disabled={isGrading} className="w-full flex items-center justify-center gap-2 px-4 py-2 text-base font-semibold text-white rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50">
-                               {isGrading ? 'Analyzing...' : <><Icon name="upload" /> Grade with AI</>}
-                            </button>
-                            {gradingError && <p className="text-sm text-red-400">{gradingError}</p>}
-                        </>
-                    )
-                ) : (
-                    !testResult && (
-                        <div className="bg-gray-900/50 p-4 rounded-lg">
-                            <Icon name="check" className="w-10 h-10 text-green-400 mx-auto mb-2" />
-                            <p className="text-lg text-gray-300">Great work!</p>
-                            <p className="text-sm text-gray-400">
-                                Your practice session has been logged.
-                            </p>
-                        </div>
-                    )
-                )}
-
-                <button onClick={onClose} className="w-full px-4 py-2 mt-4 text-base font-semibold text-white rounded-lg bg-gray-700 hover:bg-gray-600">Close</button>
-                
-                {isUploadingKey && <AnswerKeyUploadModal onClose={() => setIsUploadingKey(false)} onGrade={handleGradeWithAI} />}
-                {analyzingMistake !== null && onUpdateWeaknesses && (
-                    <SpecificMistakeAnalysisModal 
-                        questionNumber={analyzingMistake}
-                        onClose={() => setAnalyzingMistake(null)}
-                        onSaveWeakness={(topic) => onUpdateWeaknesses([...new Set([...(student.CONFIG.WEAK || []), topic])])}
-                    />
-                )}
-            </div>
-        );
-    }
-    
+    // UI HELPER: Option Styles
     const getOptionClasses = (option: string) => {
-        // Handle current question type being MULTI_CHOICE
         const isMultiChoice = currentQuestionType === 'MULTI_CHOICE';
         const userAnswer = answers[currentQuestionNumber];
         const normalizedOption = normalizeAnswer(option);
@@ -462,18 +370,19 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
             ? userAnswer.some(ans => normalizeAnswer(ans) === normalizedOption)
             : normalizeAnswer(userAnswer) === normalizedOption;
 
+        const baseClass = "relative w-full text-left p-4 rounded-xl border-2 transition-all flex items-center gap-4 group hover:scale-[1.01] active:scale-[0.99]";
+
         if (isOptionSelected && !feedback) {
-            return 'bg-cyan-800/50 border-cyan-500 text-white';
+            return `${baseClass} bg-cyan-900/30 border-cyan-400 text-white shadow-lg shadow-cyan-900/20`;
         }
-        
+
         if (!feedback) {
-            return `bg-gray-800 border-gray-700 hover:border-cyan-500`;
+            return `${baseClass} bg-gray-800/40 border-white/5 hover:border-cyan-500/50 hover:bg-gray-800/60 text-gray-300`;
         }
-        
+
         const normalizedCorrectAnswer = normalizeAnswer(feedback.correctAnswer);
         const currentOption = normalizeAnswer(option) as string;
 
-        // Feedback logic for Multi-Choice
         if (isMultiChoice) {
             const normalizedUserAnswers = Array.isArray(userAnswer) ? userAnswer.map(normalizeAnswer) : [];
             const normalizedCorrectAnswers = Array.isArray(normalizedCorrectAnswer) ? normalizedCorrectAnswer : [];
@@ -482,197 +391,303 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
             const wasUserSelected = normalizedUserAnswers.includes(currentOption);
 
             if (isCorrectOption) {
-                // Correctly selected correct option OR correct option not selected but should have been
-                return 'bg-green-800/50 border-green-500';
+                return `${baseClass} bg-green-900/40 border-green-500 text-green-100 shadow-green-900/20`;
             } else if (wasUserSelected && !isCorrectOption) {
-                // Incorrectly selected wrong option
-                return 'bg-red-800/50 border-red-500';
+                return `${baseClass} bg-red-900/40 border-red-500 text-red-100 shadow-red-900/20`;
             }
-            return 'bg-gray-800 border-gray-700 opacity-60'; // Unselected irrelevant options
-        } else { // MCQ or NUM
-            const normalizedUserAnswer = normalizeAnswer(userAnswer); // Can be string or string[]
-            
-            if (currentOption === normalizedCorrectAnswer) return 'bg-green-800/50 border-green-500';
-            // FIX: Add type guard to ensure normalizedUserAnswer is a string before comparison
-            if (typeof normalizedUserAnswer === 'string' && currentOption === normalizedUserAnswer && normalizedUserAnswer !== normalizedCorrectAnswer) return 'bg-red-800/50 border-red-500';
-            return 'bg-gray-800 border-gray-700 opacity-60';
+            return `${baseClass} opacity-50 border-transparent bg-gray-900/30`;
+        } else {
+            const normalizedUserAnswer = normalizeAnswer(userAnswer);
+            if (currentOption === normalizedCorrectAnswer) return `${baseClass} bg-green-900/40 border-green-500 text-green-100 shadow-green-900/20`;
+            if (typeof normalizedUserAnswer === 'string' && currentOption === normalizedUserAnswer && normalizedUserAnswer !== normalizedCorrectAnswer) return `${baseClass} bg-red-900/40 border-red-500 text-red-100 shadow-red-900/20`;
+            return `${baseClass} opacity-50 border-transparent bg-gray-900/30`;
         }
     };
-  
-    return (
-        <div ref={timerRef} className="flex flex-col h-[70vh] max-h-[600px] relative fullscreen:h-screen fullscreen:max-h-screen bg-gray-900/50 p-4 rounded-lg">
-            {/* Header */}
-            <div className="flex-shrink-0 flex justify-between items-start pb-3 border-b border-gray-700">
-                <div className="flex items-center gap-4">
-                     <button onClick={toggleFullscreen} className="p-2 text-gray-400 hover:text-white" title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"} aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}>
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isFullscreen ? "M4 8V4m0 0h4M4 4l5 5m11 7h-4m0 0v4m0-4l5 5M4 16v4m0 0h4m-4 0l5-5m11-7h-4m0 0v-4m0 4l5-5" : "M4 8V4m0 0h4M4 4l5 5m11-1v4m0 0h-4m4 0l-5-5M4 16v4m0 0h4m-4 0l5-5m11 1v-4m0 0h-4m4 0l-5 5"} /></svg>
-                    </button>
-                    <div>
-                        <h4 className="text-lg font-bold text-white">{category}</h4>
-                        <p className="text-sm text-cyan-400">{currentSubject}</p>
+
+    if (!isActive) {
+        return (
+            <div className="flex flex-col items-center justify-center h-[60vh] text-center p-8 bg-[var(--glass-bg)] rounded-3xl border border-[var(--glass-border)] shadow-2xl relative overflow-hidden backdrop-blur-xl">
+                <div className="absolute inset-0 bg-gradient-to-b from-cyan-900/10 to-transparent pointer-events-none" />
+
+                <div className="w-24 h-24 mb-6 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/30 animate-pulse-slow">
+                    <Icon name="play" className="w-10 h-10 text-white fill-current translate-x-1" />
+                </div>
+
+                <h3 className="text-3xl font-bold text-white mb-2 tracking-tight">Ready to Ace It?</h3>
+                <p className="text-gray-400 mb-8 max-w-sm">
+                    You are about to start a practice session for <span className="text-cyan-400 font-semibold">{subject}</span>.
+                </p>
+
+                <div className="flex gap-6 mb-8 text-sm font-medium">
+                    <div className="px-4 py-2 rounded-lg bg-gray-800/50 border border-white/5">
+                        <span className="text-gray-400 block text-xs uppercase tracking-wider mb-1">Questions</span>
+                        <span className="text-xl text-white">{totalQuestions}</span>
+                    </div>
+                    <div className="px-4 py-2 rounded-lg bg-gray-800/50 border border-white/5">
+                        <span className="text-gray-400 block text-xs uppercase tracking-wider mb-1">Duration</span>
+                        <span className="text-xl text-white">{formatTime(totalSeconds)}</span>
                     </div>
                 </div>
-                <div className="text-right">
-                    <p className="font-mono text-xl font-bold tracking-wider">{formatTime(totalSeconds)}</p>
-                    <button onClick={() => setIsPaletteOpen(true)} className="text-xs text-gray-400 hover:text-white">
-                        Question {currentQuestionIndex + 1} / {totalQuestions}
-                    </button>
-                </div>
+
+                <button onClick={handleStart} className="px-8 py-3 bg-white text-black font-bold rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all text-lg flex items-center gap-2">
+                    <Icon name="play" className="w-5 h-5" /> Start Now
+                </button>
+
+                <button onClick={onClose} className="mt-6 text-sm text-gray-500 hover:text-white transition-colors">
+                    Cancel Session
+                </button>
             </div>
-            
-            <div className="py-2"><MusicVisualizerWidget /></div>
+        )
+    }
 
-            {/* Question Area */}
-            <div className={`flex-grow flex flex-col items-center justify-center p-4 overflow-y-auto ${isNavigating ? 'question-exit' : 'question-enter'}`}>
-                <div key={currentQuestionNumber} className="w-full">
-                    {currentQuestion ? (
-                        <div className="text-left w-full space-y-4">
-                            <p className="text-base text-gray-300 whitespace-pre-wrap">{currentQuestion.text}</p>
-                            <div className="space-y-2">
-                                {currentQuestion.type === 'NUM' ? (
-                                    <input 
-                                        type="text" 
-                                        value={(answers[currentQuestionNumber] as string) || ''} 
-                                        onChange={(e) => handleAnswerInput(e.target.value)} 
-                                        disabled={isNavigating || !!feedback} 
-                                        className="w-full max-w-xs text-center text-2xl font-mono bg-gray-900 border border-gray-600 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-60" 
-                                        placeholder="Numerical Answer" 
-                                    />
-                                ) : (
-                                    currentQuestion.options.map((option, idx) => {
-                                        const optionLetter = String.fromCharCode(65 + idx); // A, B, C, D
-                                        const isSelected = Array.isArray(answers[currentQuestionNumber]) 
-                                            ? (answers[currentQuestionNumber] as string[]).includes(optionLetter)
-                                            : answers[currentQuestionNumber] === optionLetter;
+    if (isFinished) {
+        return (
+            <div className="flex flex-col h-[80vh] bg-[var(--glass-bg)] rounded-3xl border border-[var(--glass-border)] overflow-hidden shadow-2xl">
+                <div className="flex items-center justify-between p-6 border-b border-white/10 bg-gradient-to-r from-cyan-900/10 to-transparent">
+                    <h3 className="text-2xl font-bold text-white">Session Analysis</h3>
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10"><Icon name="close" className="w-6 h-6 text-gray-400" /></button>
+                </div>
 
-                                        const handleOptionClick = () => {
-                                            if (currentQuestion.type === 'MULTI_CHOICE') {
-                                                setAnswers(prev => {
-                                                    const currentMultiAnswers = (prev[currentQuestionNumber] || []) as string[];
-                                                    if (currentMultiAnswers.includes(optionLetter)) {
-                                                        return { ...prev, [currentQuestionNumber]: currentMultiAnswers.filter(a => a !== optionLetter) };
-                                                    } else {
-                                                        return { ...prev, [currentQuestionNumber]: [...currentMultiAnswers, optionLetter] };
-                                                    }
-                                                });
-                                            } else {
-                                                handleAnswerInput(optionLetter);
-                                            }
-                                        };
-                                        return (
-                                            <button 
-                                                key={idx} 
-                                                onClick={handleOptionClick} 
-                                                disabled={isNavigating || (!!feedback && currentQuestion.type !== 'MULTI_CHOICE')} // Allow multi-choice selection even with feedback
-                                                className={`w-full text-left p-3 rounded-lg border-2 transition-colors flex items-start gap-3 disabled:cursor-default focus:outline-none ${getOptionClasses(optionLetter)}`}
-                                            >
-                                                <span className="font-bold">{optionLetter}.</span> 
-                                                <span>{option.replace(/^\([A-D]\)\s*/, '')}</span>
-                                            </button>
-                                        );
-                                    })
-                                )}
+                <div className="flex-grow overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                    {testResult && !testResult.analysis && (
+                        <div className="bg-gray-900/50 p-6 rounded-2xl border border-white/5 text-center">
+                            <p className="text-lg font-medium text-gray-400 uppercase tracking-widest mb-2">Total Score</p>
+                            <div className="text-6xl font-black text-cyan-400 mb-2 drop-shadow-lg tracking-tighter">{testResult.SCORE}</div>
+                            <p className="text-sm text-gray-400">{testResult.MISTAKES.length} Incorrect Answers</p>
+                        </div>
+                    )}
+
+                    {(practiceMode === 'jeeMains' || (questions && onLogResult)) ? (
+                        testResult && testResult.analysis ? (
+                            <TestAnalysisReport
+                                result={testResult}
+                                onAnalyzeMistake={(qNum) => setAnalyzingMistake(qNum)}
+                            />
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="p-6 rounded-2xl bg-gradient-to-br from-purple-900/20 to-blue-900/20 border border-purple-500/20 text-center">
+                                    <Icon name="bulb" className="w-12 h-12 text-purple-400 mx-auto mb-4" />
+                                    <h4 className="text-xl font-bold text-white mb-2">Get Deep AI Analysis</h4>
+                                    <p className="text-gray-400 mb-6 text-sm max-w-md mx-auto">
+                                        Upload the answer key (image or text) to get instant subject-wise breakdown, weak areas, and AI suggestions.
+                                    </p>
+                                    <button onClick={() => setIsUploadingKey(true)} disabled={isGrading} className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg shadow-purple-900/30 transition-all hover:scale-105">
+                                        {isGrading ? 'Analyzing...' : <><Icon name="upload" className="w-5 h-5" /> Analyze with AI</>}
+                                    </button>
+                                    {gradingError && <p className="text-sm text-red-400 mt-4">{gradingError}</p>}
+                                </div>
                             </div>
-                        </div>
+                        )
                     ) : (
-                        <div className="text-center">
-                             <Icon name="file-text" className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                             <h2 className="text-2xl font-bold mb-2">Question {currentQuestionNumber.toString().padStart(3,'0')}</h2>
-                             <p className="text-gray-400 mb-6">Question text is not available in this mode.</p>
-                             <p className="text-gray-300 mb-4">Select your answer:</p>
-                             {currentQuestionType === 'MCQ' || currentQuestionType === 'MULTI_CHOICE' ? (
-                                 <div className="grid grid-cols-2 gap-4 w-full max-w-xs mx-auto">
-                                     {(['A', 'B', 'C', 'D'] as const).map(option => {
-                                         const isSelected = Array.isArray(answers[currentQuestionNumber]) 
-                                            ? (answers[currentQuestionNumber] as string[]).includes(option)
-                                            : answers[currentQuestionNumber] === option;
-                                        
-                                        const handleOptionClick = () => {
-                                            if (currentQuestionType === 'MULTI_CHOICE') {
-                                                setAnswers(prev => {
-                                                    const currentMultiAnswers = (prev[currentQuestionNumber] || []) as string[];
-                                                    if (currentMultiAnswers.includes(option)) {
-                                                        return { ...prev, [currentQuestionNumber]: currentMultiAnswers.filter(a => a !== option) };
-                                                    } else {
-                                                        return { ...prev, [currentQuestionNumber]: [...currentMultiAnswers, option] };
-                                                    }
-                                                });
-                                            } else {
-                                                handleAnswerInput(option);
-                                            }
-                                        };
+                        !testResult && (
+                            <div className="text-center py-10">
+                                <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <Icon name="check" className="w-10 h-10 text-green-400" />
+                                </div>
+                                <h3 className="text-2xl font-bold text-white mb-2">Great Work!</h3>
+                                <p className="text-gray-400">Session successfully logged to your history.</p>
+                            </div>
+                        )
+                    )}
 
-                                        return (
-                                            <button 
-                                                key={option} 
-                                                onClick={handleOptionClick} 
-                                                disabled={isNavigating || (!!feedback && currentQuestionType !== 'MULTI_CHOICE')} 
-                                                className={`py-3 px-6 rounded-lg font-semibold border-2 transition-colors disabled:cursor-default focus:outline-none ${getOptionClasses(option)}`}
-                                            >
-                                                {option}
-                                            </button>
-                                        );
-                                    })}
-                                 </div>
-                             ) : (
-                                 <input type="text" value={(answers[currentQuestionNumber] as string) || ''} onChange={(e) => handleAnswerInput(e.target.value)} disabled={isNavigating || !!feedback} className="w-full max-w-xs text-center text-2xl font-mono bg-gray-900 border border-gray-600 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-60" placeholder="Numerical Answer" />
-                             )}
-                        </div>
+                    {isUploadingKey && <AnswerKeyUploadModal onClose={() => setIsUploadingKey(false)} onGrade={handleGradeWithAI} />}
+                    {analyzingMistake !== null && onUpdateWeaknesses && (
+                        <SpecificMistakeAnalysisModal
+                            questionNumber={analyzingMistake}
+                            onClose={() => setAnalyzingMistake(null)}
+                            onSaveWeakness={(topic) => onUpdateWeaknesses([...new Set([...(student.CONFIG.WEAK || []), topic])])}
+                        />
                     )}
                 </div>
             </div>
-            
-            {/* Navigation */}
-            <div className="flex-shrink-0 space-y-2">
-                 <div className="flex gap-2">
-                    <button onClick={() => navigate(currentQuestionIndex - 1)} disabled={isNavigating || currentQuestionIndex === 0} className="flex-1 py-2 text-sm font-semibold rounded-md bg-gray-700 hover:bg-gray-600 disabled:opacity-50">Back</button>
-                    <button onClick={() => setAnswers(prev => ({...prev, [currentQuestionNumber]: ''}))} disabled={isNavigating || !!feedback} className="flex-1 py-2 text-sm font-semibold rounded-md bg-gray-700 hover:bg-gray-600 disabled:opacity-50">Clear</button>
-                    <button onClick={() => navigate(currentQuestionIndex + 1)} disabled={isNavigating} className="flex-1 py-2 text-sm font-semibold rounded-md bg-gray-700 hover:bg-gray-600 disabled:opacity-50">Skip</button>
-                    <button onClick={handleMarkForReview} disabled={isNavigating} className="flex-1 py-2 text-sm font-semibold rounded-md bg-yellow-600/80 hover:bg-yellow-500/80 flex items-center justify-center gap-1 disabled:opacity-50">
-                        <Icon name="marker" className="w-4 h-4"/> Review
+        );
+    }
+
+    return (
+        <div ref={timerRef} className={`flex flex-col relative bg-[#0f1115] overflow-hidden ${isFullscreen ? 'fixed inset-0 z-50 rounded-none' : 'h-[85vh] max-h-[800px] w-full max-w-5xl rounded-3xl border border-white/5 shadow-2xl'}`}>
+
+            {/* Header Toolbar */}
+            <div className={`flex-shrink-0 flex justify-between items-center px-6 py-4 border-b border-white/5 bg-[#14161a] z-20 transition-all ${focusMode ? '-translate-y-full absolute w-full opacity-0 pointer-events-none' : ''}`}>
+                <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg shadow-inner ${currentSubject === 'Physics' ? 'bg-purple-500/20 text-purple-400' :
+                            currentSubject === 'Chemistry' ? 'bg-yellow-500/20 text-yellow-400' :
+                                currentSubject === 'Maths' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-700 text-gray-300'
+                        }`}>
+                        {currentSubject[0]}
+                    </div>
+                    <div>
+                        <h4 className="text-base font-bold text-white leading-tight">{category}</h4>
+                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                            <span>Q{currentQuestionIndex + 1} of {totalQuestions}</span>
+                            <span className="w-1 h-1 rounded-full bg-gray-600"></span>
+                            <span className="text-cyan-400 font-medium">{currentSubject}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <button onClick={() => setFocusMode(true)} className="p-2.5 rounded-xl bg-gray-800/50 text-gray-400 hover:text-white hover:bg-gray-800 transition-colors" title="Focus Mode">
+                        <Icon name="maximize" className="w-5 h-5" />
+                    </button>
+                    <button onClick={toggleFullscreen} className="p-2.5 rounded-xl bg-gray-800/50 text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+                        <Icon name={isFullscreen ? "minimize" : "expand"} className="w-5 h-5" />
+                    </button>
+                    <button onClick={finishSession} className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-xl font-semibold text-sm transition-all border border-red-500/20">
+                        End Test
                     </button>
                 </div>
-                 <button onClick={finishSession} className="w-full py-2 text-sm font-semibold rounded-md bg-red-800/80 hover:bg-red-700/80">
-                    Submit Test
-                 </button>
             </div>
-            
-            {/* Feedback Pop-up */}
-            {feedback && feedback.status !== 'answered' && (
-                <div className={`absolute bottom-[100px] left-1/2 -translate-x-1/2 p-3 rounded-lg text-white font-semibold text-sm shadow-lg animate-fadeIn
-                    ${feedback.status === 'correct' ? 'bg-green-600' : 'bg-red-600'}`}>
-                    {feedback.status === 'correct' ? 'Correct!' : `Incorrect. The correct answer is ${Array.isArray(feedback.correctAnswer) ? feedback.correctAnswer.join(', ') : feedback.correctAnswer}.`}
-                </div>
+
+            {/* Focus Mode Floating Exit */}
+            {focusMode && (
+                <button onClick={() => setFocusMode(false)} className="absolute top-4 right-4 z-50 p-2 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur-md">
+                    <Icon name="minimize" className="w-5 h-5" />
+                </button>
             )}
-            
-            {/* Question Palette */}
-            {isPaletteOpen && (
-                <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10" onClick={() => setIsPaletteOpen(false)}>
-                    <div className="bg-gray-800 p-4 rounded-lg max-w-md w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                        <h4 className="font-bold text-lg mb-4">Question Palette</h4>
-                        <div className="grid grid-cols-5 md:grid-cols-10 gap-2">
+
+            {/* Main Content Split */}
+            <div className="flex-grow flex flex-col md:flex-row overflow-hidden relative">
+
+                {/* Visualizers & Timer (Left/Bottom) */}
+                <div className={`md:w-64 bg-[#111317] border-r border-white/5 flex flex-col z-10 ${focusMode ? 'hidden' : 'block'}`}>
+                    {/* Timer */}
+                    <div className="p-6 text-center border-b border-white/5">
+                        <div className="text-xs text-gray-500 uppercase tracking-widest font-bold mb-1">Time Remaining</div>
+                        <div className={`text-4xl font-black font-mono tracking-wider ${totalSeconds < 300 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
+                            {formatTime(totalSeconds)}
+                        </div>
+                    </div>
+
+                    {/* Palette Button / Grid Preview */}
+                    <div className="flex-grow overflow-y-auto p-4 custom-scrollbar">
+                        <div className="grid grid-cols-4 gap-2">
                             {questionNumbers.map((qNum, index) => {
                                 const userAnswer = answers[qNum];
                                 const isAnswered = userAnswer !== undefined && (Array.isArray(userAnswer) ? userAnswer.length > 0 : userAnswer !== '');
                                 const isMarked = markedForReview.includes(qNum);
                                 const isCurrent = index === currentQuestionIndex;
 
-                                let statusClass = 'bg-gray-700 hover:bg-gray-600';
-                                if(isCurrent) statusClass = 'ring-2 ring-white';
-                                else if(isAnswered && isMarked) statusClass = 'bg-purple-600';
-                                else if(isAnswered) statusClass = 'bg-green-600';
-                                else if(isMarked) statusClass = 'bg-yellow-600';
+                                let statusClass = 'bg-gray-800 text-gray-500 hover:bg-gray-700';
+                                if (isCurrent) statusClass = 'bg-white text-black ring-2 ring-cyan-500 z-10 scale-105';
+                                else if (isAnswered && isMarked) statusClass = 'bg-purple-900 text-purple-200 border border-purple-500';
+                                else if (isAnswered) statusClass = 'bg-green-900 text-green-200 border border-green-500';
+                                else if (isMarked) statusClass = 'bg-yellow-900 text-yellow-200 border border-yellow-500';
 
                                 return (
-                                    <button key={qNum} onClick={() => navigate(index)} className={`w-10 h-10 text-xs rounded-md font-semibold transition-colors ${statusClass}`}>
+                                    <button key={qNum} onClick={() => navigate(index)} className={`aspect-square rounded-lg text-xs font-bold transition-all ${statusClass}`}>
                                         {qNum}
                                     </button>
                                 );
                             })}
                         </div>
                     </div>
+
+                    {/* Music Visualizer at bottom */}
+                    {isPlaying && (
+                        <div className="h-24 p-4 border-t border-white/5">
+                            <MusicVisualizerWidget height={60} color="#06b6d4" />
+                        </div>
+                    )}
+                </div>
+
+                {/* Question Area (Right/Main) */}
+                <div className={`flex-1 flex flex-col relative ${isNavigating ? 'opacity-50 scale-[0.99]' : 'opacity-100 scale-100'} transition-all duration-300`}>
+
+                    {/* Question Content */}
+                    <div className="flex-grow overflow-y-auto p-6 md:p-10 custom-scrollbar flex items-center justify-center">
+                        <div className="w-full max-w-3xl">
+                            <div className="mb-8">
+                                <span className="text-cyan-500 font-bold text-sm uppercase tracking-wider mb-2 block">Question {currentQuestionNumber}</span>
+                                {currentQuestion ? (
+                                    <p className="text-xl md:text-2xl text-white font-medium leading-relaxed whitespace-pre-wrap">{currentQuestion.text}</p>
+                                ) : (
+                                    <div className="text-center py-10 opacity-50">
+                                        <p className="text-xl">Question text unavailable</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="space-y-3">
+                                {currentQuestionType === 'NUM' && (
+                                    <input
+                                        type="text"
+                                        value={(answers[currentQuestionNumber] as string) || ''}
+                                        onChange={(e) => handleAnswerInput(e.target.value)}
+                                        disabled={isNavigating || !!feedback}
+                                        className="w-full max-w-md mx-auto block text-center text-3xl font-mono bg-[#1a1d23] border border-white/10 rounded-2xl p-6 focus:outline-none focus:ring-4 focus:ring-cyan-500/30 focus:border-cyan-500 text-white placeholder-gray-700 transition-all"
+                                        placeholder="Enter Value..."
+                                    />
+                                )}
+
+                                {(currentQuestionType === 'MCQ' || currentQuestionType === 'MULTI_CHOICE') && (
+                                    <div className="grid grid-cols-1 gap-4">
+                                        {(currentQuestion?.options || ['A', 'B', 'C', 'D'].map(o => `(${o}) Option ${o}`)).map((optionText, idx) => {
+                                            const optionLetter = currentQuestion?.options ? String.fromCharCode(65 + idx) : (optionText as string).replace(/[()]/g, ''); // Extract 'A' from '(A)' etc if fallback
+                                            const cleanOptionText = currentQuestion ? optionText.replace(/^\([A-D]\)\s*/, '') : optionText;
+
+                                            return (
+                                                <button
+                                                    key={idx}
+                                                    onClick={() => {
+                                                        if (currentQuestionType === 'MULTI_CHOICE') {
+                                                            const currentMultiAnswers = (answers[currentQuestionNumber] || []) as string[];
+                                                            if (currentMultiAnswers.includes(optionLetter)) handleAnswerInput(currentMultiAnswers.filter(a => a !== optionLetter));
+                                                            else handleAnswerInput([...currentMultiAnswers, optionLetter]);
+                                                        } else {
+                                                            handleAnswerInput(optionLetter);
+                                                        }
+                                                    }}
+                                                    disabled={isNavigating || (!!feedback && currentQuestionType !== 'MULTI_CHOICE')}
+                                                    className={getOptionClasses(optionLetter)}
+                                                >
+                                                    <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center font-bold text-gray-400 group-hover:bg-white/10 transition-colors border border-white/5">
+                                                        {optionLetter}
+                                                    </div>
+                                                    <div className="font-medium text-lg">{cleanOptionText}</div>
+
+                                                    {/* Checkmark/Cross Indicator */}
+                                                    {getOptionClasses(optionLetter).includes('green') && <Icon name="check-circle" className="w-6 h-6 text-green-400 ml-auto" />}
+                                                    {getOptionClasses(optionLetter).includes('red') && <Icon name="close" className="w-6 h-6 text-red-400 ml-auto" />}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Bottom Control Bar */}
+            <div className={`p-4 bg-[#14161a] border-t border-white/5 flex items-center justify-between z-20 ${focusMode ? 'hidden' : 'flex'}`}>
+                <button onClick={handleMarkForReview} className={`px-4 py-2 rounded-xl border flex items-center gap-2 transition-colors ${markedForReview.includes(currentQuestionNumber) ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400' : 'border-white/10 text-gray-400 hover:text-white'}`}>
+                    <Icon name="marker" className="w-4 h-4" />
+                    {markedForReview.includes(currentQuestionNumber) ? 'Marked' : 'Review'}
+                </button>
+
+                <div className="flex gap-4">
+                    <button onClick={() => navigate(currentQuestionIndex - 1)} disabled={currentQuestionIndex === 0 || isNavigating} className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center hover:bg-gray-700 disabled:opacity-50 transition-colors">
+                        <Icon name="arrow-left" className="w-5 h-5 text-white" />
+                    </button>
+                    <button onClick={() => setAnswers(prev => ({ ...prev, [currentQuestionNumber]: '' }))} className="px-6 py-2 rounded-full font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+                        Clear
+                    </button>
+                    <button onClick={() => handleNextQuestion()} disabled={isNavigating} className="px-8 py-2 bg-white text-black font-bold rounded-full hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center gap-2">
+                        {currentQuestionIndex === totalQuestions - 1 ? 'Finish' : 'Next'} <Icon name="arrow-right" className="w-4 h-4" />
+                    </button>
+                </div>
+            </div>
+
+            {/* Feedback Pop-up Toast */}
+            {feedback && feedback.status !== 'answered' && (
+                <div className={`absolute bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl text-white font-bold shadow-2xl animate-bounce-in flex items-center gap-3 backdrop-blur-md border border-white/10
+                    ${feedback.status === 'correct' ? 'bg-green-600/90' : 'bg-red-600/90'}`}>
+                    <Icon name={feedback.status === 'correct' ? 'check-circle' : 'close'} className="w-6 h-6" />
+                    <span>{feedback.status === 'correct' ? 'Correct Answer!' : `Wrong! Correct was ${Array.isArray(feedback.correctAnswer) ? feedback.correctAnswer.join(', ') : feedback.correctAnswer}`}</span>
                 </div>
             )}
+
         </div>
     );
 };

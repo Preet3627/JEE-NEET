@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ScheduleItem, ScheduleCardData, HomeworkData, FlashcardDeck } from '../types';
 import Icon from './Icon';
 import AIGenerateAnswerKeyModal from './AIGenerateAnswerKeyModal';
@@ -11,54 +11,55 @@ interface CreateEditTaskModalProps {
   onClose: () => void;
   onSave: (task: ScheduleItem) => void;
   decks: FlashcardDeck[];
+  onDelete?: (taskId: string) => void;
   animationOrigin?: { x: string, y: string };
 }
 
 type TaskType = 'ACTION' | 'HOMEWORK' | 'FLASHCARD_REVIEW';
 
 const parseAnswers = (text: string): Record<string, string> => {
-    const answers: Record<string, string> = {};
-    if (!text) return answers;
+  const answers: Record<string, string> = {};
+  if (!text) return answers;
 
-    // Check for key-value pair format first
-    if (/[:=,;\n]/.test(text)) {
-        const entries = text.split(/[,;\n]/);
-        entries.forEach(entry => {
-            const parts = entry.split(/[:=]/);
-            if (parts.length === 2) {
-                const qNum = parts[0].trim();
-                const answer = parts[1].trim();
-                if (qNum && answer) {
-                    answers[qNum] = answer;
-                }
-            }
-        });
-    } else {
-        // Assume space-separated list for questions 1, 2, 3...
-        const answerList = text.trim().split(/\s+/);
-        answerList.forEach((answer, index) => {
-            if (answer) {
-                answers[(index + 1).toString()] = answer;
-            }
-        });
-    }
-    return answers;
+  // Check for key-value pair format first
+  if (/[:=,;\n]/.test(text)) {
+    const entries = text.split(/[,;\n]/);
+    entries.forEach(entry => {
+      const parts = entry.split(/[:=]/);
+      if (parts.length === 2) {
+        const qNum = parts[0].trim();
+        const answer = parts[1].trim();
+        if (qNum && answer) {
+          answers[qNum] = answer;
+        }
+      }
+    });
+  } else {
+    // Assume space-separated list for questions 1, 2, 3...
+    const answerList = text.trim().split(/\s+/);
+    answerList.forEach((answer, index) => {
+      if (answer) {
+        answers[(index + 1).toString()] = answer;
+      }
+    });
+  }
+  return answers;
 };
 
-const formatAnswers = (answers?: Record<string, string>): string => {
-    if (!answers) return '';
-    return Object.entries(answers).map(([q, a]) => `${q}:${a}`).join('\n');
+const formatAnswers = (answers?: Record<string, string | string[]>): string => {
+  if (!answers) return '';
+  return Object.entries(answers).map(([q, a]) => `${q}:${Array.isArray(a) ? a.join(',') : a}`).join('\n');
 };
 
-const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnly = false, onClose, onSave, decks, animationOrigin }) => {
+const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnly = false, onClose, onSave, decks, onDelete, animationOrigin }) => {
   const { currentUser } = useAuth();
   const theme = currentUser?.CONFIG.settings.theme;
-    
+
   const getInitialTaskType = (): TaskType => {
-      if (!task) return 'ACTION';
-      if (task.type === 'HOMEWORK') return 'HOMEWORK';
-      if (task.type === 'ACTION' && task.SUB_TYPE === 'FLASHCARD_REVIEW') return 'FLASHCARD_REVIEW';
-      return 'ACTION';
+    if (!task) return 'ACTION';
+    if (task.type === 'HOMEWORK') return 'HOMEWORK';
+    if (task.type === 'ACTION' && task.SUB_TYPE === 'FLASHCARD_REVIEW') return 'FLASHCARD_REVIEW';
+    return 'ACTION';
   };
 
   const getInitialTime = () => {
@@ -75,7 +76,7 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
     details: '',
     subject: 'PHYSICS',
     time: '20:00',
-    day: new Date().toLocaleString('en-us', {weekday: 'long'}).toUpperCase(),
+    day: new Date().toLocaleString('en-us', { weekday: 'long' }).toUpperCase(),
     date: '',
     qRanges: '',
     category: 'Custom',
@@ -85,6 +86,42 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
     imageUrl: '',
     externalLink: '',
   });
+  const [smartInputValue, setSmartInputValue] = useState('');
+
+  // Smart Parsing Logic
+  const handleSmartInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSmartInputValue(val);
+
+    // Basic heuristic parsing
+    const lowerVal = val.toLowerCase();
+
+    // Subject detection
+    let newSubject = formData.subject;
+    if (lowerVal.includes('physics') || lowerVal.includes('phy')) newSubject = 'PHYSICS';
+    else if (lowerVal.includes('math') || lowerVal.includes('calc')) newSubject = 'MATHS';
+    else if (lowerVal.includes('chem')) newSubject = 'CHEMISTRY';
+
+    // Type detection
+    let newType = taskType;
+    if (lowerVal.includes('homework') || lowerVal.includes('hw') || lowerVal.includes('assignment')) newType = 'HOMEWORK';
+    else if (lowerVal.includes('review') || lowerVal.includes('flashcard')) newType = 'FLASHCARD_REVIEW';
+    else if (lowerVal.includes('study') || lowerVal.includes('read')) newType = 'ACTION';
+
+    // Time extraction (simple HH:MM)
+    let newTime = formData.time;
+    const timeMatch = val.match(/(\d{1,2}:\d{2})/);
+    if (timeMatch) newTime = timeMatch[1];
+
+    setFormData(prev => ({
+      ...prev,
+      title: val, // Use full input as title for now
+      subject: newSubject,
+      time: newTime
+    }));
+    setTaskType(newType);
+  };
+
 
   useEffect(() => {
     if (task) {
@@ -95,11 +132,11 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
         subject: task.SUBJECT_TAG.EN,
         time: getInitialTime(),
         day: task.DAY.EN.toUpperCase(),
-        date: 'date' in task ? task.date : '',
+        date: 'date' in task && task.date ? task.date : '',
         qRanges: task.type === 'HOMEWORK' ? task.Q_RANGES : '',
         category: task.type === 'HOMEWORK' ? task.category || 'Custom' : 'Custom',
-        deckId: task.type === 'ACTION' && task.SUB_TYPE === 'FLASHCARD_REVIEW' ? task.deckId : (decks.length > 0 ? decks[0].id : ''),
-        answers: task.type === 'HOMEWORK' ? formatAnswers(task.answers) : '',
+        deckId: task.type === 'ACTION' && task.SUB_TYPE === 'FLASHCARD_REVIEW' ? task.deckId || '' : (decks.length > 0 ? decks[0].id : ''),
+        answers: task.type === 'HOMEWORK' ? formatAnswers(task.answers as Record<string, string>) : '', // Cast to expected type or fix formatAnswers
         gradient: 'gradient' in task && task.gradient ? task.gradient : '',
         imageUrl: 'imageUrl' in task && task.imageUrl ? task.imageUrl : '',
         externalLink: 'externalLink' in task && task.externalLink ? task.externalLink : '',
@@ -111,7 +148,7 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
         details: '',
         subject: 'PHYSICS',
         time: '20:00',
-        day: new Date().toLocaleString('en-us', {weekday: 'long'}).toUpperCase(),
+        day: new Date().toLocaleString('en-us', { weekday: 'long' }).toUpperCase(),
         date: '',
         qRanges: '',
         category: 'Custom',
@@ -122,7 +159,7 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
         externalLink: '',
       });
     }
-  }, [task, decks]); // getInitialTaskType and getInitialTime depend on 'task', so include 'task' in dependencies.
+  }, [task, decks]);
 
   const [isExiting, setIsExiting] = useState(false);
   const [isAiKeyModalOpen, setIsAiKeyModalOpen] = useState(false);
@@ -135,250 +172,295 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const isEditing = !!task;
     let finalTask: ScheduleItem;
-    
-    const dayData = formData.date ? { EN: new Date(`${formData.date}T12:00:00Z`).toLocaleString('en-us', {weekday: 'long', timeZone: 'UTC'}).toUpperCase(), GU: "" } : { EN: formData.day, GU: "" };
+
+    const dayData = formData.date ? { EN: new Date(`${formData.date}T12:00:00Z`).toLocaleString('en-us', { weekday: 'long', timeZone: 'UTC' }).toUpperCase(), GU: "" } : { EN: formData.day, GU: "" };
     const dateData = formData.date ? { date: formData.date } : {};
 
     const commonData = {
-        ...dateData,
-        CARD_TITLE: { EN: formData.title, GU: "" },
-        FOCUS_DETAIL: { EN: formData.details, GU: "" },
-        SUBJECT_TAG: { EN: formData.subject.toUpperCase(), GU: "" },
-        gradient: formData.gradient || undefined,
-        imageUrl: formData.imageUrl || undefined,
-        externalLink: formData.externalLink || undefined,
-        googleEventId: isEditing && task && 'googleEventId' in task ? task.googleEventId : undefined,
+      ...dateData,
+      CARD_TITLE: { EN: formData.title, GU: "" },
+      FOCUS_DETAIL: { EN: formData.details, GU: "" },
+      SUBJECT_TAG: { EN: formData.subject.toUpperCase(), GU: "" },
+      gradient: formData.gradient || undefined,
+      imageUrl: formData.imageUrl || undefined,
+      externalLink: formData.externalLink || undefined,
+      googleEventId: isEditing && task && 'googleEventId' in task ? task.googleEventId : undefined,
     };
 
     if (taskType === 'HOMEWORK') {
-        finalTask = {
-            ID: isEditing && task.type === 'HOMEWORK' ? task.ID : `H${Date.now()}`,
-            type: 'HOMEWORK',
-            isUserCreated: true,
-            DAY: dayData,
-            ...commonData,
-            Q_RANGES: formData.qRanges,
-            TIME: formData.time || undefined,
-            category: formData.category as HomeworkData['category'],
-            answers: parseAnswers(formData.answers),
-        } as HomeworkData;
+      finalTask = {
+        ID: isEditing && task.type === 'HOMEWORK' ? task.ID : `H${Date.now()}`,
+        type: 'HOMEWORK',
+        isUserCreated: true,
+        DAY: dayData,
+        ...commonData,
+        Q_RANGES: formData.qRanges,
+        TIME: formData.time || undefined,
+        category: formData.category as HomeworkData['category'],
+        answers: parseAnswers(formData.answers),
+      } as HomeworkData;
     } else {
-        finalTask = {
-            ID: isEditing && task.type === 'ACTION' ? task.ID : `A${Date.now()}`,
-            type: 'ACTION',
-            SUB_TYPE: taskType === 'FLASHCARD_REVIEW' ? 'FLASHCARD_REVIEW' : 'DEEP_DIVE',
-            isUserCreated: true,
-            DAY: dayData,
-            ...commonData,
-            TIME: formData.time,
-            deckId: taskType === 'FLASHCARD_REVIEW' ? formData.deckId : undefined,
-        } as ScheduleCardData;
+      finalTask = {
+        ID: isEditing && task.type === 'ACTION' ? task.ID : `A${Date.now()}`,
+        type: 'ACTION',
+        SUB_TYPE: taskType === 'FLASHCARD_REVIEW' ? 'FLASHCARD_REVIEW' : 'DEEP_DIVE',
+        isUserCreated: true,
+        DAY: dayData,
+        ...commonData,
+        TIME: formData.time,
+        deckId: taskType === 'FLASHCARD_REVIEW' ? formData.deckId : undefined,
+      } as ScheduleCardData;
     }
 
     onSave(finalTask);
     handleClose();
   };
 
+  const handleDeleteTask = () => {
+    if (onDelete && task) {
+      if (window.confirm('Are you sure you want to delete this task?')) {
+        onDelete(task.ID);
+        handleClose();
+      }
+    }
+  };
+
   const animationClasses = theme === 'liquid-glass' ? (isExiting ? 'genie-out' : 'genie-in') : (isExiting ? 'modal-exit' : 'modal-enter');
   const contentAnimationClasses = theme === 'liquid-glass' ? '' : (isExiting ? 'modal-content-exit' : 'modal-content-enter');
-  const inputClass = "w-full px-4 py-2 mt-1 text-gray-200 bg-gray-900/50 border border-[var(--glass-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:bg-gray-800/50 disabled:cursor-not-allowed";
 
-  const ViewField: React.FC<{ label: string, value?: string }> = ({ label, value }) => (
+  // New Design System Classes
+  const labelClass = "block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1";
+  const inputClass = "w-full bg-gray-900/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 transition-all backdrop-blur-md hover:bg-gray-900/60";
+  const selectClass = "appearance-none w-full bg-gray-900/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all backdrop-blur-md hover:bg-gray-900/60 cursor-pointer";
+
+  const ViewField: React.FC<{ label: string, value?: string, icon?: string }> = ({ label, value, icon }) => (
     value ? (
-        <div>
-            <p className="text-sm font-bold text-gray-400">{label}</p>
-            <p className="text-gray-200 mt-1">{value}</p>
-        </div>
+      <div className="bg-white/5 border border-white/5 rounded-xl p-4">
+        <p className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2 mb-2">
+          {icon && <Icon name={icon as any} className="w-3 h-3" />}
+          {label}
+        </p>
+        <p className="text-gray-200 font-medium">{value}</p>
+      </div>
     ) : null
   );
 
   const ModalShell: React.FC<{ children: React.ReactNode, title: string }> = ({ children, title }) => (
     <div
-      className={`fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm ${animationClasses}`}
+      className={`fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-md ${animationClasses}`}
       style={{ '--clip-origin-x': animationOrigin?.x, '--clip-origin-y': animationOrigin?.y } as React.CSSProperties}
       onClick={handleClose}
     >
       <div
-        className={`w-full max-w-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--modal-border-radius)] shadow-[var(--modal-shadow)] ${contentAnimationClasses} max-h-[90vh] overflow-hidden flex flex-col`}
+        className={`w-full max-w-2xl bg-[#0f1115]/90 border border-white/10 rounded-3xl shadow-2xl ${contentAnimationClasses} max-h-[90vh] overflow-hidden flex flex-col relative`}
         onClick={(e) => e.stopPropagation()}
       >
-        {theme === 'liquid-glass' && (
-          <div className="flex-shrink-0 flex items-center p-3 border-b border-[var(--glass-border)]">
-            <div className="flex gap-2">
-              <button onClick={handleClose} className="w-3 h-3 rounded-full bg-red-500"></button>
-              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-              <div className="w-3 h-3 rounded-full bg-green-500"></div>
-            </div>
-            <h2 className="text-sm font-semibold text-white text-center flex-grow -ml-12">{title}</h2>
+        {/* Header */}
+        <div className="flex-shrink-0 flex items-center justify-between p-6 border-b border-white/5 bg-gradient-to-r from-cyan-900/10 to-transparent">
+          <div>
+            <h2 className="text-xl font-bold text-white tracking-tight">{title}</h2>
+            <p className="text-sm text-gray-400 mt-1">Manage your schedule and tasks efficiently</p>
           </div>
-        )}
-        <div className={`p-6 flex-grow overflow-y-auto ${theme === 'liquid-glass' ? '' : ''}`}>
-          {theme !== 'liquid-glass' && <h2 className="text-2xl font-bold text-white mb-4">{title}</h2>}
+          <button onClick={handleClose} className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors">
+            <Icon name="close" className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-grow overflow-y-auto custom-scrollbar">
           {children}
         </div>
+
+        {/* Footer (if viewing) */}
+        {viewOnly && task && (
+          <div className="p-6 border-t border-white/5 bg-gray-900/50 flex justify-end gap-3">
+            <button onClick={handleClose} className="px-6 py-2.5 rounded-xl font-medium text-gray-300 hover:bg-white/5 transition-colors">Close</button>
+            {onDelete && <button onClick={handleDeleteTask} className="px-6 py-2.5 rounded-xl font-medium bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-colors">Delete</button>}
+            {task.type === 'HOMEWORK' && <button className="px-6 py-2.5 rounded-xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-900/20 hover:scale-[1.02] active:scale-[0.98] transition-all">Start Task</button>}
+          </div>
+        )}
       </div>
     </div>
   );
 
   if (viewOnly && task) {
     return (
-      <ModalShell title="Task Details">
-          <div className="space-y-4">
-            <ViewField label="Title" value={task.CARD_TITLE.EN} />
-            <ViewField label="Details" value={task.FOCUS_DETAIL.EN} />
-            <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Date" value={('date' in task && task.date) ? new Date(task.date).toLocaleDateString() : task.DAY.EN} />
-                {'TIME' in task && <ViewField label="Time" value={task.TIME} />}
-            </div>
-            <ViewField label="Subject" value={task.SUBJECT_TAG.EN} />
-            {task.type === 'HOMEWORK' && <ViewField label="Questions" value={task.Q_RANGES} />}
-            
-            <div className="flex justify-end gap-4 pt-4">
-                <button type="button" onClick={handleClose} className="px-5 py-2 text-sm font-semibold rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600">Close</button>
-                {task.type === 'HOMEWORK' && <button type="submit" className="px-5 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-cyan-500 to-purple-500 text-white hover:opacity-90">Start Practice</button>}
+      <ModalShell title="Task Overview">
+        <div className="p-6 space-y-4">
+          {/* Header Info */}
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-4">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-bold shadow-inner ${task.SUBJECT_TAG.EN === 'PHYSICS' ? 'bg-purple-500/20 text-purple-400' :
+                task.SUBJECT_TAG.EN === 'CHEMISTRY' ? 'bg-yellow-500/20 text-yellow-400' :
+                  task.SUBJECT_TAG.EN === 'MATHS' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400'
+                }`}>
+                {task.SUBJECT_TAG.EN[0]}
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-white">{task.CARD_TITLE.EN}</h3>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-white/10 text-gray-300 uppercase tracking-wider">{task.type.replace('_', ' ')}</span>
+                  <span className="text-sm text-gray-400">{task.DAY.EN}</span>
+                </div>
+              </div>
             </div>
           </div>
+
+          <ViewField label="Details" value={task.FOCUS_DETAIL.EN} icon="align-left" />
+
+          <div className="grid grid-cols-2 gap-4">
+            <ViewField label="Date" value={('date' in task && task.date) ? new Date(task.date).toLocaleDateString() : task.DAY.EN} icon="calendar" />
+            {'TIME' in task && <ViewField label="Time" value={task.TIME} icon="clock" />}
+          </div>
+
+          {task.type === 'HOMEWORK' && <ViewField label="Questions" value={task.Q_RANGES} icon="list" />}
+        </div>
       </ModalShell>
     );
   }
 
   return (
     <>
-      <ModalShell title={task ? 'Edit Task' : 'Create New Task'}>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-sm font-bold text-gray-400">Task Type</label>
-              <select value={taskType} onChange={e => setTaskType(e.target.value as TaskType)} className={inputClass}>
-                  <option value="ACTION">Study Session</option>
-                  <option value="HOMEWORK">Homework</option>
-                  <option value="FLASHCARD_REVIEW">Flashcard Review</option>
-              </select>
-            </div>
+      <ModalShell title={task ? 'Edit Task' : 'Create Task'}>
+        <div className="p-6 space-y-6">
 
-            <div>
-              <label className="text-sm font-bold text-gray-400">Title</label>
-              <input required autoComplete="off" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className={inputClass} />
+          {/* Smart Input (Only for new tasks or explicit usage) */}
+          {!task && (
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Icon name="sparkles" className="h-5 w-5 text-cyan-400 animate-pulse" />
+              </div>
+              <input
+                className="w-full bg-gradient-to-r from-gray-900/80 to-gray-800/80 border border-cyan-500/30 rounded-2xl pl-12 pr-4 py-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 shadow-lg shadow-cyan-900/10 transition-all font-medium"
+                placeholder="Smart Input: 'Maths homework tomorrow at 5pm'..."
+                value={smartInputValue}
+                onChange={handleSmartInputChange}
+              />
+              <div className="absolute top-full left-0 mt-2 w-full text-xs text-gray-500 px-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                AI-free smart parsing active
+              </div>
             </div>
-             <div>
-              <label className="text-sm font-bold text-gray-400">Details</label>
-              <textarea required autoComplete="off" value={formData.details} onChange={e => setFormData({...formData, details: e.target.value})} className={inputClass}></textarea>
-            </div>
-             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                 <div>
-                    <label className="text-sm font-bold text-gray-400">Repeating Day</label>
-                    <select required value={formData.day} onChange={e => setFormData({...formData, day: e.target.value, date: ''})} className={`${inputClass} disabled:opacity-50`} disabled={!!formData.date}>
-                       {daysOfWeek.map(d => <option key={d} value={d}>{d.charAt(0) + d.slice(1).toLowerCase()}</option>)}
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+
+            {/* Main Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+              {/* Left Column */}
+              <div className="space-y-4">
+                <div>
+                  <label className={labelClass}>Subject</label>
+                  <div className="relative">
+                    <select required value={formData.subject} onChange={e => setFormData({ ...formData, subject: e.target.value })} className={selectClass}>
+                      <option value="PHYSICS">Physics</option>
+                      <option value="CHEMISTRY">Chemistry</option>
+                      <option value="MATHS">Maths</option>
+                      <option value="OTHER">Other</option>
                     </select>
-                </div>
-                <div>
-                    <label className="text-sm font-bold text-gray-400">Or Specific Date</label>
-                    <input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className={inputClass} />
-                </div>
-             </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                 <div>
-                    <label className="text-sm font-bold text-gray-400">Time</label>
-                    <input type="time" required={taskType !== 'HOMEWORK'} value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} className={inputClass} />
-                </div>
-                 <div>
-                    <label className="text-sm font-bold text-gray-400">Subject</label>
-                    <select required value={formData.subject} onChange={e => setFormData({...formData, subject: e.target.value})} className={inputClass}>
-                        <option value="PHYSICS">Physics</option>
-                        <option value="CHEMISTRY">Chemistry</option>
-                        <option value="MATHS">Maths</option>
-                        <option value="OTHER">Other</option>
-                    </select>
-                </div>
-             </div>
-
-            <div className="border-t border-[var(--glass-border)] pt-4 space-y-4 mt-4">
-                <h3 className="text-md font-semibold text-gray-300">Customization (Optional)</h3>
-                <div>
-                  <label className="text-sm font-bold text-gray-400">External Link (e.g., Lecture URL)</label>
-                  <input
-                    value={formData.externalLink}
-                    onChange={e => setFormData({...formData, externalLink: e.target.value})}
-                    className={inputClass}
-                    placeholder="https://example.com/lecture/..."
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-bold text-gray-400">Custom Background Image URL</label>
-                  <input
-                    value={formData.imageUrl}
-                    onChange={e => setFormData({...formData, imageUrl: e.target.value})}
-                    className={inputClass}
-                    placeholder="https://example.com/image.png"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-bold text-gray-400">Custom CSS Gradient</label>
-                  <input
-                    value={formData.gradient}
-                    onChange={e => setFormData({...formData, gradient: e.target.value})}
-                    className={inputClass}
-                    placeholder="linear-gradient(to right, #ff7e5f, #feb47b)"
-                  />
-                </div>
-            </div>
-
-            {taskType === 'HOMEWORK' && (
-              <>
-                <div className="mt-4">
-                  <label className="text-sm font-bold text-gray-400">Question Ranges</label>
-                  <input value={formData.qRanges} onChange={e => setFormData({...formData, qRanges: e.target.value})} className={inputClass} placeholder="e.g., Ex 1.1: 1-10; PYQs: 15-20" />
-                </div>
-                <div>
-                  <label className="text-sm font-bold text-gray-400">Category</label>
-                  <select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value as 'Custom' | 'Level-1' | 'Level-2' | 'Classroom-Discussion' | 'PYQ'})} className={inputClass}>
-                      <option value="Custom">Custom</option>
-                      <option value="Level-1">Level-1</option>
-                      <option value="Level-2">Level-2</option>
-                      <option value="Classroom-Discussion">Classroom-Discussion</option>
-                      <option value="PYQ">PYQ</option>
-                  </select>
-                </div>
-                <div>
-                    <div className="flex justify-between items-center">
-                        <label className="text-sm font-bold text-gray-400">Answer Key (Optional)</label>
-                        <button type="button" onClick={() => setIsAiKeyModalOpen(true)} className="text-xs font-semibold text-cyan-400 hover:underline flex items-center gap-1">
-                            <Icon name="gemini" className="w-3 h-3" /> Generate with AI
-                        </button>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
+                      <Icon name="chevron-down" className="w-4 h-4" />
                     </div>
-                  <textarea autoComplete="off" value={formData.answers} onChange={e => setFormData({...formData, answers: e.target.value})} className={`${inputClass} h-24 font-mono`} placeholder="Formats:&#10;1:A, 2:C, 3:12.5 (key-value)&#10;A C 12.5 (space-separated list)" />
+                  </div>
                 </div>
-              </>
-            )}
-            
-            {taskType === 'FLASHCARD_REVIEW' && (
+
+                <div>
+                  <label className={labelClass}>Task Type</label>
+                  <div className="relative">
+                    <select value={taskType} onChange={e => setTaskType(e.target.value as TaskType)} className={selectClass}>
+                      <option value="ACTION">Study Session</option>
+                      <option value="HOMEWORK">Homework</option>
+                      <option value="FLASHCARD_REVIEW">Flashcard Review</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400">
+                      <Icon name="chevron-down" className="w-4 h-4" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column */}
+              <div className="space-y-4">
+                <div>
+                  <label className={labelClass}>Repeating Day / Date</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-grow">
+                      <select required value={formData.day} onChange={e => setFormData({ ...formData, day: e.target.value, date: '' })} className={`${selectClass} ${formData.date ? 'opacity-50' : ''}`} disabled={!!formData.date}>
+                        {daysOfWeek.map(d => <option key={d} value={d}>{d.charAt(0) + d.slice(1).toLowerCase()}</option>)}
+                      </select>
+                    </div>
+                    <input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className={`${inputClass} w-auto`} title="Specific Date" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Time</label>
+                  <input type="time" required={taskType !== 'HOMEWORK'} value={formData.time} onChange={e => setFormData({ ...formData, time: e.target.value })} className={inputClass} />
+                </div>
+              </div>
+            </div>
+
+            {/* Details Section */}
+            <div className="space-y-4 pt-2">
               <div>
-                <label className="text-sm font-bold text-gray-400">Flashcard Deck</label>
-                <select required value={formData.deckId} onChange={e => setFormData({...formData, deckId: e.target.value})} className={`${inputClass} disabled:opacity-50`} disabled={decks.length === 0}>
-                  {decks.length > 0 ? (
-                      decks.map(d => <option key={d.id} value={d.id}>{d.name}</option>)
-                  ) : (
-                      <option>No decks available</option>
-                  )}
+                <label className={labelClass}>Title</label>
+                <input required autoComplete="off" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className={inputClass} placeholder="e.g. Chapter 4 Integration" />
+              </div>
+
+              <div>
+                <label className={labelClass}>Focus Details</label>
+                <textarea required rows={3} autoComplete="off" value={formData.details} onChange={e => setFormData({ ...formData, details: e.target.value })} className={`${inputClass} resize-none`} placeholder="What specific topics or problems?"></textarea>
+              </div>
+            </div>
+
+            {/* Type Specific Fields */}
+            {taskType === 'HOMEWORK' && (
+              <div className="bg-cyan-900/10 border border-cyan-500/20 rounded-xl p-4 animate-fade-in">
+                <label className={labelClass}>Question Ranges</label>
+                <input value={formData.qRanges} onChange={e => setFormData({ ...formData, qRanges: e.target.value })} className={inputClass} placeholder="e.g. 1-10, 15, 20-25" />
+                <p className="text-[10px] text-gray-500 mt-1 ml-1">Comma separated ranges</p>
+              </div>
+            )}
+
+            {taskType === 'FLASHCARD_REVIEW' && decks.length > 0 && (
+              <div className="bg-purple-900/10 border border-purple-500/20 rounded-xl p-4 animate-fade-in">
+                <label className={labelClass}>Select Deck</label>
+                <select value={formData.deckId} onChange={e => setFormData({ ...formData, deckId: e.target.value })} className={selectClass}>
+                  {decks.map(deck => (
+                    <option key={deck.id} value={deck.id}>{deck.name} ({deck.cards.length} cards)</option>
+                  ))}
                 </select>
               </div>
             )}
 
-            <div className="flex justify-end gap-4 pt-4">
-              <button type="button" onClick={handleClose} className="px-5 py-2 text-sm font-semibold rounded-lg bg-gray-700 text-gray-200 hover:bg-gray-600">Cancel</button>
-              <button type="submit" className="px-5 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-cyan-500 to-purple-500 text-white hover:opacity-90">Save Task</button>
+            {/* Advanced / Optional Toggles could go here */}
+
+            {/* Footer Actions */}
+            <div className="pt-6 flex items-center justify-between border-t border-white/5 mt-6">
+              {onDelete && task ? (
+                <button type="button" onClick={handleDeleteTask} className="text-red-400 hover:text-red-300 text-sm font-semibold px-2 py-1 transition-colors">Delete Task</button>
+              ) : <div></div>}
+
+              <div className="flex gap-3">
+                <button type="button" onClick={handleClose} className="px-6 py-2.5 rounded-xl font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors">Cancel</button>
+                <button type="submit" className="px-8 py-2.5 rounded-xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-900/20 hover:shadow-cyan-900/40 hover:scale-[1.02] active:scale-[0.98] transition-all">
+                  {task ? 'Save Changes' : 'Create Task'}
+                </button>
+              </div>
             </div>
           </form>
+        </div>
       </ModalShell>
+
+      {/* Answer Key Generation Modal placeholder if needed */}
       {isAiKeyModalOpen && (
-          <AIGenerateAnswerKeyModal
-              onClose={() => setIsAiKeyModalOpen(false)}
-              onKeyGenerated={(keyText) => {
-                  setFormData(prev => ({ ...prev, answers: keyText }));
-              }}
-          />
+        <AIGenerateAnswerKeyModal
+          onClose={() => setIsAiKeyModalOpen(false)}
+          onKeyGenerated={(key) => setFormData(prev => ({ ...prev, answers: key }))}
+        />
       )}
     </>
   );

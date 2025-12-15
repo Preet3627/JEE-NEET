@@ -5,26 +5,26 @@ import Icon from '../Icon';
 import MusicVisualizerWidget from './MusicVisualizerWidget';
 
 interface MusicPlayerWidgetProps {
-  onOpenLibrary: () => void;
+    onOpenLibrary: () => void;
 }
 
 const MusicPlayerWidget: React.FC<MusicPlayerWidgetProps> = ({ onOpenLibrary }) => {
-    const { 
-        currentTrack, 
-        isPlaying, 
-        play, 
+    const {
+        currentTrack,
+        isPlaying,
+        play,
         pause,
         nextTrack,
         prevTrack,
         toggleFullScreenPlayer,
     } = useMusicPlayer();
-    
+
     // Ensure the widget has minimum height even when empty
     const containerClass = "bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl shadow-lg p-4 backdrop-blur-sm h-full min-h-[10rem] flex flex-col justify-between relative overflow-hidden group";
 
     if (!currentTrack) {
         return (
-            <div 
+            <div
                 className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl shadow-lg p-6 backdrop-blur-sm h-full min-h-[10rem] flex flex-col items-center justify-center text-center cursor-pointer group hover:border-cyan-500/50 transition-all"
                 onClick={onOpenLibrary}
             >
@@ -36,33 +36,49 @@ const MusicPlayerWidget: React.FC<MusicPlayerWidgetProps> = ({ onOpenLibrary }) 
             </div>
         );
     }
-    
+
     return (
         <div className={containerClass}>
-            <div className="absolute inset-0 opacity-20 pointer-events-none">
-                 {currentTrack.coverArtUrl && <img src={currentTrack.coverArtUrl} alt="" className="w-full h-full object-cover blur-3xl" />}
+            {/* Background Image / Default */}
+            <div className="absolute inset-0 opacity-20 pointer-events-none transition-all duration-700">
+                {currentTrack.coverArtUrl ? (
+                    <img src={currentTrack.coverArtUrl} alt="" className="w-full h-full object-cover blur-3xl scale-110" />
+                ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-indigo-900 via-purple-900 to-black opacity-80">
+                        {/* Abstract pattern or noise could go here */}
+                    </div>
+                )}
             </div>
 
             <div className="relative z-10 flex items-start justify-between">
-                 <div className="flex items-center gap-3 min-w-0 cursor-pointer" onClick={toggleFullScreenPlayer}>
-                    <img src={currentTrack.coverArtUrl} alt="art" className={`w-12 h-12 rounded-lg object-cover shadow-md ${isPlaying ? 'animate-pulse' : ''}`} />
+                <div className="flex items-center gap-3 min-w-0 cursor-pointer" onClick={toggleFullScreenPlayer}>
+                    <div className="w-12 h-12 rounded-lg overflow-hidden shadow-md shrink-0 bg-gray-800 border border-white/10 flex items-center justify-center relative">
+                        {currentTrack.coverArtUrl ? (
+                            <img src={currentTrack.coverArtUrl} alt="art" className={`w-full h-full object-cover ${isPlaying ? 'animate-pulse-slow' : ''}`} />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-tr from-cyan-600 to-blue-700 text-white">
+                                <Icon name="music" className="w-6 h-6 drop-shadow-md" />
+                            </div>
+                        )}
+                    </div>
                     <div className="min-w-0">
                         <p className="font-bold text-white truncate text-sm">{currentTrack.title}</p>
                         <p className="text-xs text-gray-300 truncate">{currentTrack.artist}</p>
                     </div>
                 </div>
-                <button onClick={onOpenLibrary} className="p-1.5 rounded-full bg-black/30 text-gray-400 hover:text-white transition-opacity opacity-0 group-hover:opacity-100">
+                <button onClick={onOpenLibrary} className="p-1.5 rounded-full bg-black/30 text-gray-400 hover:text-white transition-opacity opacity-0 group-hover:opacity-100 backdrop-blur-md">
                     <Icon name="music" className="w-4 h-4" />
                 </button>
             </div>
 
             <div className="relative z-10 mt-4">
-                <div className="h-10 -mx-4 -mb-2 opacity-70">
-                    <MusicVisualizerWidget />
+                {/* Fixed visualizer container with constrained height */}
+                <div className="h-12 w-full flex items-center justify-center opacity-80 mb-2 overflow-hidden">
+                    <MusicVisualizerWidget height={40} />
                 </div>
-                <div className="flex justify-between items-center bg-black/40 p-1 rounded-full mt-2 backdrop-blur-md border border-white/5">
+                <div className="flex justify-between items-center bg-black/40 p-1.5 rounded-full backdrop-blur-md border border-white/5">
                     <button onClick={prevTrack} className="p-2 text-gray-300 hover:text-white transition-colors rounded-full"><Icon name="arrow-left" className="w-5 h-5" /></button>
-                    <button onClick={isPlaying ? pause : play} className="p-3 bg-white text-black rounded-full hover:scale-110 transition-transform shadow-lg">
+                    <button onClick={isPlaying ? pause : play} className="p-2.5 bg-white text-black rounded-full hover:scale-105 transition-transform shadow-lg shadow-white/10 active:scale-95">
                         <Icon name={isPlaying ? "pause" : "play"} className="w-5 h-5 fill-current" />
                     </button>
                     <button onClick={nextTrack} className="p-2 text-gray-300 hover:text-white transition-colors rounded-full"><Icon name="arrow-right" className="w-5 h-5" /></button>

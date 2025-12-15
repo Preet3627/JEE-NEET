@@ -40,7 +40,9 @@ import StudyMaterialView from './StudyMaterialView';
 import FileViewerModal from './FileViewerModal';
 import AIGenerateFlashcardsModal from './flashcards/AIGenerateFlashcardsModal';
 import EditResultModal from './EditResultModal';
+import ZUstat from './ZUstat';
 import MusicVisualizerWidget from './widgets/MusicVisualizerWidget';
+import InteractiveFlashcardWidget from './widgets/InteractiveFlashcardWidget';
 import GoogleAssistantGuideModal from './GoogleAssistantGuideModal';
 import DeepLinkConfirmationModal from './DeepLinkConfirmationModal';
 import AIGuideModal from './AIGuideModal';
@@ -48,7 +50,6 @@ import { useAuth } from '../context/AuthContext';
 import MoveTasksModal from './MoveTasksModal';
 import TodayPlanner from './TodayPlanner';
 import CountdownWidget from './widgets/CountdownWidget';
-import InteractiveFlashcardWidget from './widgets/InteractiveFlashcardWidget';
 import MotivationalQuoteWidget from './widgets/MotivationalQuoteWidget';
 import MusicPlayerWidget from './widgets/MusicPlayerWidget';
 import MusicLibraryModal from './MusicLibraryModal';
@@ -141,12 +142,12 @@ interface StudentDashboardProps extends ModalControlProps {
 }
 
 const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
-    const { 
-        student, onSaveTask, onSaveBatchTasks, onDeleteTask, onToggleMistakeFixed, onUpdateConfig, onLogStudySession, 
-        onUpdateWeaknesses, onLogResult, onAddExam, onUpdateExam, onDeleteExam, onExportToIcs, onBatchImport, 
-        googleAuthStatus, onGoogleSignIn, onGoogleSignOut, onBackupToDrive, onRestoreFromDrive, allDoubts, 
+    const {
+        student, onSaveTask, onSaveBatchTasks, onDeleteTask, onToggleMistakeFixed, onUpdateConfig, onLogStudySession,
+        onUpdateWeaknesses, onLogResult, onAddExam, onUpdateExam, onDeleteExam, onExportToIcs, onBatchImport,
+        googleAuthStatus, onGoogleSignIn, onGoogleSignOut, onBackupToDrive, onRestoreFromDrive, allDoubts,
         onPostDoubt, onPostSolution, deepLinkAction, setDeepLinkAction, openModal, closeModal,
-        
+
         // Destructure all modal state setters and getters from modalControlProps
         isCreateModalOpen, setIsCreateModalOpen,
         isAiParserModalOpen, setisAiParserModalOpen,
@@ -177,12 +178,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         aiChatHistory, setAiChatHistory,
         showAiChatFab, setShowAiChatFab,
         isAiChatLoading, setIsAiChatLoading,
-        isAiDoubtSolverOpen, setIsAiDoubtSolverOpen, 
+        isAiDoubtSolverOpen, setIsAiDoubtSolverOpen,
         isCreateDeckModalOpen, setCreateDeckModalOpen,
         isAiFlashcardModalOpen, setAiFlashcardModalOpen,
         editingDeck, setEditingDeck,
         viewingDeck, setViewingDeck,
-        isCreateCardModalOpen, setCreateCardModalOpen, 
+        isCreateCardModalOpen, setCreateCardModalOpen,
         editingCard, setEditingCard,
         reviewingDeck, setReviewingDeck,
         viewingFile, setViewingFile,
@@ -197,15 +198,15 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     const [deepLinkData, setDeepLinkData] = useState<any | null>(null);
     const [triggeredAlarms, setTriggeredAlarms] = useState<Set<string>>(new Set());
     const [isGeneratingPractice, setIsGeneratingPractice] = useState(false);
-    
+
     // Local state for dashboard widgets
-    const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidgetItem[]>([]); 
-    const dragItemRef = useRef<number | null>(null); 
-    const dragOverItemRef = useRef<number | null>(null); 
+    const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidgetItem[]>([]);
+    const dragItemRef = useRef<number | null>(null);
+    const dragOverItemRef = useRef<number | null>(null);
 
     // Layout Editor State
     const [isEditLayoutMode, setIsEditLayoutMode] = useState(false);
-    
+
     const useToolbarLayout = window.innerWidth < 768 && student.CONFIG.settings.mobileLayout === 'toolbar';
     const taskItems = student.SCHEDULE_ITEMS;
     const activityItems = student.SCHEDULE_ITEMS.filter(item => item.type === 'ACTIVITY') as ActivityData[];
@@ -225,8 +226,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                 questionTypes: ['MCQ', 'NUM'],
                 isPYQ: false,
                 chapters: [],
-                examType: student?.CONFIG.settings.examType,
-                userId: student?.sid,
             });
             if (result.questions && result.answers) {
                 setAiPracticeTest(result);
@@ -275,7 +274,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     useEffect(() => {
         if (deepLinkAction) {
             if (deepLinkAction.action === 'new_schedule' || deepLinkAction.action === 'import_data') {
-                 setDeepLinkData(deepLinkAction.data);
+                setDeepLinkData(deepLinkAction.data);
             }
         }
     }, [deepLinkAction]);
@@ -295,9 +294,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         if (data.custom_widget) {
             const newWidgetId = `custom_${Date.now()}`;
             const newCustomWidget = { id: newWidgetId, ...data.custom_widget };
-            
+
             const currentCustomWidgets = student.CONFIG.customWidgets || [];
-            onUpdateConfig({ 
+            onUpdateConfig({
                 customWidgets: [...currentCustomWidgets, newCustomWidget],
                 settings: {
                     ...student.CONFIG.settings,
@@ -308,7 +307,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             closeModal('AIParserModal');
             return;
         }
-        
+
         // Check for flashcard decks
         if (data.flashcard_deck) {
             // Ensure IDs
@@ -328,7 +327,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         closeModal('AIParserModal');
     };
 
-    const handleEditClick = (item: ScheduleItem) => { setEditingTask(item); openModal('CreateEditTaskModal', setIsCreateModalOpen, true); }; 
+    const handleEditClick = (item: ScheduleItem) => { setEditingTask(item); openModal('CreateEditTaskModal', setIsCreateModalOpen, true); };
     const handleAiPracticeTest = (data: any) => { setAiPracticeTest(data); closeModal('AIParserModal'); setTimeout(() => openModal('CustomPracticeModal', setIsPracticeModalOpen), 300); };
     const handleCompleteTask = (task: ScheduleCardData) => { onDeleteTask(task.ID); };
     const handleStarTask = (taskId: string) => { const task = student.SCHEDULE_ITEMS.find(t => t.ID === taskId); if (task) onSaveTask({ ...task, isStarred: !task.isStarred }); };
@@ -340,11 +339,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         setAiChatHistory(newHistory);
         setIsAiChatLoading(true);
         try {
-            const result = await api.aiChat({ 
-                history: newHistory, 
-                prompt, 
+            const result = await api.aiChat({
+                history: newHistory,
+                prompt,
                 imageBase64,
-                domain: window.location.origin 
+                domain: window.location.origin
             });
             setAiChatHistory(prev => [...prev, result]);
         } catch (error: any) {
@@ -355,8 +354,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     };
     const handleToggleSelectMode = () => { setIsSelectMode(prev => !prev); setSelectedTaskIds([]); };
     const handleTaskSelect = (taskId: string) => { setSelectedTaskIds(prev => prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]); };
-    
-    const handleDeleteSelected = async () => { 
+
+    const handleDeleteSelected = async () => {
         if (selectedTaskIds.length === 0) return;
         if (!window.confirm(`Are you sure you want to delete ${selectedTaskIds.length} selected tasks?`)) return;
         try {
@@ -369,8 +368,8 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             alert(`Failed to delete tasks: ${error.message}`);
         }
     };
-    const handleClearAllSchedule = async () => { 
-        if(!window.confirm("Are you sure you want to clear all your schedule items? This cannot be undone.")) return;
+    const handleClearAllSchedule = async () => {
+        if (!window.confirm("Are you sure you want to clear all your schedule items? This cannot be undone.")) return;
         try {
             await api.clearAllSchedule();
             refreshUser();
@@ -401,7 +400,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             default: break;
         }
     };
-    
+
     // DND Handlers for dashboard widgets
     const handleDragStart = (index: number) => { dragItemRef.current = index; };
     const handleDragEnter = (index: number) => { dragOverItemRef.current = index; };
@@ -446,26 +445,26 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             'practice': <PracticeLauncherWidget onLaunch={() => openModal('CustomPracticeModal', setIsPracticeModalOpen, true)} onLaunchWithWeaknesses={handleLaunchWeaknessPractice} />,
             'subjectAllocation': <SubjectAllocationWidget items={student.SCHEDULE_ITEMS} />,
             'scoreTrend': <ScoreTrendWidget results={student.RESULTS} />,
-            'flashcards': <InteractiveFlashcardWidget 
-                student={student} 
-                onUpdateConfig={onUpdateConfig} 
+            'flashcards': <InteractiveFlashcardWidget
+                student={student}
+                onUpdateConfig={onUpdateConfig}
                 onReviewDeck={handleStartReviewSession}
                 onAddCard={() => {
                     const deck = (student.CONFIG.flashcardDecks && student.CONFIG.flashcardDecks.length > 0) ? student.CONFIG.flashcardDecks[0] : null;
-                    if(deck) {
+                    if (deck) {
                         setViewingDeck(deck);
                         setEditingCard(null);
-                        openModal('CreateEditFlashcardModal', setCreateCardModalOpen); 
+                        openModal('CreateEditFlashcardModal', setCreateCardModalOpen);
                     } else {
                         alert("Please create a deck first.");
                     }
                 }}
                 onOpenDeck={(deckId) => {
                     const deck = student.CONFIG.flashcardDecks?.find(d => d.id === deckId);
-                    if(deck) openModal('DeckViewModal', setViewingDeck, deck);
+                    if (deck) openModal('DeckViewModal', setViewingDeck, deck);
                 }}
             />,
-            'readingHours': <ReadingHoursWidget student={student} />,
+            'readingHours': <ReadingHoursWidget student={student} onLogStudySession={onLogStudySession} />,
             'todaysAgenda': <TodaysAgendaWidget items={student.SCHEDULE_ITEMS} onStar={handleStarTask} />,
             'upcomingExams': <UpcomingExamsWidget exams={student.EXAMS} />,
             'homework': <HomeworkWidget items={student.SCHEDULE_ITEMS} onStartPractice={handleStartPractice} />,
@@ -484,23 +483,23 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
         return (
             <div className="relative min-h-screen p-4 rounded-2xl overflow-hidden transition-all duration-500">
                 {bgImage && (
-                    <div 
-                        className="absolute inset-0 z-0 bg-cover bg-center opacity-30" 
+                    <div
+                        className="absolute inset-0 z-0 bg-cover bg-center opacity-30"
                         style={{ backgroundImage: `url(${bgImage})` }}
                     />
                 )}
-                
+
                 <div className="relative z-10 mb-4 flex justify-end gap-2">
                     {isEditLayoutMode && (
-                        <button 
-                            onClick={() => openModal('WidgetSelectorModal', setIsWidgetSelectorModalOpen, true)} 
+                        <button
+                            onClick={() => openModal('WidgetSelectorModal', setIsWidgetSelectorModalOpen, true)}
                             className="px-4 py-1.5 text-xs font-bold rounded-full flex items-center gap-2 transition-colors shadow-lg backdrop-blur-md bg-purple-600/50 text-white hover:bg-purple-700/50"
                         >
                             <Icon name="plus-circle" className="w-3 h-3" /> Add/Remove Widgets
                         </button>
                     )}
-                    <button 
-                        onClick={() => setIsEditLayoutMode(!isEditLayoutMode)} 
+                    <button
+                        onClick={() => setIsEditLayoutMode(!isEditLayoutMode)}
                         className={`px-4 py-1.5 text-xs font-bold rounded-full flex items-center gap-2 transition-colors shadow-lg backdrop-blur-md ${isEditLayoutMode ? 'bg-green-600 text-white' : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50'}`}
                     >
                         <Icon name={isEditLayoutMode ? 'check' : 'edit'} className="w-3 h-3" /> {isEditLayoutMode ? 'Done' : 'Edit Layout'}
@@ -511,14 +510,14 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                     {dashboardWidgets.map((item, index) => {
                         const widget = widgetComponents[item.id];
                         if (!widget) return null;
-                        
+
                         const isLarge = ['countdown', 'dailyInsight', 'quote', 'clock'].includes(item.id) || item.wide;
-                        const isTall = item.tall; 
+                        const isTall = item.tall;
                         const isMinimized = item.minimized;
 
                         return (
-                            <div 
-                                key={item.id} 
+                            <div
+                                key={item.id}
                                 className={`${isLarge ? 'md:col-span-2' : ''} ${isTall ? 'row-span-2' : ''} transition-all duration-300 widget-container ${isMinimized ? 'widget-minimized' : ''} ${isEditLayoutMode ? 'cursor-move ring-2 ring-dashed ring-cyan-500/50 rounded-xl scale-95' : ''}`}
                                 draggable={isEditLayoutMode}
                                 onDragStart={() => handleDragStart(index)}
@@ -533,9 +532,9 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                                 <div className="flex items-center gap-1.5 p-2 pl-3 mb-1 window-controls absolute top-2 left-2 z-20">
                                     <div onClick={() => handleRemoveWidget(item.id)} className="traffic-light traffic-red cursor-pointer shadow-md"></div>
                                     <div onClick={() => handleToggleMinimizeWidget(item.id)} className="traffic-light traffic-yellow cursor-pointer shadow-md"></div>
-                                    <div onClick={() => {}} className="traffic-light traffic-green cursor-pointer shadow-md"></div>
+                                    <div onClick={() => { }} className="traffic-light traffic-green cursor-pointer shadow-md"></div>
                                 </div>
-                                
+
                                 <div className={`h-full pt-8 ${isMinimized ? 'opacity-50' : ''}`}>
                                     {widget}
                                 </div>
@@ -554,31 +553,31 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
     );
 
     const TopTabBar = () => (
-      <div className="flex flex-col sm:flex-row items-center justify-between border-b border-[var(--glass-border)] mb-6 gap-4">
-        <div className="flex items-center flex-wrap">
-          <TabButton tabId="dashboard" icon="dashboard">Dashboard</TabButton>
-          <TabButton tabId="today" icon="star">Today</TabButton>
-          <TabButton tabId="schedule" icon="schedule">Schedule</TabButton>
-          <TabButton tabId="material" icon="book-open">Study Material</TabButton>
-          <TabButton tabId="flashcards" icon="cards">Flashcards</TabButton>
-          <TabButton tabId="exams" icon="trophy">Exams</TabButton>
-          <TabButton tabId="performance" icon="performance">Performance</TabButton>
-          <TabButton tabId="doubts" icon="community">Doubts</TabButton>
+        <div className="flex flex-col sm:flex-row items-center justify-between border-b border-[var(--glass-border)] mb-6 gap-4">
+            <div className="flex items-center flex-wrap">
+                <TabButton tabId="dashboard" icon="dashboard">Dashboard</TabButton>
+                <TabButton tabId="today" icon="star">Today</TabButton>
+                <TabButton tabId="schedule" icon="schedule">Schedule</TabButton>
+                <TabButton tabId="material" icon="book-open">Study Material</TabButton>
+                <TabButton tabId="flashcards" icon="cards">Flashcards</TabButton>
+                <TabButton tabId="exams" icon="trophy">Exams</TabButton>
+                <TabButton tabId="performance" icon="performance">Performance</TabButton>
+                <TabButton tabId="doubts" icon="community">Doubts</TabButton>
+            </div>
+            <div className="flex items-center gap-2 mb-2 sm:mb-0">
+                <button onClick={() => openModal('UniversalSearch', setIsSearchOpen, true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 hover:text-white" title="Search (Cmd+K)">
+                    <Icon name="search" className="w-4 h-4" />
+                </button>
+                <button onClick={() => openModal('AIParserModal', setisAiParserModalOpen, true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700 flex items-center gap-2 text-sm font-semibold" title="AI Import">
+                    <Icon name="gemini" className="w-4 h-4" /> AI Import
+                </button>
+                <button onClick={() => openModal('CustomPracticeModal', setIsPracticeModalOpen, true)} className="p-2.5 rounded-lg bg-purple-600/50 hover:bg-purple-600" title="Custom Practice"><Icon name="stopwatch" /></button>
+                <button onClick={() => openModal('SettingsModal', setIsSettingsModalOpen, true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700"><Icon name="settings" /></button>
+                <button onClick={() => { setEditingTask(null); openModal('CreateEditTaskModal', setIsCreateModalOpen, true); }} className="flex items-center gap-2 px-3 py-2.5 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-[var(--accent-color)] to-[var(--gradient-purple)]">
+                    <Icon name="plus" /> Create
+                </button>
+            </div>
         </div>
-        <div className="flex items-center gap-2 mb-2 sm:mb-0">
-          <button onClick={() => openModal('UniversalSearch', setIsSearchOpen, true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-300 hover:text-white" title="Search (Cmd+K)">
-            <Icon name="search" className="w-4 h-4" />
-          </button>
-          <button onClick={() => openModal('AIParserModal', setisAiParserModalOpen, true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700 flex items-center gap-2 text-sm font-semibold" title="AI Import">
-            <Icon name="gemini" className="w-4 h-4" /> AI Import
-          </button>
-          <button onClick={() => openModal('CustomPracticeModal', setIsPracticeModalOpen, true)} className="p-2.5 rounded-lg bg-purple-600/50 hover:bg-purple-600" title="Custom Practice"><Icon name="stopwatch" /></button>
-          <button onClick={() => openModal('SettingsModal', setIsSettingsModalOpen, true)} className="p-2.5 rounded-lg bg-gray-700/50 hover:bg-gray-700"><Icon name="settings" /></button>
-          <button onClick={() => { setEditingTask(null); openModal('CreateEditTaskModal', setIsCreateModalOpen, true); }} className="flex items-center gap-2 px-3 py-2.5 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-[var(--accent-color)] to-[var(--gradient-purple)]">
-            <Icon name="plus" /> Create
-          </button>
-        </div>
-      </div>
     );
 
     const renderContent = () => {
@@ -586,18 +585,18 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             case 'dashboard': return renderDashboardContent();
             case 'today': return <TodayPlanner items={taskItems} onEdit={handleEditClick} />;
             case 'schedule':
-                 return (
+                return (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div className="lg:col-span-2 space-y-8">
                             <ActivityTracker activities={activityItems} />
-                            <ScheduleList 
-                                items={taskItems} 
-                                onDelete={onDeleteTask} 
-                                onEdit={handleEditClick} 
-                                onMoveToNextDay={()=>{}} 
-                                onStar={handleStarTask} 
-                                onStartPractice={handleStartPractice} 
-                                isSubscribed={student.CONFIG.UNACADEMY_SUB} 
+                            <ScheduleList
+                                items={taskItems}
+                                onDelete={onDeleteTask}
+                                onEdit={handleEditClick}
+                                onMoveToNextDay={() => { }}
+                                onStar={handleStarTask}
+                                onStartPractice={handleStartPractice}
+                                isSubscribed={student.CONFIG.UNACADEMY_SUB}
                                 onStartReviewSession={handleStartReviewSession}
                                 onCompleteTask={handleCompleteTask}
                                 view={scheduleView}
@@ -611,38 +610,45 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
                             />
                         </div>
                         <div className="space-y-8">
-                             <TodaysAgendaWidget items={student.SCHEDULE_ITEMS} onStar={handleStarTask} />
-                             <HomeworkWidget items={student.SCHEDULE_ITEMS} onStartPractice={handleStartPractice} />
+                            <TodaysAgendaWidget items={student.SCHEDULE_ITEMS} onStar={handleStarTask} />
+                            <HomeworkWidget items={student.SCHEDULE_ITEMS} onStartPractice={handleStartPractice} />
                         </div>
                     </div>
-                 );
-             case 'planner': return <PlannerView items={taskItems} onEdit={handleEditClick} />;
+                );
+            case 'planner': return <PlannerView items={taskItems} onEdit={handleEditClick} />;
             case 'material': return <StudyMaterialView student={student} onUpdateConfig={onUpdateConfig} onViewFile={viewingFile => openModal('FileViewerModal', setViewingFile, viewingFile)} />;
             case 'flashcards':
-                return <FlashcardManager 
-                            decks={student.CONFIG.flashcardDecks || []}
-                            onAddDeck={() => { setEditingDeck(null); openModal('CreateEditDeckModal', setCreateDeckModalOpen, true); }}
-                            onEditDeck={(deck) => { setEditingDeck(deck); openModal('CreateEditDeckModal', setCreateDeckModalOpen, true); }}
-                            onDeleteDeck={handleDeleteDeck}
-                            onViewDeck={viewingDeck => openModal('DeckViewModal', setViewingDeck, viewingDeck)}
-                            onStartReview={handleStartReviewSession}
-                            onGenerateWithAI={() => openModal('AIGenerateFlashcardsModal', setAiFlashcardModalOpen, true)}
-                        />;
+                return <FlashcardManager
+                    decks={student.CONFIG.flashcardDecks || []}
+                    onAddDeck={() => { setEditingDeck(null); openModal('CreateEditDeckModal', setCreateDeckModalOpen, true); }}
+                    onEditDeck={(deck) => { setEditingDeck(deck); openModal('CreateEditDeckModal', setCreateDeckModalOpen, true); }}
+                    onDeleteDeck={handleDeleteDeck}
+                    onViewDeck={viewingDeck => openModal('DeckViewModal', setViewingDeck, viewingDeck)}
+                    onStartReview={handleStartReviewSession}
+                    onGenerateWithAI={() => openModal('AIGenerateFlashcardsModal', setAiFlashcardModalOpen, true)}
+                />;
             case 'exams':
                 return <ExamsView exams={student.EXAMS} onAdd={() => { setEditingExam(null); openModal('CreateEditExamModal', setIsExamModalOpen, true); }} onEdit={(exam) => { setEditingExam(exam); openModal('CreateEditExamModal', setIsExamModalOpen, true); }} onDelete={onDeleteExam} />;
             case 'performance':
-                 return (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div className="lg:col-span-2 space-y-8">
-                            <div className="flex justify-end gap-4">
-                                <button onClick={() => openModal('AIMistakeAnalysisModal', setAiMistakeModalOpen, true)} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600"><Icon name="book-open" /> Analyze Mistake with AI</button>
-                                <button onClick={() => openModal('LogResultModal', setLogResultModalOpen, true)} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-[var(--accent-color)] to-[var(--gradient-purple)]"><Icon name="plus" /> Log Mock Result</button>
+                return (
+                    <div className="space-y-8">
+                        <ZUstat student={student} />
+
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            <div className="lg:col-span-2 space-y-8">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="text-xl font-bold text-white">Mock Test Results</h3>
+                                    <div className="flex gap-4">
+                                        <button onClick={() => openModal('AIMistakeAnalysisModal', setAiMistakeModalOpen, true)} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90"><Icon name="book-open" /> Analyze Weakness</button>
+                                        <button onClick={() => openModal('LogResultModal', setLogResultModalOpen, true)} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-r from-[var(--accent-color)] to-[var(--gradient-purple)] hover:opacity-90"><Icon name="plus" /> Log Result</button>
+                                    </div>
+                                </div>
+                                {student.RESULTS.length > 0 ? [...student.RESULTS].reverse().map(result => (<MistakeManager key={result.ID} result={result} onToggleMistakeFixed={onToggleMistakeFixed} onViewAnalysis={viewingReport => openModal('TestReportModal', setViewingReport, viewingReport)} onEdit={handleEditResult} onDelete={onDeleteResult} />)) : <p className="text-gray-500 text-center py-10">No results recorded.</p>}
                             </div>
-                            {student.RESULTS.length > 0 ? [...student.RESULTS].reverse().map(result => (<MistakeManager key={result.ID} result={result} onToggleMistakeFixed={onToggleMistakeFixed} onViewAnalysis={viewingReport => openModal('TestReportModal', setViewingReport, viewingReport)} onEdit={handleEditResult} onDelete={onDeleteResult} />)) : <p className="text-gray-500 text-center py-10">No results recorded.</p>}
-                        </div>
-                        <div className="space-y-8">
-                             <PerformanceMetrics score={student.CONFIG.SCORE} weaknesses={student.CONFIG.WEAK} onEditWeaknesses={() => openModal('EditWeaknessesModal', setIsEditWeaknessesModalOpen, true)} />
-                             <AchievementsWidget student={student} allDoubts={allDoubts} />
+                            <div className="space-y-8">
+                                <PerformanceMetrics score={student.CONFIG.SCORE} weaknesses={student.CONFIG.WEAK} onEditWeaknesses={() => openModal('EditWeaknessesModal', setIsEditWeaknessesModalOpen, true)} />
+                                <AchievementsWidget student={student} allDoubts={allDoubts} />
+                            </div>
                         </div>
                     </div>
                 );
@@ -664,11 +670,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             ) : <TopTabBar />}
 
             <div key={activeTab} className="tab-content-enter">
-              {renderContent()}
+                {renderContent()}
             </div>
 
             {useToolbarLayout && <BottomToolbar activeTab={activeTab} setActiveTab={setActiveTab} onFabClick={() => { setEditingTask(null); openModal('CreateEditTaskModal', setIsCreateModalOpen, true); }} />}
-            
+
             {deepLinkData && (
                 <DeepLinkConfirmationModal data={deepLinkData} onClose={() => setDeepLinkData(null)} onConfirm={() => onBatchImport({
                     schedules: deepLinkData.schedules || [],
@@ -679,7 +685,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = (props) => {
             )}
 
             {isWidgetSelectorModalOpen && (
-                <WidgetSelectorModal 
+                <WidgetSelectorModal
                     currentLayout={dashboardWidgets}
                     onSaveLayout={handleSaveDashboardLayout}
                     onClose={() => closeModal('WidgetSelectorModal')}

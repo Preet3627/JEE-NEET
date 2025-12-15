@@ -253,12 +253,12 @@ export interface StudentData {
 }
 
 export interface MessageData {
-    id: number;
-    sender_sid: string;
-    recipient_sid: string;
-    content: string;
-    created_at: string;
-    is_read: boolean;
+  id: number;
+  sender_sid: string;
+  recipient_sid: string;
+  content: string;
+  created_at: string;
+  is_read: boolean;
 }
 
 export interface StudyMaterialItem {
@@ -270,27 +270,27 @@ export interface StudyMaterialItem {
 }
 
 export interface PracticeQuestion {
-    number: number;
-    text: string;
-    options: string[]; // For MCQ & MULTI_CHOICE, empty for NUM
-    type: 'MCQ' | 'NUM' | 'MULTI_CHOICE'; // Added MULTI_CHOICE
-    solution?: string; // Optional detailed solution
+  number: number;
+  text: string;
+  options: string[]; // For MCQ & MULTI_CHOICE, empty for NUM
+  type: 'MCQ' | 'NUM' | 'MULTI_CHOICE'; // Added MULTI_CHOICE
+  solution?: string; // Optional detailed solution
 }
 
 export interface Track {
-    id: string;
-    title: string;
-    artist: string;
-    album: string;
-    genre: string;
-    track: string;
-    coverArt: string;
-    coverArtUrl?: string;
-    duration: string;
-    size: string;
-    path?: string;
-    isLocal: boolean;
-    file?: File;
+  id: string;
+  title: string;
+  artist: string;
+  album: string;
+  genre: string;
+  track: string;
+  coverArt: string;
+  coverArtUrl?: string;
+  duration: string;
+  size: string;
+  path?: string;
+  isLocal: boolean;
+  file?: File;
 }
 
 // Added missing types for video generation models, if they were used (not directly in current error files)
@@ -309,4 +309,4 @@ export enum VideoGenerationReferenceType {
 
 export type ActiveTab = 'dashboard' | 'today' | 'schedule' | 'planner' | 'material' | 'flashcards' | 'exams' | 'performance' | 'doubts';
 
-export type IconName = 'bell' | 'copy' | 'check' | 'trash' | 'play' | 'pause' | 'stop' | 'upload' | 'stopwatch' | 'logout' | 'dashboard' | 'users' | 'plus' | 'fixed' | 'login' | 'user-plus' | 'edit' | 'ellipsis' | 'forward' | 'trophy' | 'star' | 'streak' | 'send' | 'message' | 'settings' | 'schedule' | 'planner' | 'performance' | 'community' | 'calendar' | 'image' | 'book-open' | 'drive' | 'gemini' | 'marker' | 'cards' | 'folder' | 'file-text' | 'pin' | 'music' | 'lock-closed' | 'lock-open' | 'shuffle' | 'expand' | 'arrow-left' | 'arrow-right' | 'sound-wave' | 'search' | 'download' | 'print' | 'loading' | 'check-circle' | 'playlist' | 'delete' | 'move' | 'timer' | 'bulb' | 'quote' | 'pie-chart' | 'chart-line' | 'clipboard' | 'eye' | 'cloud' | 'plus-circle' | 'close';
+export type IconName = 'bell' | 'copy' | 'check' | 'trash' | 'play' | 'pause' | 'stop' | 'upload' | 'stopwatch' | 'logout' | 'dashboard' | 'users' | 'plus' | 'fixed' | 'login' | 'user-plus' | 'edit' | 'ellipsis' | 'forward' | 'trophy' | 'star' | 'streak' | 'send' | 'message' | 'settings' | 'schedule' | 'planner' | 'performance' | 'community' | 'calendar' | 'image' | 'book-open' | 'drive' | 'gemini' | 'marker' | 'cards' | 'folder' | 'file-text' | 'pin' | 'music' | 'lock-closed' | 'lock-open' | 'shuffle' | 'expand' | 'maximize' | 'minimize' | 'chevron-down' | 'sparkles' | 'clock' | 'list' | 'server' | 'align-left' | 'arrow-left' | 'arrow-right' | 'sound-wave' | 'search' | 'download' | 'print' | 'loading' | 'check-circle' | 'playlist' | 'delete' | 'move' | 'timer' | 'bulb' | 'quote' | 'pie-chart' | 'chart-line' | 'clipboard' | 'eye' | 'cloud' | 'plus-circle' | 'close' | 'sync' | 'refresh';

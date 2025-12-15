@@ -4,12 +4,16 @@ import Icon from './Icon';
 import FullScreenVisualizer from './FullScreenVisualizer'; // Import the new component
 import { getDominantColor } from '../utils/colors';
 
-const FullScreenMusicPlayer: React.FC = () => {
-    const { 
+interface FullScreenMusicPlayerProps {
+    onClose?: () => void;
+}
+
+const FullScreenMusicPlayer: React.FC<FullScreenMusicPlayerProps> = ({ onClose }) => {
+    const {
         currentTrack, isPlaying, play, pause, nextTrack, prevTrack, toggleFullScreenPlayer,
         seek, duration, currentTime, isAutoMixEnabled, toggleAutoMix, queue, removeFromQueue, toggleLibrary,
         analyser, visualizerSettings, notchSettings // Destructure analyser, visualizerSettings and notchSettings
-    } = useMusicPlayer();    
+    } = useMusicPlayer();
     const [bgGradient, setBgGradient] = useState('from-gray-900 to-black');
     const [localTime, setLocalTime] = useState(currentTime);
     const [isDragging, setIsDragging] = useState(false);
@@ -17,13 +21,18 @@ const FullScreenMusicPlayer: React.FC = () => {
     const [blurredBackgroundUrl, setBlurredBackgroundUrl] = useState(''); // New state for blurred background
     const [dominantAlbumColor, setDominantAlbumColor] = useState('#3b82f6'); // Default blue-ish
 
+    const handleClose = () => {
+        if (onClose) onClose();
+        else toggleFullScreenPlayer();
+    }
+
     useEffect(() => {
-        if(!isDragging) setLocalTime(currentTime);
+        if (!isDragging) setLocalTime(currentTime);
     }, [currentTime, isDragging]);
 
     useEffect(() => {
-        if(!currentTrack) return;
-        
+        if (!currentTrack) return;
+
         // Use the existing color logic for the main gradient for now
         const colors = [
             'from-slate-900 to-black', 'from-zinc-900 to-black', 'from-stone-900 to-black',
@@ -61,19 +70,19 @@ const FullScreenMusicPlayer: React.FC = () => {
 
     return (
         <div className={`fixed inset-0 z-[100] flex flex-col bg-gradient-to-b ${bgGradient} animate-fadeIn overflow-hidden transition-colors duration-1000`}>
-            
+
             {/* Header Controls */}
             <div className="absolute top-6 left-6 z-20 flex gap-4">
-                <button onClick={toggleFullScreenPlayer} className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-all">
+                <button onClick={handleClose} className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-all">
                     <Icon name="arrow-left" className="w-6 h-6" />
                 </button>
                 <button onClick={toggleLibrary} className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-all" title="Music Library">
                     <Icon name="music" className="w-6 h-6" />
                 </button>
             </div>
-            
+
             <div className="absolute top-6 right-6 z-20">
-                 <button onClick={() => setIsQueueOpen(!isQueueOpen)} className={`p-3 rounded-full backdrop-blur-md transition-all ${isQueueOpen ? 'bg-cyan-600 text-white' : 'bg-white/10 hover:bg-white/20 text-gray-300'}`}>
+                <button onClick={() => setIsQueueOpen(!isQueueOpen)} className={`p-3 rounded-full backdrop-blur-md transition-all ${isQueueOpen ? 'bg-cyan-600 text-white' : 'bg-white/10 hover:bg-white/20 text-gray-300'}`}>
                     <Icon name="schedule" className="w-6 h-6" />
                 </button>
             </div>
@@ -104,9 +113,9 @@ const FullScreenMusicPlayer: React.FC = () => {
                 ) : (
                     <>
                         <div className={`relative w-64 h-64 md:w-96 md:h-96 rounded-2xl shadow-2xl transition-transform duration-[800ms] cubic-bezier(0.34, 1.56, 0.64, 1) ${isPlaying ? 'scale-100' : 'scale-90 opacity-80'}`}>
-                            <img 
+                            <img
                                 src={currentTrack.coverArt || 'https://via.placeholder.com/400'} // Use currentTrack.coverArt
-                                alt="Album Art" 
+                                alt="Album Art"
                                 className="w-full h-full object-cover rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] ring-1 ring-white/10"
                             />
                         </div>
@@ -137,14 +146,14 @@ const FullScreenMusicPlayer: React.FC = () => {
 
                     {/* Playback Buttons */}
                     <div className="flex justify-between items-center">
-                        <button 
+                        <button
                             onClick={toggleAutoMix}
                             className={`p-3 rounded-full transition-all ${isAutoMixEnabled ? 'bg-cyan-500/20 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)]' : 'text-gray-500 hover:text-white'}`}
                             title={isAutoMixEnabled ? "Auto Mix On" : "Auto Mix Off"}
                         >
                             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
                         </button>
-                        
+
                         <div className="flex items-center gap-10">
                             <button onClick={prevTrack} className="p-2 text-white hover:text-gray-300 transition-transform active:scale-90 hover:-translate-x-1"><Icon name="arrow-left" className="w-10 h-10" /></button>
                             <button onClick={isPlaying ? pause : play} className="p-7 bg-white text-black rounded-full shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-110 transition-all active:scale-95">
