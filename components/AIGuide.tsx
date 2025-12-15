@@ -35,7 +35,7 @@ const GuideRenderer: React.FC<{ content: string }> = ({ content }) => {
       .replace(/\[size=(\d+)\](.*?)\[\/size\]/g, '<span style="font-size: $1px;">$2</span>')
       .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:underline">$1</a>');
 
-    return <p key={index} className="my-1" dangerouslySetInnerHTML={{ __html: processedLine }}></p>;
+    return <p key={index} className="my-1 text-gray-200 leading-relaxed" dangerouslySetInnerHTML={{ __html: processedLine }}></p>;
   };
 
   const lines = content.split('\n');
@@ -56,7 +56,7 @@ const GuideRenderer: React.FC<{ content: string }> = ({ content }) => {
       const rows = tableRows.slice(2); // Skip header and separator
 
       elements.push(
-        <table key={`table-${i}`} className="w-full text-left my-4 border-collapse">
+        <table key={`table-${i}`} className="w-full text-left my-4 border-collapse text-gray-200">
           <thead>
             <tr className="border-b-2 border-gray-600">
               {headers.map((header, hIndex) => <th key={hIndex} className="py-2 px-3 text-cyan-400 font-semibold">{header}</th>)}
@@ -80,6 +80,9 @@ const GuideRenderer: React.FC<{ content: string }> = ({ content }) => {
         let j = i + 1;
         while(j < lines.length && !lines[j].startsWith('```')) j++;
         i = j + 1;
+    } else if (line.match(/^\s*-\s/)) { // Handle list items with improved styling
+        elements.push(<li key={i} className="ml-4 list-disc text-gray-200 mb-1">{line.replace(/^\s*-\s/, '')}</li>);
+        i++;
     } else {
       elements.push(renderLine(line, i));
       i++;

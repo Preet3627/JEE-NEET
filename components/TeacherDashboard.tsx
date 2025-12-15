@@ -121,7 +121,11 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ students, onToggleU
                 alert("Broadcast queued successfully.");
             }
         } catch (error: any) {
-            alert(`Error processing data: ${error.message}`);
+            let errorMessage = `Error processing data: ${error.message}`;
+            if (error && typeof error === 'object' && 'error' in error && error.error === 'AI_QUOTA_EXCEEDED') {
+                errorMessage = "AI service for processing broadcast data temporarily unavailable due to quota limits or maintenance. Please try manual creation.";
+            }
+            alert(errorMessage);
         }
     };
     

@@ -10,6 +10,8 @@ import { initClient, handleSignIn as handleGoogleClientSignIn, handleSignOut as 
 const processUserData = (userData: StudentData): StudentData => {
     const processedData = { ...userData };
 
+    console.log('processUserData: Checking SCHEDULE_ITEMS:', processedData.SCHEDULE_ITEMS, 'Type:', typeof processedData.SCHEDULE_ITEMS); // Debug log
+
     // Parse SCHEDULE_ITEMS
     if (typeof processedData.SCHEDULE_ITEMS === 'string') {
         try {

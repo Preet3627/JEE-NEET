@@ -400,6 +400,24 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [token, checkBackendStatus]);
 
+  useEffect(() => {
+    const fetchAllStudents = async () => {
+        if (userRole === 'admin') {
+            try {
+                const studentsData = await api.getStudents();
+                // Process each student's data using the helper from AuthContext
+                const processedStudents = studentsData.map((student: StudentData) => processUserData(student));
+                setAllStudents(processedStudents);
+            } catch (error) {
+                console.error("Failed to fetch all students for admin dashboard:", error);
+            }
+        } else {
+            setAllStudents([]); // Clear student data if not admin
+        }
+    };
+    fetchAllStudents();
+  }, [userRole]); // Run this effect when userRole changes
+
 
 
   // Deep Link Handling (for custom protocol)
@@ -908,9 +926,15 @@ const App: React.FC = () => {
     try {
         await api.broadcastTask(task, examType);
         alert("Task broadcasted successfully!");
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to broadcast task:", error);
-        alert("Failed to broadcast task. Please try again.");
+        let errorMessage = "Failed to broadcast task. Please try again.";
+        if (error && typeof error === 'object' && 'message' in error) {
+            errorMessage = `Failed to broadcast task: ${error.message}`;
+        } else if (error && typeof error === 'object' && 'error' in error) {
+            errorMessage = `Failed to broadcast task: ${error.error}`;
+        }
+        alert(errorMessage);
     } finally {
         setIsSyncing(false);
     }
