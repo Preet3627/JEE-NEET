@@ -268,21 +268,37 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
         return () => clearInterval(intervalId);
     }, [isActive, isFinished, sessionStartTime, perMcqMaxTime, isNavigating, finishSession]);
 
+    const handleNextQuestion = useCallback((fromTimer: boolean = false) => { // Added fromTimer parameter
+        if (questionStartTimeRef.current) {
+            const timeSpent = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
+            setTimings(prev => ({ ...prev, [currentQuestionNumber]: (prev[currentQuestionNumber] || 0) + timeSpent }));
+        }
+
+        if (currentQuestionIndex < totalQuestions - 1) {
+            setCurrentQuestionIndex(prev => prev + 1);
+            setCurrentMcqTime(perMcqMaxTime); // Reset MCQ timer for next question
+            questionStartTimeRef.current = Date.now();
+            setFeedback(null);
+            setIsNavigating(false);
+            setIsPaletteOpen(false);
+        } else {
+            finishSession();
+        }
+    }, [currentQuestionNumber, currentQuestionIndex, totalQuestions, perMcqMaxTime, finishSession]);
+
     // Handle MCQ Timeout Side Effect separately
     useEffect(() => {
         if (perMcqMaxTime > 0 && currentMcqTime <= 0 && isActive && !isFinished && !isNavigating) {
             setAnswers(prev => ({ ...prev, [currentQuestionNumber]: '' })); // Mark as unanswered
             handleNextQuestion(true); // Auto-skip
         }
-    }, [currentMcqTime, perMcqMaxTime, isActive, isFinished, isNavigating, currentQuestionNumber]); // Add necessary dependencies
-
+    }, [currentMcqTime, perMcqMaxTime, isActive, isFinished, isNavigating, currentQuestionNumber, handleNextQuestion]); // Add handleNextQuestion to dependencies
 
     useEffect(() => {
         if (isFinished) {
             gradeTest();
         }
     }, [isFinished, gradeTest]);
-
 
     const handleStart = () => {
         vibrate('click');
@@ -335,24 +351,6 @@ const McqTimer: React.FC<McqTimerProps> = (props) => {
             setFeedback({ status: 'answered' });
             setIsNavigating(true);
             setTimeout(() => handleNextQuestion(), 1000);
-        }
-    };
-
-    const handleNextQuestion = (fromTimer: boolean = false) => { // Added fromTimer parameter
-        if (questionStartTimeRef.current) {
-            const timeSpent = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
-            setTimings(prev => ({ ...prev, [currentQuestionNumber]: (prev[currentQuestionNumber] || 0) + timeSpent }));
-        }
-
-        if (currentQuestionIndex < totalQuestions - 1) {
-            setCurrentQuestionIndex(prev => prev + 1);
-            setCurrentMcqTime(perMcqMaxTime); // Reset MCQ timer for next question
-            questionStartTimeRef.current = Date.now();
-            setFeedback(null);
-            setIsNavigating(false);
-            setIsPaletteOpen(false);
-        } else {
-            finishSession();
         }
     };
 

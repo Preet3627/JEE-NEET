@@ -129,7 +129,7 @@ interface StudentDashboardProps extends ModalControlProps {
     onUpdateExam: (exam: ExamData) => void;
     onDeleteExam: (examId: string) => void;
     onExportToIcs: () => void;
-    onBatchImport: (data: { schedules: ScheduleItem[], exams: ExamData[], results: ResultData[], weaknesses: string[] }) => void;
+    onBatchImport: (data: { schedules?: ScheduleItem[], exams?: ExamData[], results?: ResultData[], weaknesses?: string[] }) => void;
     googleAuthStatus: 'signed_in' | 'signed_out' | 'loading' | 'unconfigured';
     onGoogleSignIn: () => void;
     onGoogleSignOut: () => void;

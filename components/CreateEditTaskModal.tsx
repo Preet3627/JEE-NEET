@@ -123,9 +123,14 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
   };
 
 
+  const [isInitialized, setIsInitialized] = React.useState(false);
+
   // Initialize form data only when task ID changes (not on every render)
   // Using task?.ID instead of task to prevent re-initialization when task object reference changes
   useEffect(() => {
+    // Prevent double initialization
+    if (isInitialized && task?.ID === formData.title) return;
+
     if (task) {
       setTaskType(getInitialTaskType());
       setFormData({
@@ -143,6 +148,7 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
         imageUrl: 'imageUrl' in task && task.imageUrl ? task.imageUrl : '',
         externalLink: 'externalLink' in task && task.externalLink ? task.externalLink : '',
       });
+      setIsInitialized(true);
     } else {
       setTaskType('ACTION');
       setFormData({
@@ -160,9 +166,10 @@ const CreateEditTaskModal: React.FC<CreateEditTaskModalProps> = ({ task, viewOnl
         imageUrl: '',
         externalLink: '',
       });
+      setIsInitialized(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task?.ID]);
+  }, [task?.ID, decks.length]);
 
   const [isExiting, setIsExiting] = useState(false);
   const [isAiKeyModalOpen, setIsAiKeyModalOpen] = useState(false);

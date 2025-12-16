@@ -714,23 +714,34 @@ const App: React.FC = () => {
     exportCalendar(currentUser.SCHEDULE_ITEMS, currentUser.EXAMS, currentUser.fullName);
   }, [currentUser]);
 
-  const handleBatchImport = useCallback(async (data: { schedules: ScheduleItem[]; exams: ExamData[]; results: ResultData[]; weaknesses: string[]; }) => {
+  const handleBatchImport = useCallback(async (data: { schedules?: ScheduleItem[]; exams?: ExamData[]; results?: ResultData[]; weaknesses?: string[]; }) => {
     if (!currentUser) return;
+    if (!data) {
+      console.error("handleBatchImport: data is undefined");
+      alert("No data to import.");
+      return;
+    }
     setIsSyncing(true);
     try {
-      if (data.schedules.length > 0) await api.saveBatchTasks(data.schedules);
-      if (data.exams.length > 0) {
-        for (const exam of data.exams) {
+      // Safely access properties with optional chaining and default values
+      const schedules = data.schedules || [];
+      const exams = data.exams || [];
+      const results = data.results || [];
+      const weaknesses = data.weaknesses || [];
+
+      if (schedules.length > 0) await api.saveBatchTasks(schedules);
+      if (exams.length > 0) {
+        for (const exam of exams) {
           await api.addExam(exam);
         }
       }
-      if (data.results.length > 0) {
-        for (const result of data.results) {
+      if (results.length > 0) {
+        for (const result of results) {
           await api.updateResult(result);
         }
       }
-      if (data.weaknesses.length > 0) {
-        const newWeaknesses = [...new Set([...currentUser.CONFIG.WEAK, ...data.weaknesses])];
+      if (weaknesses.length > 0) {
+        const newWeaknesses = [...new Set([...currentUser.CONFIG.WEAK, ...weaknesses])];
         await api.updateConfig({ WEAK: newWeaknesses });
       }
       await refreshUser();

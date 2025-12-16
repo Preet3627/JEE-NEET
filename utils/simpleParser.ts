@@ -10,33 +10,43 @@ interface ParsedData {
 }
 
 export const simpleParse = (text: string): ParsedData => {
+    if (!text || typeof text !== 'string') {
+        return { error: 'Invalid input: text is required' };
+    }
+
     const trimmed = text.trim();
+
+    if (trimmed.length === 0) {
+        return { error: 'Input text is empty' };
+    }
 
     // 1. Try JSON Parsing
     if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
         try {
             const json = JSON.parse(trimmed);
             // Basic validation to check if it matches expected keys
-            if (json.schedules || json.flashcard_deck || json.practice_test || json.custom_widget) {
-                return json;
-            }
-            // If it's an array, assume it might be schedules or flashcards
-            if (Array.isArray(json)) {
-                // Heuristic: check first item
-                if (json.length > 0) {
-                    if (json[0].front && json[0].back) {
-                        return {
-                            flashcard_deck: {
-                                id: `deck_${Date.now()}`,
-                                name: 'Imported Deck',
-                                subject: 'General',
-                                isLocked: false,
-                                cards: json.map((c: any, i: number) => ({ ...c, id: c.id || `card_${i}` }))
-                            }
-                        };
-                    }
-                    if (json[0].type && (json[0].type === 'ACTION' || json[0].type === 'HOMEWORK')) {
-                        return { schedules: json };
+            if (json && typeof json === 'object') {
+                if (json.schedules || json.flashcard_deck || json.practice_test || json.custom_widget) {
+                    return json;
+                }
+                // If it's an array, assume it might be schedules or flashcards
+                if (Array.isArray(json)) {
+                    // Heuristic: check first item
+                    if (json.length > 0) {
+                        if (json[0].front && json[0].back) {
+                            return {
+                                flashcard_deck: {
+                                    id: `deck_${Date.now()}`,
+                                    name: 'Imported Deck',
+                                    subject: 'General',
+                                    isLocked: false,
+                                    cards: json.map((c: any, i: number) => ({ ...c, id: c.id || `card_${i}` }))
+                                }
+                            };
+                        }
+                        if (json[0].type && (json[0].type === 'ACTION' || json[0].type === 'HOMEWORK')) {
+                            return { schedules: json };
+                        }
                     }
                 }
             }
@@ -48,6 +58,11 @@ export const simpleParse = (text: string): ParsedData => {
 
     // 2. Text Heuristics
     const lines = trimmed.split('\n').filter(l => l.trim().length > 0);
+
+    if (lines.length === 0) {
+        return { error: 'No valid lines found in input' };
+    }
+
     const schedules: ScheduleItem[] = [];
     const cards: Flashcard[] = [];
 
@@ -135,5 +150,5 @@ export const simpleParse = (text: string): ParsedData => {
         return { schedules };
     }
 
-    return { error: 'Could not parse text. Try "Subject: Task at Time" format.' };
+    return { error: 'Could not parse text. Try "Subject: Task at Time" format or "Front | Back" for flashcards.' };
 };

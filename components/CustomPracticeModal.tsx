@@ -136,9 +136,27 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
   const handleStart = async () => {
     setError('');
 
-    // Manual Tab: Generate questions from homework context
+    // Manual Tab: Allow practice with or without AI generation
     if (activeTab === 'manual') {
-      if (totalQuestions > 0 && initialTask) {
+      if (totalQuestions === 0) {
+        alert('Please enter valid question ranges.');
+        return;
+      }
+
+      // If answer key is provided, start immediately without AI
+      if (correctAnswersText.trim()) {
+        console.log('Starting manual practice with provided answer key');
+        setPracticeMode('custom');
+        setPracticeQuestions(null); // No AI-generated questions
+        setPracticeAnswers(null); // Will use correctAnswers from useMemo
+        setSyllabus(initialTask?.CARD_TITLE.EN || 'Manual Practice');
+        setCategory('Homework Practice');
+        setIsTimerStarted(true);
+        return;
+      }
+
+      // If no answer key, try to generate questions with AI (optional)
+      if (initialTask) {
         setIsLoading(true);
         try {
           const result = await api.generatePracticeTest({
@@ -153,22 +171,33 @@ export const CustomPracticeModal: React.FC<CustomPracticeModalProps> = (props) =
             setPracticeMode('custom');
             setPracticeQuestions(result.questions);
             setPracticeAnswers(result.answers);
-            setSyllabus(initialTask.CARD_TITLE.EN); // Set syllabus for context
+            setSyllabus(initialTask.CARD_TITLE.EN);
             setCategory('Homework Practice');
             setIsTimerStarted(true);
           } else {
             throw new Error("AI failed to return a valid test format.");
           }
         } catch (err: any) {
-          setError(err.error || 'Failed to generate practice questions. You can still practice without question text by using the provided answer key.');
-          setIsLoading(false); // Make sure loading is off
-          alert("Failed to generate questions. Please check your AI/backend configuration and try again. You can still use manual mode with an answer key.");
-          return; // Stay on the modal
+          console.warn('AI generation failed, but you can still practice:', err);
+          // Allow practice without AI-generated questions
+          alert("Couldn't generate questions with AI, but you can still practice! Add an answer key to enable instant feedback.");
+          setPracticeMode('custom');
+          setPracticeQuestions(null);
+          setPracticeAnswers(null);
+          setSyllabus(initialTask.CARD_TITLE.EN || 'Manual Practice');
+          setCategory('Homework Practice');
+          setIsTimerStarted(true);
         } finally {
           setIsLoading(false);
         }
-      } else if (totalQuestions === 0) {
-        alert('Please enter valid question ranges.');
+      } else {
+        // No initial task, just start with manual settings
+        setPracticeMode('custom');
+        setPracticeQuestions(null);
+        setPracticeAnswers(null);
+        setSyllabus('Manual Practice');
+        setCategory('Custom Practice');
+        setIsTimerStarted(true);
       }
       return;
     }
