@@ -63,3 +63,5 @@ function StudentDashboard(props) {
     </div>
   );
 }
+
+export default StudentDashboard;
