@@ -1,2 +1,20 @@
+# Allow all crawlers, including standard Google, Bing, etc.
 User-agent: *
-Allow: /
+Disallow:
+
+# Explicitly allow Google's AI agents
+User-agent: Google-Extended
+Disallow:
+
+# Explicitly allow OpenAI's crawler
+User-agent: GPTBot
+Disallow:
+
+# Explicitly allow Anthropic's crawler
+User-agent: anthropic-ai
+Disallow:
+
+# You can add rules for other AI agents as they become known.
+# For example:
+# User-agent: PerplexityBot
+# Disallow:
