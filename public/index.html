@@ -1,18 +1,19 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>JEE Scheduler Pro</title>
-  <link rel="manifest" href="/manifest.json" />
-  <meta name="theme-color" content="#02040a">
-</head>
-
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
-</body>
-
-</html>
+<script>
+  (function() {
+    try {
+      const allowedHost = 'your-trusted-host.example.com';
+      if (location.hostname === allowedHost) {
+        const link = document.createElement('link');
+        link.rel = 'preload';
+        link.href = 'https://r2cdn.perplexity.ai/fonts/FKGroteskNeue.woff2';
+        link.as = 'font';
+        link.crossOrigin = 'anonymous';
+        document.head.appendChild(link);
+      } else {
+        // don't request the remote font — respects CSP
+      }
+    } catch (e) {
+      console.warn('Font conditional loader failed', e);
+    }
+  })();
+</script>
