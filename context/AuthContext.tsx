@@ -194,27 +194,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Effect for Google API initialization
     useEffect(() => {
-        const loadGoogleClient = async () => {
+        const loadGoogleClient = () => {
             setGoogleAuthStatus('loading');
-            try {
-                const config = await api.getPublicConfig();
-                if (config.googleClientId) {
-                    setGoogleClientId(config.googleClientId);
-                    initClient(
-                        config.googleClientId,
-                        (isSignedIn) => {
-                            setGoogleAuthStatus(isSignedIn ? 'signed_in' : 'signed_out');
-                        },
-                        (error) => {
-                            console.error("Google Auth Init Error:", error);
-                            setGoogleAuthStatus('unconfigured');
-                        }
-                    );
-                } else {
-                    setGoogleAuthStatus('unconfigured');
-                }
-            } catch (error) {
-                console.error("Failed to fetch public config for Google Client ID:", error);
+            const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+            if (clientId) {
+                setGoogleClientId(clientId);
+                initClient(
+                    clientId,
+                    (isSignedIn) => {
+                        setGoogleAuthStatus(isSignedIn ? 'signed_in' : 'signed_out');
+                    },
+                    (error) => {
+                        console.error("Google Auth Init Error:", error);
+                        setGoogleAuthStatus('unconfigured');
+                    }
+                );
+            } else {
+                console.error("VITE_GOOGLE_CLIENT_ID is not set in the environment variables.");
                 setGoogleAuthStatus('unconfigured');
             }
         };
