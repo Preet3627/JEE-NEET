@@ -13,7 +13,7 @@ function StudentDashboard(props) {
   return (
     <div>
       <SubjectAllocationWidget items={scheduleItems} />
-      <TodaysAgendaWidget items={scheduleItems} onStar={/* store action or handler */} />
+      <TodaysAgendaWidget items={scheduleItems} onStar={() => {}} />
       <ScheduleList items={scheduleItems} ... />
     </div>
   );
